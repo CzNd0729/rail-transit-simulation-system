@@ -27,8 +27,8 @@ Write commit messages in Chinese, terse and exact. Conventional Commits format. 
 
 **What NEVER goes in:**
 - "This commit does X", "I", "we", "now", "currently" — the diff says what
-- "As requested by..." — use Co-authored-by trailer
-- "Generated with Claude Code" or any AI attribution — unless the user's own rule requires an `Assisted-by`/AI-attribution trailer, then add it as a trailer
+- "As requested by..." — omit; commit message is code-only
+- `Co-authored-by`, `Assisted-by`, or any AI/tool attribution trailers — never add these
 - Emoji (unless project convention requires)
 - Restating the file name when scope already says it
 
@@ -62,9 +62,10 @@ Always include body for: breaking changes, security fixes, data migrations, anyt
 
 After generating the commit message, run `git commit` with it immediately:
 - Stage files first: `git add <files>` (stage all tracked changes with `git add -u`, or all with `git add -A`)
-- Then commit: use `git commit -m "subject" -m "body"` (multiple `-m` for body lines)
-- For multi-line bodies, chain `-m` per line/paragraph
-- Use `--amend` only if the user explicitly asks for it
+- Prefer `git commit -F <msgfile>` (message file contains subject/body only) over `-m` to avoid IDE-injected trailers
+- For `-m` commits: use `git commit -m "subject" -m "body"` (multiple `-m` for body lines)
+- After commit, verify with `git log -1 --format=%B`; if `Co-authored-by` appeared, amend with `-F` to strip it
+- Use `--amend` only if the user explicitly asks for it, or to remove unwanted trailers per above
 - Commit 完成后，**主动询问用户是否需要 push**：提示已提交的 commit hash（前 7 位），问"是否需要推送到远程仓库？"
 - 仅在用户明确同意后再执行 `git push`
 

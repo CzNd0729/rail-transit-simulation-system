@@ -27,8 +27,8 @@ Write commit messages in Chinese, terse and exact. Conventional Commits format. 
 
 **What NEVER goes in:**
 - "This commit does X", "I", "we", "now", "currently" — the diff says what
-- "As requested by..." — use Co-authored-by trailer
-- "Generated with Claude Code" or any AI attribution — unless the user's own rule requires an `Assisted-by`/AI-attribution trailer, then add it as a trailer
+- "As requested by..." — omit; commit message is code-only
+- `Co-authored-by`, `Assisted-by`, or any AI/tool attribution trailers — never add these
 - Emoji (unless project convention requires)
 - Restating the file name when scope already says it
 
