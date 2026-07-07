@@ -10,7 +10,7 @@
  * - UI-VW-05: 子系统状态指示器 — 供电/信号/轨道/车辆各系统状态灯
  */
 import LineProfile from '../components/views/overview/LineProfile';
-import TrainAnimation from '../components/views/overview/TrainAnimation';
+import LineDiagram from '../components/views/overview/LineDiagram';
 import SpeedPositionCurve from '../components/views/overview/SpeedPositionCurve';
 import StatusCards from '../components/views/overview/StatusCards';
 import SubsystemIndicators from '../components/views/overview/SubsystemIndicators';
@@ -24,11 +24,11 @@ export default function OverviewView() {
         <SubsystemIndicators />
       </div>
 
-      {/* 中部：线路纵断面 + 列车动画 */}
+      {/* 中部：线路纵断面 + 交互式线路图 */}
       <div style={styles.middleRow}>
         <div style={styles.lineSection}>
           <LineProfile />
-          <TrainAnimation />
+          <LineDiagram />
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 /**
- * 城市轨道交通运行仿真系统 — 前端类型定义
+ * NULL轨道交通仿真系统 — 前端类型定义
  * 基于《需求文档》和《详细设计文档》中定义的数据模型
  */
 
@@ -29,7 +29,7 @@ export type SpeedMultiplier = 1 | 5 | 10;
 export interface Station {
   id: string;
   name: string;
-  chainage: number;          // 站台中心公里标 (m)
+  chainage: number;          // 车站起点公里标 (m)
   dwell_time: number;        // 默认站停时间 (s)
   platform_half_length: number; // 站台半长 (m), 默认 15
   is_terminus: boolean;      // 是否终点站
@@ -291,6 +291,8 @@ export interface AppState {
   events: SimulationEvent[];
   /** 渲染帧率 */
   fps: number;
+  /** 线路布局数据（Mock 模式或从后端初始化） */
+  lineLayout: LineLayout | null;
 }
 
 // ==================== WebSocket 消息类型 ====================
@@ -316,4 +318,39 @@ export interface InitConfig {
     params: VehicleParams;
   };
   simulation: SimulationConfig;
+}
+
+// ==================== 线路布局（交互式线路图） ====================
+
+/** 站内股道布局 */
+export interface TrackLayout {
+  track_id: string;
+  name: string;           // "正线", "侧线1", "存车线"
+  type: 'main' | 'siding' | 'parking';
+  occupied: boolean;
+}
+
+/** 车站布局（扩展现有 Station） */
+export interface StationLayout extends Station {
+  length: number;         // 站长 (m)
+  tracks: TrackLayout[];
+  arrival_time?: number;  // 到达仿真时间 (s)
+  departure_time?: number;
+  dwell_time_actual?: number; // 实际停站时长 (s)
+  occupancy_rate: number; // 站台占用率 [0, 1]
+}
+
+/** 区间轨道段（两站之间） */
+export interface InterStationSegment {
+  start_chainage: number;
+  end_chainage: number;
+  circuits: TrackCircuit[];
+}
+
+/** 完整线路布局数据 */
+export interface LineLayout {
+  name: string;
+  stations: StationLayout[];
+  segments: InterStationSegment[];
+  total_length: number;
 }

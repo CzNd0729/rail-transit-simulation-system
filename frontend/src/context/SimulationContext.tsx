@@ -9,6 +9,7 @@ import type {
   ViewType,
   SimulationSnapshot,
   SimulationParams,
+  LineLayout,
 } from '../types/simulation';
 
 // ==================== 初始状态 ====================
@@ -52,6 +53,7 @@ const initialState: AppState = {
   },
   events: [],
   fps: 0,
+  lineLayout: null,
 };
 
 // ==================== Action 类型 ====================
