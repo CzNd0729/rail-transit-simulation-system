@@ -26,7 +26,7 @@ export default function TopBar() {
       {/* 左侧：系统标题 */}
       <div style={styles.left}>
         <span style={styles.logo}>🚇</span>
-        <span style={styles.title}>城市轨道交通运行仿真系统</span>
+        <span style={styles.title}>NULL轨道交通仿真系统</span>
       </div>
 
       {/* 中间：视图切换按钮组 */}

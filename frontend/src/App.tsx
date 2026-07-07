@@ -1,6 +1,6 @@
 /**
  * App.tsx — 应用主入口
- * 城市轨道交通运行仿真系统前端
+ * NULL轨道交通仿真系统前端
  *
  * 架构：
  * - SimulationProvider: 全局状态管理 (Context + useReducer)
