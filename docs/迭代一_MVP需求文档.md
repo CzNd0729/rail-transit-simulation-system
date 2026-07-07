@@ -208,7 +208,7 @@ TractionCurvePoint:
      结束：v <= 0 且 |x - station_center| < 1m → 停车
 ```
 
-**MVP 不实现：** ATP 安全包络计算、ATO PID/MPC 控制、ATS 运行图调整与晚点恢复、联锁逻辑、移动授权（MA）、紧急制动曲线。
+**MVP 不实现：** ATP 安全包络计算、ATO PID/MPC 控制、ATS 运行图调整与晚点恢复、手动驾驶模式、联锁逻辑、移动授权（MA）、紧急制动曲线。
 
 ### 2.6 数据记录与输出
 
