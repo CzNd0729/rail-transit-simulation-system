@@ -148,6 +148,15 @@ WebSocket 地址：
 | DELETE | /params/presets/{presetId} | 删除预设方案 | 三 |
 | GET | /events | 获取仿真事件/告警 | 二 |
 | GET | /health | 健康检查 | 一 |
+| POST | /control/manual/activate | 切换手动驾驶模式 | 三 |
+| POST | /control/manual/deactivate | 切回自动驾驶模式 | 三 |
+| PUT | /control/manual/throttle | 设置手动牵引级位 | 三 |
+| PUT | /control/manual/brake | 设置手动制动级位 | 三 |
+| POST | /control/manual/emergency-brake | 触发手动紧急制动 | 三 |
+| GET | /control/manual/status | 获取手动驾驶模式状态 | 三 |
+| GET | /drivercab/status | 获取司机台连接状态 | 三 |
+| POST | /drivercab/connect | 建立司机台连接（接口预留） | 三 |
+| POST | /drivercab/disconnect | 断开司机台连接（接口预留） | 三 |
 
 ---
 
@@ -1100,7 +1109,251 @@ GET /events?page=1&pageSize=50&severity=warning&eventType=emergency_brake
 
 ---
 
-## 8. WebSocket 实时通信协议
+## 8. 手动驾驶控制接口（迭代三）
+
+### 8.1 切换手动驾驶模式
+
+**请求**：
+```
+POST /control/manual/activate
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "manualMode": true,
+    "trainId": "TRAIN_01"
+  }
+}
+```
+
+**错误**：
+
+| code | message | 触发条件 |
+|------|---------|----------|
+| 40002 | 仿真未在运行中 | 当前仿真状态非 running |
+
+### 8.2 切回自动驾驶模式
+
+**请求**：
+```
+POST /control/manual/deactivate
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "manualMode": false,
+    "trainId": "TRAIN_01"
+  }
+}
+```
+
+### 8.3 设置手动牵引级位
+
+**请求**：
+```
+PUT /control/manual/throttle
+Content-Type: application/json
+```
+
+**请求体**：
+```json
+{
+  "trainId": "TRAIN_01",
+  "level": 0.8
+}
+```
+
+`level` 取值范围：`[0, 1]`，`0` 为零牵引，`1` 为最大牵引力。
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "trainId": "TRAIN_01",
+    "tractionLevel": 0.8
+  }
+}
+```
+
+### 8.4 设置手动制动级位
+
+**请求**：
+```
+PUT /control/manual/brake
+Content-Type: application/json
+```
+
+**请求体**：
+```json
+{
+  "trainId": "TRAIN_01",
+  "level": 0.5
+}
+```
+
+`level` 取值范围：`[0, 1]`，`0` 为零制动，`1` 为最大制动力。
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "trainId": "TRAIN_01",
+    "brakeLevel": 0.5
+  }
+}
+```
+
+### 8.5 触发手动紧急制动
+
+**请求**：
+```
+POST /control/manual/emergency-brake
+Content-Type: application/json
+```
+
+**请求体**：
+```json
+{
+  "trainId": "TRAIN_01"
+}
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "trainId": "TRAIN_01",
+    "emergencyBrake": true
+  }
+}
+```
+
+### 8.6 获取手动驾驶模式状态
+
+**请求**：
+```
+GET /control/manual/status?trainId=TRAIN_01
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "trainId": "TRAIN_01",
+    "manualMode": true,
+    "tractionLevel": 0.8,
+    "brakeLevel": 0.0,
+    "emergencyBrake": false
+  }
+}
+```
+
+---
+
+## 9. 实体司机台通信接口（迭代三，接口预留）
+
+### 9.1 设计说明
+
+> 本组接口为**预留接口层**，用于未来与外部实体司机台（硬件设备）进行通信。当前阶段（迭代三）：
+> - 接口定义已固定，后续扩展时不会破坏已有接口
+> - 具体通信协议（CAN / Modbus / OPC UA / 串口 / Ethernet）待后续确定
+> - 后端提供 Mock 实现，用于前端联调和测试
+> - 实体司机台对接将在迭代四协议确定后实施
+
+### 9.2 获取司机台连接状态
+
+**请求**：
+```
+GET /drivercab/status
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "connected": false,
+    "driverCabType": "mock",
+    "protocol": "pending",
+    "lastHeartbeat": null
+  }
+}
+```
+
+### 9.3 建立司机台连接
+
+**请求**：
+```
+POST /drivercab/connect
+Content-Type: application/json
+```
+
+**请求体**：
+```json
+{
+  "protocol": "mock",
+  "endpoint": "",
+  "config": {}
+}
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| protocol | string | 协议类型：`mock`（模拟）/ `can` / `modbus` / `opcua` / `serial` / `tcp`，当前仅 `mock` 可用 |
+| endpoint | string | 连接端点地址（具体协议确定后定义格式） |
+| config | object | 协议特定配置（待后续确定） |
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "connected": true,
+    "driverCabType": "mock",
+    "connectedAt": "2026-07-07T10:00:00Z"
+  }
+}
+```
+
+### 9.4 断开司机台连接
+
+**请求**：
+```
+POST /drivercab/disconnect
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "connected": false
+  }
+}
+```
+
+---
+
+## 10. WebSocket 实时通信协议
 
 ### 8.1 连接建立
 
@@ -1135,9 +1388,13 @@ wss://sim.example.com/ws
 | S→C | `simulation_status` | 仿真状态变更通知（开始/暂停/停止） | 状态变化时 |
 | S→C | `simulation_complete` | 仿真运行完成通知 | 运行时一次 |
 | S→C | `event_alert` | 事件/告警推送 | 事件发生时 |
+| S→C | `manual_mode_status` | 手动驾驶模式状态变更通知 | 模式切换时 |
+| S→C | `drivercab_status` | 司机台连接状态变更通知 | 连接状态变化时 |
 | S→C | `heartbeat` | 心跳 | 每 15s |
 | C→S | `sim_control` | 仿真控制指令 | 按需 |
 | C→S | `param_update` | 参数更新指令 | 按需 |
+| C→S | `manual_control` | 手动驾驶控制指令（牵引/制动级位） | 按需（手动模式下） |
+| C→S | `drivercab_data` | 实体司机台数据透传（预留） | 按需 |
 
 ### 8.4 消息格式详解
 
@@ -1348,6 +1605,50 @@ wss://sim.example.com/ws
 
 `action` 可选值：`start` / `pause` / `resume` / `stop` / `reset` / `step`
 
+#### 8.5.3 manual_control — 手动驾驶控制指令
+
+手动模式下，前端或实体司机台通过此消息发送牵引/制动操作指令：
+
+```json
+{
+  "type": "manual_control",
+  "data": {
+    "trainId": "TRAIN_01",
+    "tractionLevel": 0.0,
+    "brakeLevel": 0.6,
+    "emergencyBrake": false
+  }
+}
+```
+
+| 字段 | 类型 | 范围 | 说明 |
+|------|------|------|------|
+| trainId | string | — | 目标列车 ID |
+| tractionLevel | float | [0, 1] | 牵引级位，0=零牵引，1=最大牵引力 |
+| brakeLevel | float | [0, 1] | 制动级位，0=零制动，1=最大制动力 |
+| emergencyBrake | bool | — | 紧急制动触发标志 |
+
+> **注意：** 牵引级位和制动级位不应同时 > 0。若同时发送，制动优先。
+
+#### 8.5.4 drivercab_data — 实体司机台数据透传（预留）
+
+用于未来与实体司机台进行数据透传，当前阶段（迭代三）仅定义消息格式，不做具体处理：
+
+```json
+{
+  "type": "drivercab_data",
+  "data": {
+    "direction": "inbound",
+    "payload": {}
+  }
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| direction | string | `inbound`（司机台→系统）/ `outbound`（系统→司机台） |
+| payload | object | 透传数据，格式由具体通信协议确定 |
+
 #### 8.5.2 param_update — 参数更新
 
 ```json
@@ -1491,6 +1792,17 @@ wss://sim.example.com/ws
 | WebSocket 初始化 | ✅ | ✅ | ✅ | ✅ |
 | WebSocket 快照推送 | ✅ | ✅ | ✅ | ✅ |
 | WebSocket 事件推送 | | ✅ | ✅ | ✅ |
+| POST /control/manual/activate | | | ✅ | ✅ |
+| POST /control/manual/deactivate | | | ✅ | ✅ |
+| PUT /control/manual/throttle | | | ✅ | ✅ |
+| PUT /control/manual/brake | | | ✅ | ✅ |
+| POST /control/manual/emergency-brake | | | ✅ | ✅ |
+| GET /control/manual/status | | | ✅ | ✅ |
+| GET /drivercab/status | | | ✅ | ✅ |
+| POST /drivercab/connect | | | ✅ | ✅ |
+| POST /drivercab/disconnect | | | ✅ | ✅ |
+| WebSocket manual_control | | | ✅ | ✅ |
+| WebSocket drivercab_data | | | ✅ | ✅ |
 
 ## 附录 B：WebSocket 消息体大小估算
 
