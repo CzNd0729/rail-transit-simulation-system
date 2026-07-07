@@ -1,2 +1,9 @@
 *.pdf
 skills-lock.json
+.cursor/
+
+# Python
+__pycache__/
+*.py[cod]
+.coverage
+.pytest_cache/
