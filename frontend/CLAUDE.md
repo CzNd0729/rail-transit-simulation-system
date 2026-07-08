@@ -110,9 +110,8 @@ src/
 ## 后端联调
 
 ```bash
-# 后端启动（参考 backend/README.md）
 cd backend
-uv sync --extra dev          # 安装后端依赖（uv 替代 pip）
+uv sync 
 uv run uvicorn sim_engine.app:app --reload --host 0.0.0.0 --port 8000
 ```
 
