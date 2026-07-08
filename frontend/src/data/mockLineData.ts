@@ -2,7 +2,7 @@
  * Mock 线路数据 — 8 站线路
  * 用于前端开发阶段，后端就绪后替换为 API 数据
  */
-import type { LineLayout, StationLayout, InterStationSegment, TrackCircuit } from '../types/simulation';
+import type { LineLayout, StationLayout, InterStationSegment, TrackCircuit, Switch, Segment } from '../types/simulation';
 
 // ==================== 车站定义 ====================
 
@@ -136,3 +136,60 @@ export const mockLineData: LineLayout = {
   segments,
   total_length: 12200,
 };
+
+// ==================== Mock 道岔数据 ====================
+
+export const mockSwitches: Switch[] = [
+  {
+    id: 'SW01', chainage: 100, type: 'single',
+    normal_direction: 'ST01→ST02', reverse_direction: '侧线1',
+    lateral_speed_limit: 25, state: 'normal',
+  },
+  {
+    id: 'SW02', chainage: 1900, type: 'single',
+    normal_direction: 'ST02→ST03', reverse_direction: '侧线1',
+    lateral_speed_limit: 25, state: 'normal',
+  },
+  {
+    id: 'SW03', chainage: 3600, type: 'crossover',
+    normal_direction: '上行→下行', reverse_direction: '上行→上行',
+    lateral_speed_limit: 30, state: 'reverse',
+  },
+  {
+    id: 'SW04', chainage: 5300, type: 'single',
+    normal_direction: 'ST04→ST05', reverse_direction: '侧线2',
+    lateral_speed_limit: 25, state: 'normal',
+  },
+  {
+    id: 'SW05', chainage: 6900, type: 'single',
+    normal_direction: 'ST05→ST06', reverse_direction: '侧线1',
+    lateral_speed_limit: 25, state: 'transitioning',
+  },
+  {
+    id: 'SW06', chainage: 8600, type: 'single',
+    normal_direction: 'ST06→ST07', reverse_direction: '存车线',
+    lateral_speed_limit: 20, state: 'reverse',
+  },
+  {
+    id: 'SW07', chainage: 10300, type: 'crossover',
+    normal_direction: '上行→下行', reverse_direction: '上行→上行',
+    lateral_speed_limit: 30, state: 'normal',
+  },
+  {
+    id: 'SW08', chainage: 12100, type: 'single',
+    normal_direction: 'ST08→折返', reverse_direction: '存车线',
+    lateral_speed_limit: 20, state: 'normal',
+  },
+];
+
+// ==================== Mock 区段参数 ====================
+
+export const mockSegmentParams: Segment[] = [
+  { id: 'SEG1', start_chainage: 200,  end_chainage: 1650, gradient: 5,   curvature: 2000, speed_limit: 80, is_tunnel: false, sort_order: 1 },
+  { id: 'SEG2', start_chainage: 1950, end_chainage: 3440, gradient: 10,  curvature: 1500, speed_limit: 80, is_tunnel: true,  sort_order: 2 },
+  { id: 'SEG3', start_chainage: 3560, end_chainage: 5075, gradient: -5,  curvature: 3000, speed_limit: 80, is_tunnel: false, sort_order: 3 },
+  { id: 'SEG4', start_chainage: 5325, end_chainage: 6735, gradient: 0,   curvature: 0,    speed_limit: 60, is_tunnel: false, sort_order: 4 },
+  { id: 'SEG5', start_chainage: 6865, end_chainage: 8410, gradient: 30,  curvature: 800,  speed_limit: 80, is_tunnel: true,  sort_order: 5 },
+  { id: 'SEG6', start_chainage: 8590, end_chainage: 10140, gradient: -15, curvature: 1200, speed_limit: 80, is_tunnel: false, sort_order: 6 },
+  { id: 'SEG7', start_chainage: 10260, end_chainage: 11900, gradient: 5,  curvature: 2500, speed_limit: 80, is_tunnel: false, sort_order: 7 },
+];

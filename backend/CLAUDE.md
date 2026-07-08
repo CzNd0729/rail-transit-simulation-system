@@ -2,10 +2,6 @@
 
 This file provides guidance to Claude Code, Cursor, and CodeBuddy when working in the `backend/` directory.
 
-## 当前分支
-
-日常开发在 `backend` 分支进行，功能完成后合并回 `dev`。
-
 ## 技术栈
 
 - Python 3.10+
@@ -33,6 +29,22 @@ python -m pytest -v -k "keyword"
 # 覆盖率报告（HTML 格式）
 python -m pytest --cov=sim_engine --cov-report=html
 ```
+
+## 本地开发
+
+### 后端启动
+
+```bash
+cd backend
+uv sync                        # 安装依赖（含 dev 组）
+uv run uvicorn sim_engine.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+启动后访问：
+- API 文档：`http://127.0.0.1:8000/docs`
+- 健康检查：`http://127.0.0.1:8000/health`
+- WebSocket：`ws://127.0.0.1:8000/ws`
+
 
 ## 项目结构
 
@@ -84,8 +96,3 @@ backend/
 - 使用 `pytest` + `pytest-cov`
 - 覆盖率目标 ≥ 80%（NFR-03）
 - 测试应覆盖正常路径、边界条件（限速、停车等）和错误输入
-
-### 迭代一实现范围（已完成）
-- VHC-01~08/10：车辆动力学解算 MVP
-- VHC-09（能耗）仅预留字段，未实现累计逻辑
-- 未实现模块用 `# TODO: 迭代N实现` 占位
