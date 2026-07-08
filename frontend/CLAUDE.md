@@ -2,10 +2,6 @@
 
 This file provides guidance to Claude Code, Cursor, and CodeBuddy when working in the `frontend/` directory.
 
-## 当前分支
-
-日常开发在 `frontend` 分支进行，功能完成后合并回 `dev`。
-
 ## 技术栈
 
 - React 19 + TypeScript 6.0
