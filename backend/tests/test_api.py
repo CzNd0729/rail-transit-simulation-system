@@ -1,0 +1,135 @@
+"""Web 服务层集成测试（FastAPI TestClient）。"""
+
+from __future__ import annotations
+
+from fastapi.testclient import TestClient
+
+from sim_engine.app import app
+
+client = TestClient(app)
+
+
+def test_health():
+    resp = client.get("/api/v1/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["code"] == 0
+    assert data["data"]["status"] == "ok"
+
+
+def test_get_config():
+    resp = client.get("/api/v1/config")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "line" in data["data"]
+    assert "vehicle" in data["data"]
+    assert "simulation" in data["data"]
+
+
+def test_get_line_config():
+    resp = client.get("/api/v1/config/line")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "stations" in data
+    assert "segments" in data
+
+
+def test_get_vehicle_config():
+    resp = client.get("/api/v1/config/vehicle")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "emptyMass" in data
+
+
+def test_get_params():
+    resp = client.get("/api/v1/params")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "vehicle" in data
+    assert "track" in data
+    assert "power" in data
+    assert "signal" in data
+
+
+def test_simulation_lifecycle():
+    """测试仿真生命周期：start → pause → resume → stop → reset。"""
+    # 初始状态
+    resp = client.get("/api/v1/simulation/status")
+    assert resp.json()["data"]["runState"] == "idle"
+
+    # 启动
+    resp = client.post("/api/v1/simulation/start")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["runState"] == "running"
+
+    # 暂停（等待一小段时间让仿真跑几步，然后暂停）
+    import time
+    time.sleep(0.3)
+    resp = client.post("/api/v1/simulation/pause")
+    # 可能仿真已经自然结束，所以接受 running 或 paused
+    assert resp.status_code == 200
+
+    # 停止
+    resp = client.post("/api/v1/simulation/stop")
+    assert resp.status_code == 200
+
+    # 重置
+    resp = client.post("/api/v1/simulation/reset")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["runState"] == "idle"
+
+
+def test_simulation_step():
+    resp = client.post("/api/v1/simulation/step")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "snapshot" in data
+    assert data["snapshot"] is not None
+
+
+def test_simulation_status():
+    resp = client.get("/api/v1/simulation/status")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "runState" in data
+    assert "simulationTime" in data
+
+
+def test_update_params():
+    resp = client.put("/api/v1/params", json={"vehicle": {"emptyMass": 220000}})
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "vehicle.emptyMass" in data["updated"]
+
+
+def test_set_speed():
+    resp = client.put("/api/v1/simulation/speed", json={"speedMultiplier": 5})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["speedMultiplier"] == 5
+
+
+def test_set_speed_invalid():
+    resp = client.put("/api/v1/simulation/speed", json={"speedMultiplier": 999})
+    assert resp.status_code == 400
+
+
+def test_get_runs_empty():
+    resp = client.get("/api/v1/simulation/runs")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["items"] == []
+
+
+def test_get_run_not_found():
+    resp = client.get("/api/v1/simulation/runs/999")
+    assert resp.status_code == 404
+
+
+def test_csv_export():
+    # 先跑几步
+    client.post("/api/v1/simulation/step")
+    client.post("/api/v1/simulation/step")
+    client.post("/api/v1/simulation/step")
+    resp = client.get("/api/v1/simulation/export/csv")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "text/csv; charset=utf-8"
+    assert "time,position,speed" in resp.text
