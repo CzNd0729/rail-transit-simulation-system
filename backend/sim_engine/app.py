@@ -93,11 +93,11 @@ def create_app() -> FastAPI:
                     if action == "start":
                         sim_manager.start()
                     elif action == "pause":
-                        sim_manager.pause()
+                        await sim_manager.pause()
                     elif action == "resume":
                         sim_manager.resume()
                     elif action == "stop":
-                        sim_manager.stop()
+                        await sim_manager.stop()
                     elif action == "reset":
                         sim_manager.reset()
                     elif action == "step":

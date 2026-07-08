@@ -44,10 +44,19 @@ class SimulationManager:
             "simulationTime": self.orchestrator.clock.elapsed,
         }
 
-    def pause(self) -> dict:
+    async def pause(self) -> dict:
         if self.orchestrator.run_state != RunState.RUNNING:
             return {"code": 40002, "message": "操作冲突", "detail": "仿真未在运行中"}
         self.orchestrator.pause()
+        # 广播权威状态，覆盖 _run_loop 可能已发出的陈旧 running 消息
+        await self.ws_manager.broadcast({
+            "type": "simulation_status",
+            "data": {
+                "runState": "paused",
+                "simulationTime": self.orchestrator.clock.elapsed,
+                "reason": "user_paused",
+            },
+        })
         return {
             "runState": self.orchestrator.run_state.value,
             "simulationTime": self.orchestrator.clock.elapsed,
@@ -63,9 +72,18 @@ class SimulationManager:
             "simulationTime": self.orchestrator.clock.elapsed,
         }
 
-    def stop(self) -> dict:
+    async def stop(self) -> dict:
         self.stop_loop()
         self.orchestrator.stop()
+        # 广播权威状态，覆盖 _run_loop 可能已发出的陈旧 running 消息
+        await self.ws_manager.broadcast({
+            "type": "simulation_status",
+            "data": {
+                "runState": "stopped",
+                "simulationTime": self.orchestrator.clock.elapsed,
+                "reason": "user_stopped",
+            },
+        })
         summary = self.orchestrator.recorder.summary()
         return {
             "runState": self.orchestrator.run_state.value,

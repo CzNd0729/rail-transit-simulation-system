@@ -29,7 +29,7 @@ async def start_simulation(body: dict | None = None) -> dict:
 
 @router.post("/simulation/pause")
 async def pause_simulation() -> dict:
-    result = _get_sim_manager().pause()
+    result = await _get_sim_manager().pause()
     if "code" in result:
         raise HTTPException(status_code=409, detail=result["detail"])
     return {"code": 0, "message": "success", "data": result}
@@ -45,7 +45,7 @@ async def resume_simulation() -> dict:
 
 @router.post("/simulation/stop")
 async def stop_simulation() -> dict:
-    result = _get_sim_manager().stop()
+    result = await _get_sim_manager().stop()
     return {"code": 0, "message": "success", "data": result}
 
 

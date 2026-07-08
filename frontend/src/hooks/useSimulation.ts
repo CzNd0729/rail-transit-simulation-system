@@ -1,6 +1,7 @@
 /**
  * 仿真控制 Hook
  * 封装仿真控制指令发送和参数更新逻辑
+ * 注意：不乐观更新 runState——按钮状态完全依赖服务端推送的 simulation_status
  */
 import { useCallback } from 'react';
 import { useSimulationDispatch } from '../context/SimulationContext';
@@ -37,22 +38,18 @@ export function useSimulation(send: (data: object) => void): UseSimulationReturn
   const startSimulation = useCallback(() => {
     dispatch({ type: 'CLEAR_CHART_HISTORY' });
     send({ type: 'sim_control', action: 'start' });
-    dispatch({ type: 'SET_RUN_STATE', payload: 'running' });
   }, [send, dispatch]);
 
   const pauseSimulation = useCallback(() => {
     send({ type: 'sim_control', action: 'pause' });
-    dispatch({ type: 'SET_RUN_STATE', payload: 'paused' });
-  }, [send, dispatch]);
+  }, [send]);
 
   const resumeSimulation = useCallback(() => {
     send({ type: 'sim_control', action: 'resume' });
-    dispatch({ type: 'SET_RUN_STATE', payload: 'running' });
-  }, [send, dispatch]);
+  }, [send]);
 
   const stopSimulation = useCallback(() => {
     send({ type: 'sim_control', action: 'stop' });
-    dispatch({ type: 'SET_RUN_STATE', payload: 'stopped' });
     dispatch({ type: 'CLEAR_CHART_HISTORY' });
   }, [send, dispatch]);
 

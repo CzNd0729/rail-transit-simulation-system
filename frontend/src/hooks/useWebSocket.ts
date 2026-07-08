@@ -12,12 +12,16 @@ export function useWebSocket(url: string = WS_BASE_URL) {
   const dispatch = useSimulationDispatch();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(false);
+  /** 代际计数器：每次新连接递增，用于区分旧 onclose 回调是否属于当前连接 */
+  const generationRef = useRef(0);
 
   const connect = useCallback(() => {
     dispatch({ type: 'WS_CONNECTING' });
 
     try {
       const ws = new WebSocket(url);
+      const myGen = ++generationRef.current;
 
       ws.onopen = () => {
         dispatch({ type: 'WS_CONNECTED' });
@@ -63,7 +67,9 @@ export function useWebSocket(url: string = WS_BASE_URL) {
 
       ws.onclose = () => {
         dispatch({ type: 'WS_DISCONNECTED' });
-        reconnectTimer.current = setTimeout(connect, WS_RECONNECT_INTERVAL);
+        if (mountedRef.current && generationRef.current === myGen) {
+          reconnectTimer.current = setTimeout(connect, WS_RECONNECT_INTERVAL);
+        }
       };
 
       ws.onerror = (err) => {
@@ -74,7 +80,9 @@ export function useWebSocket(url: string = WS_BASE_URL) {
       wsRef.current = ws;
     } catch (err) {
       console.error('[WebSocket] 创建连接失败:', err);
-      reconnectTimer.current = setTimeout(connect, WS_RECONNECT_INTERVAL);
+      if (mountedRef.current) {
+        reconnectTimer.current = setTimeout(connect, WS_RECONNECT_INTERVAL);
+      }
     }
   }, [url, dispatch]);
 
@@ -88,11 +96,15 @@ export function useWebSocket(url: string = WS_BASE_URL) {
 
   useEffect(() => {
     if (USE_MOCK) return;
+    mountedRef.current = true;
     connect();
     return () => {
+      mountedRef.current = false;
       wsRef.current?.close();
+      wsRef.current = null;
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current);
+        reconnectTimer.current = null;
       }
     };
   }, [connect]);
