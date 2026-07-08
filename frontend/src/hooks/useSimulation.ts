@@ -33,6 +33,7 @@ export function useSimulation(send: (data: object) => void): UseSimulationReturn
   const dispatch = useSimulationDispatch();
 
   const startSimulation = useCallback(() => {
+    dispatch({ type: 'CLEAR_CHART_HISTORY' });
     send({ type: 'sim_control', action: 'start' });
     dispatch({ type: 'SET_RUN_STATE', payload: 'running' });
   }, [send, dispatch]);
@@ -50,6 +51,7 @@ export function useSimulation(send: (data: object) => void): UseSimulationReturn
   const stopSimulation = useCallback(() => {
     send({ type: 'sim_control', action: 'stop' });
     dispatch({ type: 'SET_RUN_STATE', payload: 'stopped' });
+    dispatch({ type: 'CLEAR_CHART_HISTORY' });
   }, [send, dispatch]);
 
   const stepSimulation = useCallback(() => {

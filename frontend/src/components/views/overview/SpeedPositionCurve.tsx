@@ -7,10 +7,8 @@ import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
 
 export default function SpeedPositionCurve() {
-  const { trains } = useSimulationState();
-  const train = trains[0]; // 默认显示第一列车
+  const { chartHistory } = useSimulationState();
 
-  // TODO: 从数据记录器获取历史轨迹数据
   const option = {
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis' as const },
@@ -36,9 +34,7 @@ export default function SpeedPositionCurve() {
         name: '实际速度',
         type: 'line',
         smooth: true,
-        data: train
-          ? [[train.position, train.speed]]
-          : [],
+        data: chartHistory.speedPosition,
         lineStyle: { color: '#1890ff', width: 2 },
         itemStyle: { color: '#1890ff' },
         showSymbol: false,

@@ -12,6 +12,9 @@ export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8
 /** 速度倍率选项 */
 export const SPEED_MULTIPLIER_OPTIONS = [1, 5, 10] as const;
 
+/** 是否使用 Mock 回放模式（预录 JSON 数据） */
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
+
 /** 默认固定网压 (V) */
 export const DEFAULT_PANTOGRAPH_VOLTAGE = 1500;
 

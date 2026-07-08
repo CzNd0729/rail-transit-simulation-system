@@ -4,7 +4,7 @@
  * 功能：自动连接、断线重连、消息分发
  */
 import { useEffect, useRef, useCallback } from 'react';
-import { WS_BASE_URL, WS_RECONNECT_INTERVAL } from '../utils/constants';
+import { WS_BASE_URL, WS_RECONNECT_INTERVAL, USE_MOCK } from '../utils/constants';
 import { useSimulationDispatch } from '../context/SimulationContext';
 import type { ServerMessage } from '../types/simulation';
 
@@ -71,6 +71,7 @@ export function useWebSocket(url: string = WS_BASE_URL) {
   }, []);
 
   useEffect(() => {
+    if (USE_MOCK) return;
     connect();
     return () => {
       wsRef.current?.close();
