@@ -9,8 +9,11 @@ import type {
   ViewType,
   SimulationSnapshot,
   SimulationParams,
+  SimulationStats,
   SpeedMultiplier,
+  LineLayout,
 } from '../types/simulation';
+import type { ProfileSegment } from '../data/mvpLineLayout';
 import { DEFAULT_VEHICLE_PARAMS } from '../data/mockVehicleParams';
 import { EMPTY_CHART_HISTORY, appendChartHistory, clearChartHistory } from '../utils/chartHistory';
 
@@ -57,6 +60,7 @@ const initialState: AppState = {
   fps: 0,
   chartHistory: { ...EMPTY_CHART_HISTORY },
   lineLayout: null,
+  profileSegments: null,
 };
 
 // ==================== Action 类型 ====================
@@ -74,7 +78,9 @@ export type SimulationAction =
   | { type: 'CLEAR_CHART_HISTORY' }
   | { type: 'INIT_DEFAULT_PARAMS' }
   | { type: 'INIT_PARAMS'; payload: Partial<SimulationParams> }
-  | { type: 'SET_SPEED_MULTIPLIER'; payload: SpeedMultiplier };
+  | { type: 'SET_SPEED_MULTIPLIER'; payload: SpeedMultiplier }
+  | { type: 'SET_LINE_LAYOUT'; payload: { layout: LineLayout; profileSegments: ProfileSegment[] } }
+  | { type: 'SET_STATS'; payload: Partial<SimulationStats> };
 
 // ==================== Reducer ====================
 
@@ -127,7 +133,21 @@ function simulationReducer(state: AppState, action: SimulationAction): AppState 
       return { ...state, fps: action.payload };
 
     case 'CLEAR_CHART_HISTORY':
-      return { ...state, chartHistory: clearChartHistory() };
+      return {
+        ...state,
+        chartHistory: clearChartHistory(),
+        stats: { ...initialState.stats },
+      };
+
+    case 'SET_LINE_LAYOUT':
+      return {
+        ...state,
+        lineLayout: action.payload.layout,
+        profileSegments: action.payload.profileSegments,
+      };
+
+    case 'SET_STATS':
+      return { ...state, stats: { ...state.stats, ...action.payload } };
 
     case 'INIT_DEFAULT_PARAMS':
       return {

@@ -2,6 +2,7 @@ import type {
   ApiSimulationSnapshot,
   SimulationParams,
   SimulationSnapshot,
+  SimulationStats,
   TrainState,
 } from '../types/simulation';
 
@@ -140,4 +141,12 @@ export function parseApiParams(raw: Record<string, unknown>): Partial<Simulation
   }
 
   return result;
+}
+
+export function parseSimulationSummary(raw: Record<string, unknown>): Partial<SimulationStats> {
+  return {
+    trip_time: Number(raw.totalTime ?? raw.total_time ?? 0),
+    avg_speed: Number(raw.avgSpeed ?? raw.avg_speed ?? 0),
+    max_speed: Number(raw.maxSpeed ?? raw.max_speed ?? 0),
+  };
 }

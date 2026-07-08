@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { WS_BASE_URL, WS_RECONNECT_INTERVAL, USE_MOCK } from '../utils/constants';
 import { useSimulationDispatch } from '../context/SimulationContext';
-import { parseServerSnapshot } from '../utils/apiAdapter';
+import { parseServerSnapshot, parseSimulationSummary } from '../utils/apiAdapter';
 import type { ServerMessage } from '../types/simulation';
 
 /**
@@ -37,9 +37,17 @@ export function useWebSocket(url: string = WS_BASE_URL) {
             case 'simulation_status':
               dispatch({ type: 'SET_RUN_STATE', payload: message.data.runState });
               break;
-            case 'simulation_complete':
+            case 'simulation_complete': {
               dispatch({ type: 'SET_RUN_STATE', payload: 'stopped' });
+              const summary = (message.data as Record<string, unknown>)?.summary;
+              if (summary && typeof summary === 'object') {
+                dispatch({
+                  type: 'SET_STATS',
+                  payload: parseSimulationSummary(summary as Record<string, unknown>),
+                });
+              }
               break;
+            }
             case 'init_state':
               if (message.state?.runState) {
                 dispatch({ type: 'SET_RUN_STATE', payload: message.state.runState });

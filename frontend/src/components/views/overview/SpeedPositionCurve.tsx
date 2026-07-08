@@ -7,7 +7,12 @@ import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
 
 export default function SpeedPositionCurve() {
-  const { chartHistory } = useSimulationState();
+  const { chartHistory, lineLayout, profileSegments } = useSimulationState();
+  const maxPos = lineLayout?.total_length ?? 3200;
+  const speedLimitData = (profileSegments ?? []).flatMap((seg) => [
+    [seg.start_chainage, seg.speed_limit],
+    [seg.end_chainage, seg.speed_limit],
+  ] as [number, number][]);
 
   const option = {
     backgroundColor: 'transparent',
@@ -19,7 +24,7 @@ export default function SpeedPositionCurve() {
       nameTextStyle: { color: '#a0a0a0' },
       axisLabel: { color: '#a0a0a0' },
       axisLine: { lineStyle: { color: '#2a2a4a' } },
-      max: 3200,
+      max: maxPos,
     },
     yAxis: {
       type: 'value' as const,
@@ -42,7 +47,7 @@ export default function SpeedPositionCurve() {
       {
         name: '限速',
         type: 'line',
-        data: [[0, 80], [1500, 80], [3200, 80]],
+        data: speedLimitData.length > 0 ? speedLimitData : [[0, 80], [1500, 80], [3200, 80]],
         lineStyle: { color: '#ff4d4f', type: 'dashed' as const, width: 1 },
         itemStyle: { color: '#ff4d4f' },
         showSymbol: false,

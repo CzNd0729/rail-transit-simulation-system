@@ -38,15 +38,30 @@ export function useMockReplay() {
   const paramsRef = useRef(params);
   paramsRef.current = params;
   const replayerRef = useRef<MockReplayer | null>(null);
+  const runStatsRef = useRef({ sumSpeed: 0, count: 0, maxSpeed: 0, tripTime: 0 });
 
   useEffect(() => {
     dispatch({ type: 'WS_CONNECTED' });
 
     replayerRef.current = createMockReplayer(undefined, {
       onTick: (snapshot) => {
+        const speed = snapshot.trains[0]?.speed ?? 0;
+        runStatsRef.current.sumSpeed += speed;
+        runStatsRef.current.count += 1;
+        runStatsRef.current.maxSpeed = Math.max(runStatsRef.current.maxSpeed, speed);
+        runStatsRef.current.tripTime = snapshot.clock.elapsed;
         dispatch({ type: 'RUNTIME_UPDATE', payload: snapshot });
       },
       onComplete: () => {
+        const s = runStatsRef.current;
+        dispatch({
+          type: 'SET_STATS',
+          payload: {
+            trip_time: s.tripTime,
+            avg_speed: s.count > 0 ? s.sumSpeed / s.count : 0,
+            max_speed: s.maxSpeed,
+          },
+        });
         dispatch({ type: 'SET_RUN_STATE', payload: 'stopped' });
       },
     });
@@ -67,6 +82,7 @@ export function useMockReplay() {
       switch (action) {
         case 'start':
           dispatch({ type: 'CLEAR_CHART_HISTORY' });
+          runStatsRef.current = { sumSpeed: 0, count: 0, maxSpeed: 0, tripTime: 0 };
           replayer.loadScenario(buildScenarioFromParams(paramsRef.current));
           dispatch({ type: 'SET_RUN_STATE', payload: 'running' });
           replayer.start();

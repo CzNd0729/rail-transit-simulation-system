@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseApiParams, parseServerSnapshot, toApiParamUpdate } from './apiAdapter';
+import { parseApiParams, parseServerSnapshot, parseSimulationSummary, toApiParamUpdate } from './apiAdapter';
 
 describe('parseServerSnapshot', () => {
   it('converts camelCase train fields to snake_case', () => {
@@ -70,5 +70,19 @@ describe('parseApiParams', () => {
     expect(out.vehicle?.empty_mass).toBe(220000);
     expect(out.track?.speed_limit).toBe(80);
     expect(out.signal?.target_speed_ratio).toBe(0.8);
+  });
+});
+
+describe('parseSimulationSummary', () => {
+  it('maps complete summary to SimulationStats fields', () => {
+    const stats = parseSimulationSummary({
+      steps: 100,
+      totalTime: 120.5,
+      avgSpeed: 45.2,
+      maxSpeed: 64,
+    });
+    expect(stats.trip_time).toBe(120.5);
+    expect(stats.avg_speed).toBe(45.2);
+    expect(stats.max_speed).toBe(64);
   });
 });

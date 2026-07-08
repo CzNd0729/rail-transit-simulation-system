@@ -1,12 +1,18 @@
 /**
  * LineProfile — 线路纵断面图
  * 基于《需求文档》UI-VW-01
- * 显示全线车站位置、区间、坡度示意
  */
 import ReactECharts from 'echarts-for-react';
+import { useSimulationState } from '../../../context/SimulationContext';
+import { buildProfileSegments } from '../../../data/mvpLineLayout';
+import { toStepData } from '../../../utils/profileChart';
 
 export default function LineProfile() {
-  // TODO: 从后端获取线路配置后替换为实际数据
+  const { lineLayout, profileSegments, params } = useSimulationState();
+  const segments = profileSegments ?? buildProfileSegments(params.track.gradient);
+  const gradientData = toStepData(segments, 'gradient');
+  const stations = lineLayout?.stations ?? [];
+
   const option = {
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis' as const },
@@ -17,6 +23,7 @@ export default function LineProfile() {
       nameTextStyle: { color: '#a0a0a0' },
       axisLabel: { color: '#a0a0a0' },
       axisLine: { lineStyle: { color: '#2a2a4a' } },
+      max: lineLayout?.total_length ?? 3200,
     },
     yAxis: {
       type: 'value' as const,
@@ -29,19 +36,19 @@ export default function LineProfile() {
       {
         name: '坡度',
         type: 'line',
-        data: [
-          [0, 5], [500, 5], [1000, 10], [1500, 10],
-          [2000, 30], [2500, 30], [3200, 15],
-        ],
+        data: gradientData,
         areaStyle: { color: 'rgba(24, 144, 255, 0.15)' },
         lineStyle: { color: '#1890ff' },
         itemStyle: { color: '#1890ff' },
         markPoint: {
-          data: [
-            { name: 'A站', coord: [0, 5], symbol: 'pin', symbolSize: 30 },
-            { name: 'B站', coord: [1500, 10], symbol: 'pin', symbolSize: 30 },
-            { name: 'C站', coord: [3200, 15], symbol: 'pin', symbolSize: 30 },
-          ],
+          data: stations.map((s) => ({
+            name: s.name,
+            coord: [s.chainage, segments.find(
+              (seg) => s.chainage >= seg.start_chainage && s.chainage <= seg.end_chainage,
+            )?.gradient ?? 0],
+            symbol: 'pin',
+            symbolSize: 30,
+          })),
           label: { color: '#fff', fontSize: 10 },
         },
       },

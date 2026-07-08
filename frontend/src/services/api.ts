@@ -55,7 +55,7 @@ export async function updateConfig(config: Partial<SimulationConfig>): Promise<S
 
 /** 获取线路配置 */
 export async function getLineConfig() {
-  return request('/config/line');
+  return requestData<Record<string, unknown>>('/config/line');
 }
 
 /** 获取车辆配置 */

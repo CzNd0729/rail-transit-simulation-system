@@ -346,6 +346,8 @@ export interface AppState {
   chartHistory: ChartHistory;
   /** 线路布局数据（Mock 模式或从后端初始化） */
   lineLayout: LineLayout | null;
+  /** 线路剖面分段（坡度/限速，供纵断面图） */
+  profileSegments: import('../data/mvpLineLayout').ProfileSegment[] | null;
 }
 
 // ==================== API 原始类型（camelCase，适配前） ====================
