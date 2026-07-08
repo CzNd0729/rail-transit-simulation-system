@@ -15,17 +15,17 @@ This file provides guidance to Claude Code, Cursor, and CodeBuddy when working i
 ## 常用命令
 
 ```bash
-# 安装依赖
-pip install -r requirements.txt
+# 安装依赖（含开发依赖）
+uv sync --extra dev
 
 # 运行所有测试（含覆盖率报告）
-python -m pytest
+uv run pytest
 
 # 运行特定测试文件
-python -m pytest tests/test_vehicle.py
+uv run pytest tests/test_vehicle.py
 
 # 运行特定测试函数
-python -m pytest tests/test_vehicle.py::test_function_name -v
+uv run pytest tests/test_vehicle.py::test_function_name -v
 
 # 仅运行带有特定标记的测试
 python -m pytest -v -k "keyword"

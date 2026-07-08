@@ -1,0 +1,13 @@
+# 虚拟环境
+.venv/
+
+# 构建产物
+*.egg-info/
+__pycache__/
+*.pyc
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/

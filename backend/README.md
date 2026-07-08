@@ -7,8 +7,8 @@
 
 ```
 backend/
-├── requirements.txt
-├── pytest.ini
+├── pyproject.toml              # 项目配置 + 依赖管理（uv）
+├── uv.lock                     # 依赖锁定文件（uv）
 ├── sim_engine/
 │   ├── __init__.py
 │   ├── config/
@@ -82,6 +82,6 @@ state = result.state                              # 循环推进
 
 ```bash
 cd backend
-python -m pip install -r requirements.txt
-python -m pytest          # 运行测试并输出覆盖率
+uv sync --extra dev        # 安装所有依赖（含开发依赖）
+uv run pytest              # 运行测试并输出覆盖率
 ```

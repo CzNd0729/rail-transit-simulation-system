@@ -116,8 +116,8 @@ src/
 ```bash
 # 后端启动（参考 backend/README.md）
 cd backend
-pip install -r requirements.txt
-python -m uvicorn sim_engine.app:app --reload --host 0.0.0.0 --port 8000
+uv sync --extra dev          # 安装后端依赖（uv 替代 pip）
+uv run uvicorn sim_engine.app:app --reload --host 0.0.0.0 --port 8000
 ```
 
 - REST API 默认：`http://localhost:8000`
