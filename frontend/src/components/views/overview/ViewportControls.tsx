@@ -1,6 +1,7 @@
 /**
  * ViewportControls — 视口控制栏
  * 缩放滑块 + 跟随锁定按钮 + 全线总览按钮
+ * 半透明背景 + 毛玻璃效果
  */
 interface ViewportControlsProps {
   zoom: number;
@@ -19,17 +20,16 @@ export default function ViewportControls({
 }: ViewportControlsProps) {
   return (
     <div style={styles.container}>
-      {/* 缩放控制 */}
       <button
         style={styles.btn}
-        onClick={() => onZoomChange(Math.max(0.2, zoom - 0.5))}
+        onClick={() => onZoomChange(Math.max(1, zoom - 0.5))}
         title="缩小"
       >
         −
       </button>
       <input
         type="range"
-        min={0.2}
+        min={1}
         max={5}
         step={0.1}
         value={zoom}
@@ -47,10 +47,8 @@ export default function ViewportControls({
 
       <span style={styles.zoomLabel}>{zoom.toFixed(1)}×</span>
 
-      {/* 分隔线 */}
       <div style={styles.separator} />
 
-      {/* 跟随按钮 */}
       <button
         style={{
           ...styles.btn,
@@ -63,7 +61,6 @@ export default function ViewportControls({
         {followMode ? '📍' : '📌'}
       </button>
 
-      {/* 全线总览 */}
       <button
         style={styles.btn}
         onClick={onFitAll}
@@ -80,10 +77,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
-    padding: '4px 10px',
-    backgroundColor: 'rgba(30, 30, 50, 0.9)',
-    borderRadius: '6px',
-    border: '1px solid var(--border-color)',
     fontSize: '12px',
   },
   btn: {

@@ -1,54 +1,39 @@
 /**
  * useViewport — SVG 视口管理 Hook
- * 管理缩放、平移、跟随模式，输出 viewBox 字符串
+ * 管理缩放、水平平移、跟随模式，输出 viewBox 字符串
  *
- * 坐标系: 世界坐标 (m), X = 公里标, Y = 股道映射
+ * 坐标系: 世界坐标 (m), X = 公里标, Y = 固定
+ * 仅支持水平方向拖拽，Y 轴固定
  */
 import { useState, useCallback, useRef, useEffect, type RefObject } from 'react';
 
 interface ViewportState {
   zoom: number;
   panX: number;
-  panY: number;
   followMode: boolean;
 }
 
 interface UseViewportOptions {
-  /** 列车当前公里标 (m), undefined 表示无列车 */
   trainPosition?: number;
-  /** 线路总长 (m) */
   totalLength: number;
-  /** SVG 容器的 ref */
   containerRef: RefObject<SVGSVGElement | null>;
-  /** Y 轴可视范围 (世界坐标单位) */
   worldHeight?: number;
-  /** 最小缩放 */
-  minZoom?: number;
-  /** 最大缩放 */
   maxZoom?: number;
 }
 
 interface UseViewportReturn {
-  /** 当前 SVG viewBox 字符串 */
   viewBox: string;
-  /** 当前缩放倍率 */
   zoom: number;
-  /** 是否处于跟随模式 */
   followMode: boolean;
-  /** 设置缩放倍率 */
   setZoom: (z: number) => void;
-  /** 切换跟随模式 */
   toggleFollow: () => void;
-  /** 缩放到全线可见 */
   fitAll: () => void;
-  /** 滚轮事件处理 */
+  focusPosition: (worldX: number, targetZoom: number, duration?: number) => void;
   handleWheel: (e: React.WheelEvent) => void;
-  /** 鼠标按下 (开始拖拽) */
   handleMouseDown: (e: React.MouseEvent) => void;
-  /** 鼠标移动 (拖拽中) */
   handleMouseMove: (e: React.MouseEvent) => void;
-  /** 鼠标松开 (结束拖拽) */
   handleMouseUp: () => void;
+  isAnimating: boolean;
 }
 
 export function useViewport(options: UseViewportOptions): UseViewportReturn {
@@ -57,99 +42,123 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     totalLength,
     containerRef,
     worldHeight = 80,
-    minZoom = 0.2,
     maxZoom = 5.0,
   } = options;
+
+  const minZoom = 1.0;
 
   const [state, setState] = useState<ViewportState>({
     zoom: 1.0,
     panX: 0,
-    panY: 0,
     followMode: true,
   });
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  // 用 ref 追踪最新状态，供动画闭包读取
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const isDragging = useRef(false);
-  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const dragStart = useRef({ x: 0, panX: 0 });
   const animFrameRef = useRef<number>(0);
 
-  // 计算容器宽度 (px)
   const getContainerWidth = useCallback(() => {
     return containerRef.current?.clientWidth || 800;
   }, [containerRef]);
 
-  // 计算 viewBox 宽度 (世界坐标)
   const getViewWidth = useCallback((zoom: number) => {
     return totalLength / zoom;
   }, [totalLength]);
 
-  // 屏幕像素 → 世界坐标 X
   const screenToWorldX = useCallback((screenX: number, zoom: number, panX: number) => {
     const containerW = getContainerWidth();
     const viewW = totalLength / zoom;
     return panX + (screenX / containerW) * viewW;
   }, [getContainerWidth, totalLength]);
 
-  // 跟随模式: 更新 panX 使列车在视口 30% 处
-  useEffect(() => {
-    if (!state.followMode || trainPosition === undefined) return;
+  // 平滑动画: 从当前状态过渡到目标 (通过 ref 读取最新值)
+  const animateTo = useCallback((targetPanX: number, targetZoom: number, duration = 300) => {
+    cancelAnimationFrame(animFrameRef.current);
+    setIsAnimating(true);
 
-    const viewW = getViewWidth(state.zoom);
-    const targetPanX = trainPosition - viewW * 0.3;
-    const clampedPanX = Math.max(0, Math.min(targetPanX, totalLength - viewW));
+    // 从 ref 读取当前最新值作为起点
+    const startPanX = stateRef.current.panX;
+    const startZoom = stateRef.current.zoom;
+    const startTime = performance.now();
+
+    const animate = (now: number) => {
+      const t = Math.min((now - startTime) / duration, 1);
+      const eased = t * (2 - t);
+
+      const currentPanX = startPanX + (targetPanX - startPanX) * eased;
+      const currentZoom = startZoom + (targetZoom - startZoom) * eased;
+
+      setState(prev => ({ ...prev, panX: currentPanX, zoom: currentZoom }));
+
+      if (t < 1) {
+        animFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        setIsAnimating(false);
+      }
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+  }, []); // 无依赖: 始终通过 stateRef 读取
+
+  // 跟随模式
+  useEffect(() => {
+    if (!state.followMode || trainPosition === undefined || isAnimating) return;
+
+    const followZoom = Math.max(state.zoom, 2.0);
+    const viewW = getViewWidth(followZoom);
+    // 列车始终居中，不 clamp：端点处允许视口超出轨道边界
+    const targetPanX = trainPosition - viewW * 0.5;
 
     setState(prev => {
-      if (Math.abs(prev.panX - clampedPanX) < 0.5) return prev;
-      return { ...prev, panX: clampedPanX };
+      if (Math.abs(prev.panX - targetPanX) < 0.5 && Math.abs(prev.zoom - followZoom) < 0.01) return prev;
+      return { ...prev, panX: targetPanX, zoom: followZoom };
     });
-  }, [trainPosition, state.followMode, state.zoom, getViewWidth, totalLength]);
+  }, [trainPosition, state.followMode, state.zoom, getViewWidth, totalLength, isAnimating]);
 
-  // 计算 viewBox 字符串
+  // viewBox 字符串 (跟随模式下不 clamp，允许端点外空白)
   const viewW = getViewWidth(state.zoom);
-  const clampedPanX = Math.max(0, Math.min(state.panX, Math.max(0, totalLength - viewW)));
-  const viewBox = `${clampedPanX} ${state.panY} ${viewW} ${worldHeight}`;
+  const viewBox = `${state.panX} 0 ${viewW} ${worldHeight}`;
 
-  // 缩放
   const setZoom = useCallback((z: number) => {
     setState(prev => ({ ...prev, zoom: Math.max(minZoom, Math.min(maxZoom, z)) }));
   }, [minZoom, maxZoom]);
 
-  // 切换跟随
   const toggleFollow = useCallback(() => {
-    setState(prev => {
-      if (!prev.followMode && trainPosition !== undefined) {
-        // 重新锁定: 平滑动画到列车位置
-        const viewW = totalLength / prev.zoom;
-        const targetPanX = trainPosition - viewW * 0.3;
-        const clamped = Math.max(0, Math.min(targetPanX, totalLength - viewW));
+    const cur = stateRef.current;
+    if (!cur.followMode && trainPosition !== undefined) {
+      setState(prev => ({ ...prev, followMode: true }));
+      const viewW = totalLength / cur.zoom;
+      const targetPanX = trainPosition - viewW * 0.5;
+      const clamped = Math.max(0, Math.min(targetPanX, totalLength - viewW));
+      animateTo(clamped, cur.zoom, 300);
+    } else {
+      setState(prev => ({ ...prev, followMode: false }));
+    }
+  }, [trainPosition, totalLength, animateTo]);
 
-        const startPanX = prev.panX;
-        const startTime = performance.now();
-        const duration = 300;
-
-        const animate = (now: number) => {
-          const t = Math.min((now - startTime) / duration, 1);
-          const eased = t * (2 - t); // ease-out
-          const currentPanX = startPanX + (clamped - startPanX) * eased;
-          setState(s => ({ ...s, panX: currentPanX }));
-          if (t < 1) {
-            animFrameRef.current = requestAnimationFrame(animate);
-          }
-        };
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = requestAnimationFrame(animate);
-
-        return { ...prev, followMode: true };
-      }
-      return { ...prev, followMode: false };
-    });
-  }, [trainPosition, totalLength]);
-
-  // 全线总览
   const fitAll = useCallback(() => {
-    setState(prev => ({ ...prev, zoom: minZoom, panX: 0, panY: 0, followMode: false }));
+    cancelAnimationFrame(animFrameRef.current);
+    setIsAnimating(false);
+    setState({ zoom: minZoom, panX: 0, followMode: false });
   }, [minZoom]);
 
-  // 滚轮缩放: 以鼠标位置为锚点
+  // 平滑聚焦到指定位置
+  const focusPosition = useCallback((worldX: number, targetZoom: number, duration = 300) => {
+    const clampedZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
+    const viewW = totalLength / clampedZoom;
+    const targetPanX = worldX - viewW * 0.5;
+    const clampedPanX = Math.max(0, Math.min(targetPanX, totalLength - viewW));
+
+    setState(prev => ({ ...prev, followMode: false }));
+    animateTo(clampedPanX, clampedZoom, duration);
+  }, [minZoom, maxZoom, totalLength, animateTo]);
+
+  // 滚轮缩放
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     const rect = containerRef.current?.getBoundingClientRect();
@@ -167,12 +176,12 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     });
   }, [containerRef, screenToWorldX, minZoom, maxZoom, getContainerWidth, totalLength]);
 
-  // 鼠标拖拽
+  // 鼠标拖拽: 仅水平
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isDragging.current = true;
-    dragStart.current = { x: e.clientX, y: e.clientY, panX: state.panX, panY: state.panY };
+    dragStart.current = { x: e.clientX, panX: stateRef.current.panX };
     setState(prev => ({ ...prev, followMode: false }));
-  }, [state.panX, state.panY]);
+  }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragging.current) return;
@@ -180,14 +189,8 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     setState(prev => {
       const viewW = totalLength / prev.zoom;
       const dx = e.clientX - dragStart.current.x;
-      const dy = e.clientY - dragStart.current.y;
       const worldDx = -(dx / containerW) * viewW;
-      const worldDy = -(dy / containerW) * viewW;
-      return {
-        ...prev,
-        panX: dragStart.current.panX + worldDx,
-        panY: dragStart.current.panY + worldDy,
-      };
+      return { ...prev, panX: dragStart.current.panX + worldDx };
     });
   }, [getContainerWidth, totalLength]);
 
@@ -195,7 +198,6 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     isDragging.current = false;
   }, []);
 
-  // 清理动画帧
   useEffect(() => {
     return () => cancelAnimationFrame(animFrameRef.current);
   }, []);
@@ -207,9 +209,11 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     setZoom,
     toggleFollow,
     fitAll,
+    focusPosition,
     handleWheel,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
+    isAnimating,
   };
 }

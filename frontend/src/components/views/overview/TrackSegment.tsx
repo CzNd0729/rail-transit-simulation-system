@@ -1,49 +1,53 @@
 /**
  * TrackSegment — 区间轨道电路 SVG 渲染
- * 在两站之间绘制轨道电路色块，颜色表示占用/空闲状态
+ * 连续正线 + 叠加轨道电路占用色块
  */
 import type { InterStationSegment } from '../../../types/simulation';
 
 interface TrackSegmentProps {
   segment: InterStationSegment;
-  /** Y 坐标基准线 (世界坐标) */
+  /** 正线 Y 坐标 (世界坐标) */
   y: number;
   /** 色块高度 (世界坐标) */
-  height?: number;
+  blockHeight?: number;
 }
 
-const COLOR_OCCUPIED = 'rgba(255, 77, 79, 0.6)';
-const COLOR_FREE = 'rgba(82, 196, 26, 0.3)';
-const GAP_COLOR = '#2a2a4a';
+const MAIN_COLOR = '#e0e0e0';
+const MAIN_STROKE = 4;
+const COLOR_OCCUPIED = 'rgba(255, 77, 79, 0.5)';
+const COLOR_FREE = 'rgba(82, 196, 26, 0.2)';
 
-export default function TrackSegment({ segment, y, height = 6 }: TrackSegmentProps) {
+export default function TrackSegment({ segment, y, blockHeight = 8 }: TrackSegmentProps) {
   return (
     <g>
-      {segment.circuits.map((circuit) => {
-        const x = circuit.start_chainage;
-        const w = circuit.end_chainage - circuit.start_chainage;
-        return (
-          <rect
-            key={circuit.id}
-            x={x}
-            y={y - height / 2}
-            width={Math.max(0, w - 1)}
-            height={height}
-            fill={circuit.occupied ? COLOR_OCCUPIED : COLOR_FREE}
-            rx={1}
-          />
-        );
-      })}
-      {/* 区间基准线 (轨道中心线) */}
+      {/* 正线 — 与车站内正线贯通 */}
       <line
         x1={segment.start_chainage}
         y1={y}
         x2={segment.end_chainage}
         y2={y}
-        stroke={GAP_COLOR}
-        strokeWidth={1}
-        strokeDasharray="4 2"
+        stroke={MAIN_COLOR}
+        strokeWidth={MAIN_STROKE}
+        strokeLinecap="round"
       />
+
+      {/* 轨道电路占用色块 — 叠加在正线上方 */}
+      {segment.circuits.map((circuit) => {
+        const cx = circuit.start_chainage;
+        const cw = circuit.end_chainage - circuit.start_chainage;
+        return (
+          <rect
+            key={circuit.id}
+            x={cx}
+            y={y - blockHeight / 2}
+            width={Math.max(0, cw - 1)}
+            height={blockHeight}
+            fill={circuit.occupied ? COLOR_OCCUPIED : COLOR_FREE}
+            rx={1}
+            opacity={0.7}
+          />
+        );
+      })}
     </g>
   );
 }
