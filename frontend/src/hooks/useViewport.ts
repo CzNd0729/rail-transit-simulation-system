@@ -29,7 +29,7 @@ interface UseViewportReturn {
   toggleFollow: () => void;
   fitAll: () => void;
   focusPosition: (worldX: number, targetZoom: number, duration?: number) => void;
-  handleWheel: (e: React.WheelEvent) => void;
+  handleWheel: (e: WheelEvent) => void;
   handleMouseDown: (e: React.MouseEvent) => void;
   handleMouseMove: (e: React.MouseEvent) => void;
   handleMouseUp: () => void;
@@ -158,8 +158,8 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     animateTo(clampedPanX, clampedZoom, duration);
   }, [minZoom, maxZoom, totalLength, animateTo]);
 
-  // 滚轮缩放
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  // 滚轮缩放 — 通过原生事件绑定避免 passive 警告
+  const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -175,6 +175,14 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
       return { ...prev, zoom: newZoom, panX: newPanX, followMode: false };
     });
   }, [containerRef, screenToWorldX, minZoom, maxZoom, getContainerWidth, totalLength]);
+
+  // 原生事件绑定 — 绕过 React 默认 passive 限制
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [containerRef, handleWheel]);
 
   // 鼠标拖拽: 仅水平
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
