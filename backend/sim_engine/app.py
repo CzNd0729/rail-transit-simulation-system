@@ -8,6 +8,7 @@ import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from sim_engine.api import config, health, params, simulation
@@ -48,6 +49,15 @@ def create_app() -> FastAPI:
         title="sim-engine",
         version="0.1.0",
         description="城市轨道交通运行仿真系统 — 后端服务",
+    )
+
+    # CORS 配置 — 允许前端 dev server 跨域访问
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     # 全局异常处理器
