@@ -23,4 +23,4 @@ include = ["sim_engine*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = --cov=sim_engine --cov-report=term-missing
+addopts = "--cov=sim_engine --cov-report=term-missing"
