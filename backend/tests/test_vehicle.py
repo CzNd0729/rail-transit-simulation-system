@@ -281,3 +281,135 @@ def test_params_from_dict_flat_layout():
     p = params_from_dict(data)
     assert p.empty_mass == 100.0
     assert p.traction_curve == []
+
+
+# ── VHC-09: 能耗预留字段 ────────────────────────────────────────────
+
+def test_energy_fields_reserved():
+    """VHC-09：牵引能耗和再生制动电量为预留字段，迭代一中恒为 0。"""
+    veh = VehicleSystem(make_params())
+    state = veh.create_initial_state(passenger_load=0.5)
+    assert state.traction_energy == 0.0
+    assert state.regen_energy == 0.0
+    # 跑几步后仍为 0
+    cmd = ControlCommands(traction_level=1.0)
+    result = veh.step(state, cmd, flat_track(speed_limit=200), dt=0.1)
+    assert result.state.traction_energy == 0.0
+    assert result.state.regen_energy == 0.0
+
+
+# ── VHC-10: 受力分解字段检查 ────────────────────────────────────────
+
+def test_force_breakdown_all_fields():
+    """VHC-10：每步输出必须含全部受力分量。"""
+    veh = VehicleSystem(make_params())
+    state = veh.create_initial_state(0.6)
+    result = veh.step(state, ControlCommands(traction_level=1.0), flat_track(), dt=0.1)
+    f = result.forces
+    for attr in ("traction", "brake", "davis", "gradient", "curve",
+                 "tunnel", "resistance_total", "net"):
+        assert hasattr(f, attr)
+        assert isinstance(getattr(f, attr), float)
+
+
+def test_force_breakdown_net_consistency():
+    """合力 = 牵引力 - 制动力 - 总阻力。"""
+    veh = VehicleSystem(make_params())
+    state = veh.create_initial_state(0.6)
+    result = veh.step(state, ControlCommands(traction_level=0.5, brake_level=0.3),
+                      flat_track(gradient=10, is_tunnel=True), dt=0.1)
+    f = result.forces
+    expected_net = f.traction - f.brake - f.resistance_total
+    assert f.net == pytest.approx(expected_net)
+
+
+def test_force_breakdown_total_consistency():
+    """总阻力 = davis + gradient + curve + tunnel。"""
+    veh = VehicleSystem(make_params())
+    state = veh.create_initial_state(0.6)
+    state.speed = 50.0
+    result = veh.step(state, ControlCommands(), flat_track(gradient=5, is_tunnel=True, curvature=500), dt=0.1)
+    f = result.forces
+    expected_total = f.davis + f.gradient + f.curve + f.tunnel
+    assert f.resistance_total == pytest.approx(expected_total)
+
+
+# ── 弯道阻力边界 ────────────────────────────────────────────────────
+
+def test_curve_resistance_none_curvature():
+    """curvature=None 时弯道阻力为 0。"""
+    mass = 260000.0
+    assert R.curve_resistance(mass, None) == 0.0
+
+
+# ── 零牵引力控车 ────────────────────────────────────────────────────
+
+def test_zero_traction_no_forward_force():
+    """traction_level=0 时牵引力为 0。"""
+    veh = VehicleSystem(make_params())
+    state = veh.create_initial_state(0.0)
+    state.speed = 10.0
+    result = veh.step(state, ControlCommands(traction_level=0.0), flat_track(), dt=0.1)
+    assert result.forces.traction == 0.0
+
+
+# ── 模式判断覆盖 ────────────────────────────────────────────────────
+
+def test_mode_braking_with_nonzero_brake_level():
+    veh = VehicleSystem(make_params())
+    state = veh.create_initial_state(0.0)
+    state.speed = 30.0
+    result = veh.step(state, ControlCommands(brake_level=0.5), flat_track(), dt=0.1)
+    assert result.state.mode == "braking"
+
+
+def test_mode_traction_with_nonzero_traction():
+    veh = VehicleSystem(make_params())
+    state = veh.create_initial_state(0.0)
+    result = veh.step(state, ControlCommands(traction_level=0.3), flat_track(speed_limit=200), dt=0.1)
+    assert result.state.mode == "traction"
+
+
+def test_mode_coasting_with_zero_commands():
+    veh = VehicleSystem(make_params())
+    state = veh.create_initial_state(0.0)
+    state.speed = 40.0
+    result = veh.step(state, ControlCommands(), flat_track(), dt=0.1)
+    assert result.state.mode == "coasting"
+
+
+# ── 多重钳位顺序 ────────────────────────────────────────────────────
+
+def test_speed_clamp_does_not_produce_negative():
+    """限速和停车钳位不应产生负速度。"""
+    veh = VehicleSystem(make_params())
+    state = veh.create_initial_state(0.0)
+    state.speed = 5.0  # 初始正向速度
+    # 纯制动 + 下坡（负梯度 → 负坡度阻力 = 助力，但 net 仍可能为负）
+    cmd = ControlCommands(brake_level=1.0)
+    track = flat_track(gradient=-50, speed_limit=80)  # 大下坡
+    result = veh.step(state, cmd, track, dt=0.1)
+    assert result.state.speed >= 0.0
+    assert result.state.position >= state.position  # 不倒退
+
+
+# ── 极小步长 ────────────────────────────────────────────────────────
+
+def test_tiny_dt_still_valid():
+    veh = VehicleSystem(make_params())
+    state = veh.create_initial_state(0.0)
+    result = veh.step(state, ControlCommands(traction_level=1.0), flat_track(speed_limit=200), dt=0.001)
+    assert result.state.position >= 0.0
+    assert result.state.speed >= 0.0
+
+
+# ── 无牵引曲线时默认满载 ─────────────────────────────────────────────
+
+def test_traction_without_curve_uses_full():
+    p = make_params()
+    p.traction_curve = []
+    veh = VehicleSystem(p)
+    state = veh.create_initial_state(0.0)
+    result = veh.step(state, ControlCommands(traction_level=1.0), flat_track(speed_limit=200), dt=0.1)
+    assert result.forces.traction == p.max_traction_force
+

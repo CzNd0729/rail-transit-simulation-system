@@ -103,3 +103,82 @@ def test_full_run_reaches_near_terminal():
     summary = orch.run_until(max_steps=15000)
     assert summary["steps"] > 100
     assert orch.train_state.position > 2500
+
+
+# ── 停止/重置状态 ────────────────────────────────────────────────────
+
+def test_stop_transitions_to_stopped():
+    orch = Orchestrator.from_config_dir()
+    orch.start()
+    orch.step_once()
+    orch.stop()
+    assert orch.run_state == RunState.STOPPED
+
+
+def test_reset_clears_state():
+    orch = Orchestrator.from_config_dir()
+    orch.start()
+    for _ in range(10):
+        orch.step_once()
+    orch.reset()
+    assert orch.clock.elapsed == 0.0
+    assert len(orch.recorder.buffer) == 0
+    assert orch.train_state is not None
+    assert orch.train_state.position == 0.0
+    assert orch.train_state.speed == 0.0
+
+
+def test_stop_then_reset():
+    orch = Orchestrator.from_config_dir()
+    orch.start()
+    orch.step_once()
+    orch.stop()
+    assert orch.run_state == RunState.STOPPED
+    orch.reset()
+    assert orch.run_state == RunState.IDLE
+
+
+# ── 速度倍率 ────────────────────────────────────────────────────────
+
+def test_speed_multiplier_setting():
+    orch = Orchestrator.from_config_dir()
+    orch.clock.speed_multiplier = 10.0
+    assert orch.clock.speed_multiplier == 10.0
+
+
+# ── 空步进 ──────────────────────────────────────────────────────────
+
+def test_step_once_initializes_if_no_state():
+    orch = Orchestrator.from_config_dir()
+    orch.train_state = None
+    snap = orch.step_once()
+    # 应自动初始化
+    assert snap is not None
+    assert orch.train_state is not None
+    assert orch.clock.elapsed > 0
+
+
+# ── 终点自动停止 ────────────────────────────────────────────────────
+
+def test_run_until_stops_at_time_limit():
+    """超时自动停止。"""
+    orch = Orchestrator.from_config_dir()
+    orch.sim_params.total_time = 1.0  # 1 秒超时
+    orch.start()
+    summary = orch.run_until()
+    assert orch.run_state == RunState.STOPPED
+    assert orch.clock.elapsed >= 1.0
+
+
+# ── 多次重置复用 ────────────────────────────────────────────────────
+
+def test_multiple_runs_with_reset():
+    """重置后能重新运行。"""
+    orch = Orchestrator.from_config_dir()
+    for _ in range(3):
+        orch.reset()
+        orch.start()
+        for _ in range(20):
+            orch.step_once()
+        assert orch.train_state.position > 0
+        orch.stop()
