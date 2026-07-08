@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
-from sim_engine.api import health
+from sim_engine.api import config, health
 from sim_engine.services.simulation_manager import SimulationManager
 from sim_engine.ws.manager import WebSocketConnectionManager
 
@@ -65,6 +65,7 @@ def create_app() -> FastAPI:
 
     # 挂载路由
     app.include_router(health.router)
+    app.include_router(config.router)
 
     # WebSocket 端点
     @app.websocket("/ws")
