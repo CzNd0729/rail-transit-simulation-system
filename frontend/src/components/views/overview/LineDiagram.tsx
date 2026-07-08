@@ -86,7 +86,6 @@ export default function LineDiagram() {
         style={styles.svg}
         viewBox={viewport.viewBox}
         preserveAspectRatio="none"
-        onWheel={viewport.handleWheel}
         onMouseDown={viewport.handleMouseDown}
         onMouseMove={viewport.handleMouseMove}
         onMouseUp={viewport.handleMouseUp}
