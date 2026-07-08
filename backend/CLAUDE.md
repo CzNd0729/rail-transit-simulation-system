@@ -42,7 +42,7 @@ uv run uvicorn sim_engine.app:app --reload --host 0.0.0.0 --port 8000
 
 启动后访问：
 - API 文档：`http://127.0.0.1:8000/docs`
-- 健康检查：`http://127.0.0.1:8000/health`
+- 健康检查：`http://127.0.0.1:8000/api/v1/health`
 - WebSocket：`ws://127.0.0.1:8000/ws`
 
 
