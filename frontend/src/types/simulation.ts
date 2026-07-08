@@ -263,6 +263,57 @@ export interface SimulationStats {
   stop_count: number;           // 站停次数
 }
 
+// ==================== 图表历史缓冲 ====================
+
+/** 实时曲线历史数据（前端累积，供 ECharts 绘制） */
+export interface ChartHistory {
+  speedTime: [number, number][];       // [时间s, 速度km/h]
+  accelTime: [number, number][];       // [时间s, 加速度m/s²]
+  speedPosition: [number, number][];   // [位置m, 速度km/h]
+}
+
+// ==================== Mock 回放数据 ====================
+
+/** 预录回放单帧（紧凑格式，比完整 SimulationSnapshot 小） */
+export interface MockReplayFrame {
+  t: number;                // 仿真时间 (s)
+  position: number;         // 公里标 (m)
+  speed: number;            // 速度 (km/h)
+  acceleration: number;     // 加速度 (m/s²)
+  mode: TrainMode;
+  mass: number;
+  passenger_count: number;
+  pantograph_voltage: number;
+  power_demand: number;
+}
+
+/** 预录回放场景 */
+export interface MockReplayScenario {
+  meta: {
+    name: string;
+    description: string;
+    timeStep: number;       // 帧间隔 (s)，默认 1.0
+    totalDuration: number;  // 总时长 (s)
+  };
+  vehicleParams: VehicleParams;
+  frames: MockReplayFrame[];
+}
+
+/** Mock 轨迹生成器输入（车辆 + 线路 + 信号参数快照） */
+export interface MockSimInput {
+  vehicle: VehicleParams;
+  track: {
+    gradient: number;      // ‰，上坡为正；覆盖 B→C 段
+    curvature: number;     // m，MVP 弯道阻力简化为 0
+    speed_limit: number;   // km/h
+  };
+  signal: {
+    dwell_time: number;
+    target_speed_ratio: number;
+  };
+  passenger_load_ratio: number;   // 0~1，默认 0.6 (AW2)
+}
+
 // ==================== 全局应用状态 ====================
 
 /** 全局仿真应用状态 */
@@ -291,6 +342,8 @@ export interface AppState {
   events: SimulationEvent[];
   /** 渲染帧率 */
   fps: number;
+  /** 曲线历史缓冲 */
+  chartHistory: ChartHistory;
   /** 线路布局数据（Mock 模式或从后端初始化） */
   lineLayout: LineLayout | null;
 }

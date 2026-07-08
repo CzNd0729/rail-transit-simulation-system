@@ -7,8 +7,7 @@ import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
 
 export default function AccelTimeCurve() {
-  const { trains, clock } = useSimulationState();
-  const train = trains[0];
+  const { chartHistory, clock } = useSimulationState();
 
   const option = {
     backgroundColor: 'transparent',
@@ -17,7 +16,9 @@ export default function AccelTimeCurve() {
     xAxis: {
       type: 'value' as const,
       name: '时间 (s)',
-      max: clock.elapsed || 600,
+      max: chartHistory.accelTime.length > 0
+        ? Math.max(clock.elapsed + 10, chartHistory.accelTime[chartHistory.accelTime.length - 1][0] + 10)
+        : 600,
       nameTextStyle: { color: '#a0a0a0' },
       axisLabel: { color: '#a0a0a0' },
       axisLine: { lineStyle: { color: '#2a2a4a' } },
@@ -33,9 +34,8 @@ export default function AccelTimeCurve() {
       {
         name: '加速度',
         type: 'line',
-        smooth: true,
         showSymbol: false,
-        data: train ? [[clock.elapsed, train.acceleration]] : [],
+        data: chartHistory.accelTime,
         lineStyle: { color: '#52c41a', width: 2 },
         itemStyle: { color: '#52c41a' },
         areaStyle: { color: 'rgba(82, 196, 26, 0.08)' },

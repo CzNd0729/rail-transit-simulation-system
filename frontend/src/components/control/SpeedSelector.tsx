@@ -3,7 +3,7 @@
  * 基于《需求文档》UI-CTRL-02
  * 迭代一实现为按钮组，迭代二可改为滑块
  */
-import { useSimulationState } from '../../context/SimulationContext';
+import { useSimulationState, useSimulationDispatch } from '../../context/SimulationContext';
 import { SPEED_MULTIPLIER_OPTIONS } from '../../utils/constants';
 import type { SpeedMultiplier } from '../../types/simulation';
 
@@ -13,8 +13,11 @@ interface Props {
 
 export default function SpeedSelector({ send }: Props) {
   const { clock } = useSimulationState();
+  const dispatch = useSimulationDispatch();
 
   const handleSpeedChange = (multiplier: SpeedMultiplier) => {
+    dispatch({ type: 'SET_SPEED_MULTIPLIER', payload: multiplier });
+    send({ type: 'speed_multiplier', value: multiplier });
     send({ type: 'sim_control', action: 'set_speed', speed_multiplier: multiplier });
   };
 

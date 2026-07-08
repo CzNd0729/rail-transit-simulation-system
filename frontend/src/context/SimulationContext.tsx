@@ -9,8 +9,10 @@ import type {
   ViewType,
   SimulationSnapshot,
   SimulationParams,
-  LineLayout,
+  SpeedMultiplier,
 } from '../types/simulation';
+import { DEFAULT_VEHICLE_PARAMS } from '../data/mockVehicleParams';
+import { EMPTY_CHART_HISTORY, appendChartHistory, clearChartHistory } from '../utils/chartHistory';
 
 // ==================== 初始状态 ====================
 
@@ -37,10 +39,10 @@ const initialState: AppState = {
     switch_states: [],
   },
   params: {
-    vehicle: {},
-    track: {},
+    vehicle: { ...DEFAULT_VEHICLE_PARAMS },
+    track: { gradient: 30, curvature: 1200, speed_limit: 80 },
     power: {},
-    signal: {},
+    signal: { dwell_time: 30, target_speed_ratio: 0.8 },
   },
   stats: {
     total_distance: 0,
@@ -53,6 +55,7 @@ const initialState: AppState = {
   },
   events: [],
   fps: 0,
+  chartHistory: { ...EMPTY_CHART_HISTORY },
   lineLayout: null,
 };
 
@@ -67,7 +70,10 @@ export type SimulationAction =
   | { type: 'SET_RUN_STATE'; payload: RunState }
   | { type: 'UPDATE_PARAMS'; payload: Partial<SimulationParams> }
   | { type: 'RESET_STATE' }
-  | { type: 'SET_FPS'; payload: number };
+  | { type: 'SET_FPS'; payload: number }
+  | { type: 'CLEAR_CHART_HISTORY' }
+  | { type: 'INIT_DEFAULT_PARAMS' }
+  | { type: 'SET_SPEED_MULTIPLIER'; payload: SpeedMultiplier };
 
 // ==================== Reducer ====================
 
@@ -91,7 +97,8 @@ function simulationReducer(state: AppState, action: SimulationAction): AppState 
         power: snapshot.power,
         signaling: snapshot.signaling,
         track: snapshot.track,
-        events: [...state.events, ...snapshot.events].slice(-500), // 保留最近 500 条
+        events: [...state.events, ...snapshot.events].slice(-500),
+        chartHistory: appendChartHistory(state.chartHistory, snapshot),
       };
     }
 
@@ -115,6 +122,24 @@ function simulationReducer(state: AppState, action: SimulationAction): AppState 
 
     case 'SET_FPS':
       return { ...state, fps: action.payload };
+
+    case 'CLEAR_CHART_HISTORY':
+      return { ...state, chartHistory: clearChartHistory() };
+
+    case 'INIT_DEFAULT_PARAMS':
+      return {
+        ...state,
+        params: {
+          ...state.params,
+          vehicle: { ...DEFAULT_VEHICLE_PARAMS },
+        },
+      };
+
+    case 'SET_SPEED_MULTIPLIER':
+      return {
+        ...state,
+        clock: { ...state.clock, speed_multiplier: action.payload },
+      };
 
     default:
       return state;

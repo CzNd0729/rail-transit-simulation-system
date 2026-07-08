@@ -9,6 +9,8 @@
  */
 import { SimulationProvider, useSimulationState } from './context/SimulationContext';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useMockReplay } from './hooks/useMockReplay';
+import { USE_MOCK } from './utils/constants';
 import MainLayout from './layouts/MainLayout';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
@@ -27,7 +29,9 @@ import ExportPanel from './components/export/ExportPanel';
 /** 内部应用组件（需要使用 hooks） */
 function AppContent() {
   const { activeView } = useSimulationState();
-  const { send } = useWebSocket();
+  const ws = useWebSocket();
+  const mock = useMockReplay();
+  const { send } = USE_MOCK ? mock : ws;
 
   // 根据当前视图渲染对应页面
   const renderView = () => {
