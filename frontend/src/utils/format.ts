@@ -62,6 +62,7 @@ export function getModeLabel(mode: string): string {
     traction: '牵引',
     coasting: '惰行',
     braking: '制动',
+    stopped: '停稳',
   };
   return labels[mode] || mode;
 }
@@ -74,6 +75,7 @@ export function getModeColor(mode: string): string {
     traction: '#52c41a',   // 绿色
     coasting: '#faad14',   // 黄色
     braking: '#ff4d4f',    // 红色
+    stopped: '#8c8c8c',    // 灰色
   };
   return colors[mode] || '#999';
 }

@@ -15,7 +15,7 @@ export type ConnectionState = 'disconnected' | 'connecting' | 'connected';
 export type ViewType = 'overview' | 'power' | 'signal' | 'vehicle' | 'track';
 
 /** 列车工况 */
-export type TrainMode = 'traction' | 'coasting' | 'braking';
+export type TrainMode = 'traction' | 'coasting' | 'braking' | 'stopped';
 
 /** 车门状态 */
 export type DoorStatus = 'open' | 'closed' | 'opening' | 'closing';
@@ -348,12 +348,46 @@ export interface AppState {
   lineLayout: LineLayout | null;
 }
 
+// ==================== API 原始类型（camelCase，适配前） ====================
+
+/** 后端 WS 推送的 camelCase 列车状态 */
+export interface ApiTrainState {
+  id: string;
+  position: number;
+  speed: number;
+  acceleration: number;
+  mode: TrainMode;
+  mass: number;
+  passengerCount: number;
+  pantographVoltage: number;
+  powerDemand: number;
+  doorStatus: DoorStatus;
+  faultAlarm: FaultAlarm | null;
+}
+
+export interface ApiSimulationSnapshot {
+  clock: { elapsed: number; speedMultiplier: SpeedMultiplier };
+  trains: ApiTrainState[];
+  power: {
+    substations: unknown[];
+    voltageProfile: unknown[];
+    totalConsumption: number;
+    totalRegeneration: number;
+  };
+  signaling: { commands: unknown[]; emergencyBrakes: unknown[] };
+  track: { occupancy: unknown[]; switchStates: unknown[] };
+  events: SimulationEvent[];
+}
+
 // ==================== WebSocket 消息类型 ====================
 
 /** 服务端推送消息 */
 export type ServerMessage =
-  | { type: 'simulation_snapshot'; timestamp: number; data: SimulationSnapshot }
-  | { type: 'init_state'; config: InitConfig };
+  | { type: 'simulation_snapshot'; timestamp: number; data: ApiSimulationSnapshot }
+  | { type: 'init_state'; config: Record<string, unknown>; state?: { runState: RunState; simulationTime: number } }
+  | { type: 'simulation_status'; data: { runState: RunState; simulationTime: number; reason?: string } }
+  | { type: 'simulation_complete'; data: Record<string, unknown> }
+  | { type: 'heartbeat'; serverTime?: string };
 
 /** 客户端发送消息 */
 export type ClientMessage =

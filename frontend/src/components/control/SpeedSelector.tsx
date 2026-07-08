@@ -4,7 +4,8 @@
  * 迭代一实现为按钮组，迭代二可改为滑块
  */
 import { useSimulationState, useSimulationDispatch } from '../../context/SimulationContext';
-import { SPEED_MULTIPLIER_OPTIONS } from '../../utils/constants';
+import { setSimulationSpeed } from '../../services/api';
+import { SPEED_MULTIPLIER_OPTIONS, USE_MOCK } from '../../utils/constants';
 import type { SpeedMultiplier } from '../../types/simulation';
 
 interface Props {
@@ -15,10 +16,17 @@ export default function SpeedSelector({ send }: Props) {
   const { clock } = useSimulationState();
   const dispatch = useSimulationDispatch();
 
-  const handleSpeedChange = (multiplier: SpeedMultiplier) => {
+  const handleSpeedChange = async (multiplier: SpeedMultiplier) => {
     dispatch({ type: 'SET_SPEED_MULTIPLIER', payload: multiplier });
-    send({ type: 'speed_multiplier', value: multiplier });
-    send({ type: 'sim_control', action: 'set_speed', speed_multiplier: multiplier });
+    if (USE_MOCK) {
+      send({ type: 'speed_multiplier', value: multiplier });
+    } else {
+      try {
+        await setSimulationSpeed(multiplier);
+      } catch (e) {
+        console.error('[SpeedSelector] REST 倍率设置失败', e);
+      }
+    }
   };
 
   return (

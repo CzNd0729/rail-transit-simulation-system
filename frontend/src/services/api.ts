@@ -8,9 +8,16 @@ import type {
   VehicleParams,
   ParameterPreset,
   SimulationParams,
+  SpeedMultiplier,
 } from '../types/simulation';
 
 const BASE = `${API_BASE_URL}/api/v1`;
+
+interface ApiEnvelope<T> {
+  code: number;
+  message: string;
+  data: T;
+}
 
 /** 通用请求封装 */
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -23,6 +30,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(`API Error: ${res.status} ${res.statusText} at ${path}`);
   }
   return res.json();
+}
+
+/** 解包 { code, data } 响应 */
+async function requestData<T>(path: string, options?: RequestInit): Promise<T> {
+  const envelope = await request<ApiEnvelope<T>>(path, options);
+  return envelope.data;
 }
 
 // ==================== 配置管理 ====================
@@ -95,14 +108,22 @@ export async function exportCSV(): Promise<string> {
 
 /** 获取当前参数值 */
 export async function getParams(): Promise<SimulationParams> {
-  return request<SimulationParams>('/params');
+  return requestData<SimulationParams>('/params');
 }
 
 /** 更新参数值 */
 export async function updateParams(params: Partial<SimulationParams>): Promise<SimulationParams> {
-  return request<SimulationParams>('/params', {
+  return requestData<SimulationParams>('/params', {
     method: 'PUT',
     body: JSON.stringify(params),
+  });
+}
+
+/** 设置仿真速度倍率 */
+export async function setSimulationSpeed(multiplier: SpeedMultiplier): Promise<void> {
+  await requestData<{ speedMultiplier: SpeedMultiplier }>('/simulation/speed', {
+    method: 'PUT',
+    body: JSON.stringify({ speedMultiplier: multiplier }),
   });
 }
 

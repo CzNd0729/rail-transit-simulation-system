@@ -1,4 +1,4 @@
-import type { VehicleParams } from '../types/simulation';
+import type { TrainMode, VehicleParams } from '../types/simulation';
 
 const G = 9.81;
 const RHO = 1.2;
@@ -41,7 +41,7 @@ export function lookupTractionForce(speedKmh: number, vehicle: VehicleParams): n
 }
 
 export function computeAcceleration(args: {
-  mode: 'traction' | 'coasting' | 'braking';
+  mode: TrainMode;
   speedKmh: number;
   mass: number;
   vehicle: VehicleParams;
@@ -51,6 +51,10 @@ export function computeAcceleration(args: {
   const v = kmhToMs(args.speedKmh);
   const resist = computeDavisResistance(v, args.mass, args.vehicle)
     + computeGradeResistance(args.gradient, args.mass);
+
+  if (args.mode === 'stopped') {
+    return 0;
+  }
 
   // 已停车时不施加制动力，避免速度钳位在 0 仍输出负加速度
   if (args.speedKmh < 0.5 && args.mode === 'braking') {

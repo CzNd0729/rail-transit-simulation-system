@@ -73,6 +73,7 @@ export type SimulationAction =
   | { type: 'SET_FPS'; payload: number }
   | { type: 'CLEAR_CHART_HISTORY' }
   | { type: 'INIT_DEFAULT_PARAMS' }
+  | { type: 'INIT_PARAMS'; payload: Partial<SimulationParams> }
   | { type: 'SET_SPEED_MULTIPLIER'; payload: SpeedMultiplier };
 
 // ==================== Reducer ====================
@@ -112,8 +113,10 @@ function simulationReducer(state: AppState, action: SimulationAction): AppState 
       return {
         ...state,
         params: {
-          ...state.params,
-          ...action.payload,
+          vehicle: { ...state.params.vehicle, ...action.payload.vehicle },
+          track: { ...state.params.track, ...action.payload.track },
+          power: { ...state.params.power, ...action.payload.power },
+          signal: { ...state.params.signal, ...action.payload.signal },
         },
       };
 
@@ -132,6 +135,17 @@ function simulationReducer(state: AppState, action: SimulationAction): AppState 
         params: {
           ...state.params,
           vehicle: { ...DEFAULT_VEHICLE_PARAMS },
+        },
+      };
+
+    case 'INIT_PARAMS':
+      return {
+        ...state,
+        params: {
+          vehicle: { ...DEFAULT_VEHICLE_PARAMS, ...action.payload.vehicle },
+          track: { ...state.params.track, ...action.payload.track },
+          power: { ...state.params.power, ...action.payload.power },
+          signal: { ...state.params.signal, ...action.payload.signal },
         },
       };
 

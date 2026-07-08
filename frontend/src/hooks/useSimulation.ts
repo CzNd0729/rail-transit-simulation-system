@@ -4,6 +4,8 @@
  */
 import { useCallback } from 'react';
 import { useSimulationDispatch } from '../context/SimulationContext';
+import { toApiParamUpdate } from '../utils/apiAdapter';
+import { USE_MOCK } from '../utils/constants';
 import type { SimulationParams, ViewType } from '../types/simulation';
 
 interface UseSimulationReturn {
@@ -64,7 +66,11 @@ export function useSimulation(send: (data: object) => void): UseSimulationReturn
 
   const updateParams = useCallback((params: Partial<SimulationParams>) => {
     dispatch({ type: 'UPDATE_PARAMS', payload: params });
-    send({ type: 'param_update', params });
+    if (USE_MOCK) {
+      send({ type: 'param_update', params });
+    } else {
+      send({ type: 'param_update', params: toApiParamUpdate(params) });
+    }
   }, [dispatch, send]);
 
   return {

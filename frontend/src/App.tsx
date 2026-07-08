@@ -10,6 +10,7 @@
 import { SimulationProvider, useSimulationState } from './context/SimulationContext';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useMockReplay } from './hooks/useMockReplay';
+import { useBootstrap } from './hooks/useBootstrap';
 import { USE_MOCK } from './utils/constants';
 import MainLayout from './layouts/MainLayout';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -28,6 +29,7 @@ import ExportPanel from './components/export/ExportPanel';
 
 /** 内部应用组件（需要使用 hooks） */
 function AppContent() {
+  useBootstrap();
   const { activeView } = useSimulationState();
   const ws = useWebSocket();
   const mock = useMockReplay();

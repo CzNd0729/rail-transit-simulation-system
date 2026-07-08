@@ -1,11 +1,7 @@
-/**
- * WebSocket 连接管理 Hook
- * 基于《详细设计文档》5.3 WebSocket 连接管理设计
- * 功能：自动连接、断线重连、消息分发
- */
 import { useEffect, useRef, useCallback } from 'react';
 import { WS_BASE_URL, WS_RECONNECT_INTERVAL, USE_MOCK } from '../utils/constants';
 import { useSimulationDispatch } from '../context/SimulationContext';
+import { parseServerSnapshot } from '../utils/apiAdapter';
 import type { ServerMessage } from '../types/simulation';
 
 /**
@@ -29,15 +25,29 @@ export function useWebSocket(url: string = WS_BASE_URL) {
 
       ws.onmessage = (event) => {
         try {
-          const message: ServerMessage = JSON.parse(event.data);
+          const message = JSON.parse(event.data) as ServerMessage;
 
-          if (message.type === 'simulation_snapshot') {
-            dispatch({
-              type: 'RUNTIME_UPDATE',
-              payload: message.data,
-            });
+          switch (message.type) {
+            case 'simulation_snapshot':
+              dispatch({
+                type: 'RUNTIME_UPDATE',
+                payload: parseServerSnapshot(message.data),
+              });
+              break;
+            case 'simulation_status':
+              dispatch({ type: 'SET_RUN_STATE', payload: message.data.runState });
+              break;
+            case 'simulation_complete':
+              dispatch({ type: 'SET_RUN_STATE', payload: 'stopped' });
+              break;
+            case 'init_state':
+              if (message.state?.runState) {
+                dispatch({ type: 'SET_RUN_STATE', payload: message.state.runState });
+              }
+              break;
+            default:
+              break;
           }
-          // init_state 消息可在后续扩展处理
         } catch (err) {
           console.error('[WebSocket] 消息解析失败:', err);
         }
@@ -45,7 +55,6 @@ export function useWebSocket(url: string = WS_BASE_URL) {
 
       ws.onclose = () => {
         dispatch({ type: 'WS_DISCONNECTED' });
-        // 自动重连
         reconnectTimer.current = setTimeout(connect, WS_RECONNECT_INTERVAL);
       };
 
@@ -61,7 +70,6 @@ export function useWebSocket(url: string = WS_BASE_URL) {
     }
   }, [url, dispatch]);
 
-  /** 发送消息到服务端 */
   const send = useCallback((data: object) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(data));

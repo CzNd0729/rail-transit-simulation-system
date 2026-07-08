@@ -9,15 +9,18 @@ import { getModeLabel, getModeColor } from '../../../utils/format';
 export default function ModeIndicator() {
   const { trains } = useSimulationState();
   const train = trains[0];
+  const displayMode = train?.mode === 'coasting' && train.speed < 0.5
+    ? 'stopped'
+    : train?.mode;
 
-  const modes = ['traction', 'coasting', 'braking'] as const;
+  const modes = ['traction', 'coasting', 'braking', 'stopped'] as const;
 
   return (
     <div className="panel">
       <div className="panel-title">⚙️ 工况指示</div>
       <div style={styles.container}>
         {modes.map((mode) => {
-          const isActive = train?.mode === mode;
+          const isActive = displayMode === mode;
           return (
             <div
               key={mode}
