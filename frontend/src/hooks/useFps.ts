@@ -1,3 +1,7 @@
+/**
+ * useFPS — 实时帧率计算 Hook
+ * 通过 requestAnimationFrame 计算每秒帧数，更新到 context
+ */
 import { useEffect } from 'react';
 import { useSimulationDispatch } from '../context/SimulationContext';
 
@@ -6,15 +10,15 @@ export function useFps() {
 
   useEffect(() => {
     let frames = 0;
-    let last = performance.now();
-    let raf = 0;
+    let lastTime = performance.now();
+    let raf: number;
 
     const tick = (now: number) => {
       frames++;
-      if (now - last >= 1000) {
+      if (now - lastTime >= 1000) {
         dispatch({ type: 'SET_FPS', payload: frames });
         frames = 0;
-        last = now;
+        lastTime = now;
       }
       raf = requestAnimationFrame(tick);
     };
