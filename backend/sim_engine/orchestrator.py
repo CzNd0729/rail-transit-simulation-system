@@ -113,6 +113,7 @@ class Orchestrator:
                 position=result.state.position,
                 speed=result.state.speed,
                 acceleration=result.state.acceleration,
+                jerk=result.state.jerk,
                 mode=result.state.mode,
                 traction_force=result.forces.traction,
                 brake_force=result.forces.brake,

@@ -134,6 +134,9 @@ class TrainState:
     acceleration: float = 0.0
     """当前加速度 (m/s^2)。"""
 
+    jerk: float = 0.0
+    """当前加加速度 / 冲击率 (m/s^3)，jerk = Δa/Δt。"""
+
     mode: str = "coasting"
     """当前工况：``traction`` / ``coasting`` / ``braking``。"""
 

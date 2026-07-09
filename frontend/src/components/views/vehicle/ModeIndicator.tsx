@@ -46,6 +46,9 @@ export default function ModeIndicator() {
             <span style={styles.detail}>
               加速度: {train.acceleration.toFixed(2)} m/s²
             </span>
+            <span style={styles.detail}>
+              冲击率: {train.jerk.toFixed(2)} m/s³
+            </span>
           </div>
         )}
       </div>

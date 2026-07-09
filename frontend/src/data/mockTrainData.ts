@@ -47,6 +47,7 @@ export function useMockTrain(): TrainState {
     position: s.pos,
     speed: s.stop ? 0 : 60,
     acceleration: 0,
+    jerk: 0,
     mode: s.stop ? 'braking' : 'traction',
     mass: 30000,
     passenger_count: 200,

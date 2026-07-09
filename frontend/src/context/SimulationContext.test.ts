@@ -15,6 +15,7 @@ describe('simulationReducer lifecycle', () => {
       chartHistory: {
         speedTime: [[1, 50], [2, 60]] as [number, number][],
         accelTime: [[1, 0.5]] as [number, number][],
+        jerkTime: [] as [number, number][],
         speedPosition: [[100, 50]] as [number, number][],
       },
     };
@@ -36,6 +37,7 @@ describe('simulationReducer lifecycle', () => {
       chartHistory: {
         speedTime: [[1, 50]] as [number, number][],
         accelTime: [[1, 0.5]] as [number, number][],
+        jerkTime: [] as [number, number][],
         speedPosition: [[100, 50]] as [number, number][],
       },
     };

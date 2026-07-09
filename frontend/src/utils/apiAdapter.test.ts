@@ -27,6 +27,24 @@ describe('parseServerSnapshot', () => {
     expect(snap.clock.speed_multiplier).toBe(5);
     expect(snap.trains[0].passenger_count).toBe(900);
     expect(snap.trains[0].pantograph_voltage).toBe(1500);
+    expect(snap.trains[0].jerk).toBe(0);
+  });
+
+  it('maps jerk from backend snapshot', () => {
+    const raw = {
+      clock: { elapsed: 1, speedMultiplier: 1 as const },
+      trains: [{
+        id: 'T1', position: 10, speed: 5, acceleration: 0.5, jerk: 0.12,
+        mode: 'traction' as const, mass: 200000, passengerCount: 0,
+        pantographVoltage: 1500, powerDemand: 0, doorStatus: 'closed' as const,
+        faultAlarm: null,
+      }],
+      power: { substations: [], voltageProfile: [], totalConsumption: 0, totalRegeneration: 0 },
+      signaling: { controlCommands: [], emergencyBrakes: [] },
+      track: { occupancy: [], switchStates: [] },
+      events: [],
+    };
+    expect(parseServerSnapshot(raw).trains[0].jerk).toBe(0.12);
   });
 
   it('preserves stopped mode from backend', () => {

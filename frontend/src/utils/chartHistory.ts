@@ -3,6 +3,7 @@ import type { ChartHistory, SimulationSnapshot } from '../types/simulation';
 export const EMPTY_CHART_HISTORY: ChartHistory = {
   speedTime: [],
   accelTime: [],
+  jerkTime: [],
   speedPosition: [],
 };
 
@@ -19,6 +20,7 @@ export function appendChartHistory(
   const next: ChartHistory = {
     speedTime: [...history.speedTime, [t, train.speed]],
     accelTime: [...history.accelTime, [t, train.acceleration]],
+    jerkTime: [...history.jerkTime, [t, train.jerk]],
     speedPosition: [...history.speedPosition, [train.position, train.speed]],
   };
 
@@ -26,6 +28,7 @@ export function appendChartHistory(
     return {
       speedTime: next.speedTime.slice(-MAX_POINTS),
       accelTime: next.accelTime.slice(-MAX_POINTS),
+      jerkTime: next.jerkTime.slice(-MAX_POINTS),
       speedPosition: next.speedPosition.slice(-MAX_POINTS),
     };
   }

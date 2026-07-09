@@ -29,6 +29,7 @@ def test_step_record_defaults():
         position=100.0,
         speed=50.0,
         acceleration=0.5,
+        jerk=0.0,
         mode="traction",
         traction_force=10000.0,
         brake_force=0.0,
@@ -53,15 +54,15 @@ def test_recorder_empty_buffer():
 
 def test_record_appends():
     r = DataRecorder()
-    r.record(StepRecord(0.1, 0.0, 0.0, 0.0, "coasting", 0.0, 0.0, 0.0))
-    r.record(StepRecord(0.2, 5.0, 10.0, 1.0, "traction", 50000.0, 0.0, 2000.0))
+    r.record(StepRecord(0.1, 0.0, 0.0, 0.0, 0.0, "coasting", 0.0, 0.0, 0.0))
+    r.record(StepRecord(0.2, 5.0, 10.0, 1.0, 0.0, "traction", 50000.0, 0.0, 2000.0))
     assert len(r.buffer) == 2
     assert r.buffer[1].speed == 10.0
 
 
 def test_clear_empties_buffer():
     r = DataRecorder()
-    r.record(StepRecord(0.1, 0.0, 0.0, 0.0, "coasting", 0.0, 0.0, 0.0))
+    r.record(StepRecord(0.1, 0.0, 0.0, 0.0, 0.0, "coasting", 0.0, 0.0, 0.0))
     assert len(r.buffer) == 1
     r.clear()
     assert len(r.buffer) == 0
@@ -77,7 +78,7 @@ def test_summary_empty():
 
 def test_summary_single_record():
     r = DataRecorder()
-    r.record(StepRecord(0.1, 2.0, 30.0, 0.5, "traction", 40000.0, 0.0, 5000.0))
+    r.record(StepRecord(0.1, 2.0, 30.0, 0.5, 0.0, "traction", 40000.0, 0.0, 5000.0))
     s = r.summary()
     assert s["steps"] == 1
     assert s["total_time"] == 0.1
@@ -93,6 +94,7 @@ def test_summary_multiple_records():
             position=i * 5.0,
             speed=10.0 + i * 10.0,  # 10, 20, 30, 40, 50
             acceleration=1.0,
+            jerk=0.0,
             mode="traction",
             traction_force=40000.0,
             brake_force=0.0,
@@ -109,7 +111,7 @@ def test_summary_multiple_records():
 
 def test_export_csv_header():
     r = DataRecorder()
-    r.record(StepRecord(0.1, 2.0, 30.0, 0.5, "traction", 40000.0, 0.0, 5000.0))
+    r.record(StepRecord(0.1, 2.0, 30.0, 0.5, 0.0, "traction", 40000.0, 0.0, 5000.0))
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".csv", delete=False, encoding="utf-8", newline=""
     ) as fp:
@@ -125,8 +127,8 @@ def test_export_csv_header():
 
 def test_export_csv_rows():
     r = DataRecorder()
-    r.record(StepRecord(0.1, 2.0, 30.0, 0.5, "traction", 40000.0, 0.0, 5000.0))
-    r.record(StepRecord(0.2, 5.0, 35.0, 0.3, "traction", 38000.0, 0.0, 4800.0))
+    r.record(StepRecord(0.1, 2.0, 30.0, 0.5, 0.0, "traction", 40000.0, 0.0, 5000.0))
+    r.record(StepRecord(0.2, 5.0, 35.0, 0.3, 0.0, "traction", 38000.0, 0.0, 4800.0))
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".csv", delete=False, encoding="utf-8", newline=""
     ) as fp:
@@ -199,6 +201,7 @@ def test_snapshot_train_fields():
     assert train["position"] == 200.0
     assert train["speed"] == 60.0
     assert train["acceleration"] == 0.3
+    assert train["jerk"] == 0.0
     assert train["mode"] == "coasting"
     assert train["mass"] == 250000.0
     assert train["pantographVoltage"] == 1500.0

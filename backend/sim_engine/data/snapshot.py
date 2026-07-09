@@ -34,6 +34,7 @@ def build_simulation_snapshot(
                     "position": state.position,
                     "speed": state.speed,
                     "acceleration": state.acceleration,
+                    "jerk": state.jerk,
                     "mode": display_mode,
                     "mass": state.mass,
                     "passengerCount": int(state.passenger_load * 1500),

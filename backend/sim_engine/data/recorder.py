@@ -13,6 +13,7 @@ class StepRecord:
     position: float
     speed: float
     acceleration: float
+    jerk: float
     mode: str
     traction_force: float
     brake_force: float
@@ -43,6 +44,7 @@ class DataRecorder:
                     "speed",
                     "mode",
                     "acceleration",
+                    "jerk",
                     "traction_force",
                     "brake_force",
                     "total_resistance",
@@ -56,6 +58,7 @@ class DataRecorder:
                         r.speed,
                         r.mode,
                         r.acceleration,
+                        r.jerk,
                         r.traction_force,
                         r.brake_force,
                         r.total_resistance,

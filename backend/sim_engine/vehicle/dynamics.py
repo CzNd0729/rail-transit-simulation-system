@@ -97,6 +97,7 @@ class VehicleSystem:
         net = f_traction - f_brake - resistance_total
 
         # --- 显式欧拉积分 ---
+        prev_accel = state.acceleration
         accel = net / mass
         new_v_ms = v_ms + accel * dt
 
@@ -114,10 +115,13 @@ class VehicleSystem:
 
         new_position = state.position + new_v_ms * dt
 
+        jerk = (accel - prev_accel) / dt if dt > 0 else 0.0
+
         new_state = TrainState(
             position=new_position,
             speed=new_v_ms * MS_TO_KMH,
             acceleration=accel,
+            jerk=jerk,
             mode=self._determine_mode(cmd),
             mass=mass,
             passenger_load=state.passenger_load,

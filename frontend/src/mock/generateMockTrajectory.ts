@@ -17,23 +17,28 @@ function appendDwellFrames(
   dwellTime: number,
   mass: number,
   passengerCount: number,
-): number {
+  prevAccel: number,
+): { t: number; prevAccel: number } {
   const dwellSteps = Math.round(dwellTime / DT);
+  let accel = prevAccel;
   for (let d = 0; d < dwellSteps; d++) {
+    const jerk = DT > 0 ? (0 - accel) / DT : 0;
     frames.push({
       t: Math.round(t * 10) / 10,
       position: stationChainage,
       speed: 0,
       acceleration: 0,
+      jerk: Math.round(jerk * 100) / 100,
       mode: 'coasting',
       mass,
       passenger_count: passengerCount,
       pantograph_voltage: 1500,
       power_demand: 0,
     });
+    accel = 0;
     t += DT;
   }
-  return t;
+  return { t, prevAccel: 0 };
 }
 
 export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
@@ -45,6 +50,7 @@ export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
   let position = MOCK_STATIONS[0].chainage;
   let speedKmh = 0;
   let stationIdx = 0;
+  let prevAccel = 0;
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const nextStation = MOCK_STATIONS[stationIdx + 1];
@@ -83,17 +89,21 @@ export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
       acceleration = 0;
     }
 
+    const jerk = DT > 0 ? (acceleration - prevAccel) / DT : 0;
+
     frames.push({
       t: Math.round(t * 10) / 10,
       position: Math.round(position * 10) / 10,
       speed: Math.round(speedKmh * 10) / 10,
       acceleration: Math.round(acceleration * 100) / 100,
+      jerk: Math.round(jerk * 100) / 100,
       mode,
       mass,
       passenger_count: passengerCount,
       pantograph_voltage: 1500,
       power_demand: mode === 'traction' ? 3200 : 0,
     });
+    prevAccel = acceleration;
 
     const vMs = kmhToMs(speedKmh);
     const vNext = Math.max(0, vMs + acceleration * DT);
@@ -105,9 +115,11 @@ export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
       position = nextStation.chainage;
       speedKmh = 0;
 
-      t = appendDwellFrames(
-        frames, t, nextStation.chainage, input.signal.dwell_time, mass, passengerCount,
+      const dwell = appendDwellFrames(
+        frames, t, nextStation.chainage, input.signal.dwell_time, mass, passengerCount, prevAccel,
       );
+      t = dwell.t;
+      prevAccel = dwell.prevAccel;
 
       stationIdx++;
       if (stationIdx >= MOCK_STATIONS.length - 1) break;

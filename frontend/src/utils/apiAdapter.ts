@@ -32,6 +32,7 @@ function mapTrain(t: ApiSimulationSnapshot['trains'][0]): TrainState {
     position: t.position,
     speed: t.speed,
     acceleration: t.acceleration,
+    jerk: t.jerk ?? 0,
     mode: t.mode,
     mass: t.mass,
     passenger_count: t.passengerCount,

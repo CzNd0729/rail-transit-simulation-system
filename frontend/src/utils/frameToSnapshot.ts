@@ -11,6 +11,7 @@ export function frameToSnapshot(
       position: frame.position,
       speed: frame.speed,
       acceleration: frame.acceleration,
+      jerk: frame.jerk ?? 0,
       mode: frame.mode,
       mass: frame.mass,
       passenger_count: frame.passenger_count,

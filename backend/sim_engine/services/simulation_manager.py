@@ -345,12 +345,12 @@ class SimulationManager:
         buf = io.StringIO()
         writer = csv.writer(buf)
         writer.writerow(
-            ["time", "position", "speed", "mode", "acceleration",
+            ["time", "position", "speed", "mode", "acceleration", "jerk",
              "traction_force", "brake_force", "total_resistance"]
         )
         for r in self.orchestrator.recorder.buffer:
             writer.writerow(
-                [r.time, r.position, r.speed, r.mode, r.acceleration,
+                [r.time, r.position, r.speed, r.mode, r.acceleration, r.jerk,
                  r.traction_force, r.brake_force, r.total_resistance]
             )
         return buf.getvalue()

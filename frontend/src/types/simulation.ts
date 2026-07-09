@@ -108,6 +108,7 @@ export interface TrainState {
   position: number;           // 当前公里标 (m)
   speed: number;              // 当前速度 (km/h)
   acceleration: number;       // 当前加速度 (m/s²)
+  jerk: number;               // 加加速度 / 冲击率 (m/s³)
   mode: TrainMode;            // 工况: traction / coasting / braking
   mass: number;               // 当前总质量 (kg)
   passenger_count: number;    // 当前载客数
@@ -272,6 +273,7 @@ export interface SimulationStats {
 export interface ChartHistory {
   speedTime: [number, number][];       // [时间s, 速度km/h]
   accelTime: [number, number][];       // [时间s, 加速度m/s²]
+  jerkTime: [number, number][];        // [时间s, 冲击率m/s³]
   speedPosition: [number, number][];   // [位置m, 速度km/h]
 }
 
@@ -283,6 +285,7 @@ export interface MockReplayFrame {
   position: number;         // 公里标 (m)
   speed: number;            // 速度 (km/h)
   acceleration: number;     // 加速度 (m/s²)
+  jerk?: number;            // 冲击率 (m/s³)
   mode: TrainMode;
   mass: number;
   passenger_count: number;
@@ -369,6 +372,7 @@ export interface ApiTrainState {
   position: number;
   speed: number;
   acceleration: number;
+  jerk?: number;
   mode: TrainMode;
   mass: number;
   passengerCount: number;

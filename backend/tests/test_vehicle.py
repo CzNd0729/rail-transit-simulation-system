@@ -168,6 +168,26 @@ def test_step_newton_second_law_consistency():
     )
 
 
+def test_jerk_equals_delta_accel_over_dt():
+    """jerk = Δa/Δt，首步由静止启动时 jerk = a/dt。"""
+    veh = VehicleSystem(make_params())
+    state = veh.create_initial_state(passenger_load=0.0)
+    dt = 0.1
+    result = veh.step(
+        state, ControlCommands(traction_level=1.0), flat_track(speed_limit=200), dt=dt
+    )
+    assert result.state.jerk == pytest.approx(
+        result.state.acceleration / dt, rel=1e-6
+    )
+
+    result2 = veh.step(
+        result.state, ControlCommands(traction_level=1.0), flat_track(speed_limit=200), dt=dt
+    )
+    assert result2.state.jerk == pytest.approx(
+        (result2.state.acceleration - result.state.acceleration) / dt, rel=1e-6
+    )
+
+
 def test_heavier_train_accelerates_slower():
     veh_light = VehicleSystem(make_params())
     light = veh_light.step(

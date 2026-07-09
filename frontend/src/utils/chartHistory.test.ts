@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { EMPTY_CHART_HISTORY, appendChartHistory, clearChartHistory } from './chartHistory';
 import type { SimulationSnapshot } from '../types/simulation';
 
-const makeSnapshot = (t: number, speed: number, accel: number, pos: number): SimulationSnapshot => ({
+const makeSnapshot = (t: number, speed: number, accel: number, pos: number, jerk = 0): SimulationSnapshot => ({
   clock: { elapsed: t, speed_multiplier: 1 },
   trains: [{
-    id: 'TRAIN_01', position: pos, speed, acceleration: accel,
+    id: 'TRAIN_01', position: pos, speed, acceleration: accel, jerk,
     mode: 'traction', mass: 200000, passenger_count: 900,
     door_status: 'closed', pantograph_voltage: 1500, power_demand: 100,
     fault_alarm: null,
@@ -21,7 +21,13 @@ describe('appendChartHistory', () => {
     const result = appendChartHistory(EMPTY_CHART_HISTORY, makeSnapshot(1.0, 50, 0.8, 100));
     expect(result.speedTime).toEqual([[1.0, 50]]);
     expect(result.accelTime).toEqual([[1.0, 0.8]]);
+    expect(result.jerkTime).toEqual([[1.0, 0]]);
     expect(result.speedPosition).toEqual([[100, 50]]);
+  });
+
+  it('records jerk from train state', () => {
+    const result = appendChartHistory(EMPTY_CHART_HISTORY, makeSnapshot(2.0, 60, 0.5, 200, 0.12));
+    expect(result.jerkTime).toEqual([[2.0, 0.12]]);
   });
 
   it('accumulates multiple snapshots', () => {

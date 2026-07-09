@@ -11,6 +11,7 @@
  */
 import SpeedTimeCurve from '../components/views/vehicle/SpeedTimeCurve';
 import AccelTimeCurve from '../components/views/vehicle/AccelTimeCurve';
+import JerkTimeCurve from '../components/views/vehicle/JerkTimeCurve';
 import ModeIndicator from '../components/views/vehicle/ModeIndicator';
 
 export default function VehicleView() {
@@ -27,6 +28,10 @@ export default function VehicleView() {
         <div style={styles.chartHalf}>
           <AccelTimeCurve />
         </div>
+      </div>
+
+      <div style={styles.jerkRow}>
+        <JerkTimeCurve />
       </div>
       {/* UI-VHC-04/05: 迭代三实现，迭代一隐藏 */}
     </div>
@@ -51,5 +56,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   chartHalf: {
     flex: 1,
+  },
+  jerkRow: {
+    flex: '0 0 220px',
+    minHeight: '180px',
   },
 };
