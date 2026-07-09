@@ -1,8 +1,17 @@
-# 仿真全局参数（迭代一 MVP）
 simulation:
   time_step: 0.1              # 固定步长 (s)
   total_time: 6000               # 最大仿真时长 (s)
   speed_multiplier: 1           # 倍率（编排器实时等待用）
   target_speed_ratio: 0.8       # 三段式目标速度 = 限速 × 此比例
   station_stop_tolerance: 1.0   # 站台停车容差 (m)
-  coasting_min_speed: 30.0      #惰行最低限速
+  coasting_min_speed: 30.0      # 惰行最低限速
+  pid:
+    kp: 0.08
+    ki: 0.002
+    kd: 0.01
+    integral_max: 0.3
+    deadband_v: 0.3
+    deadband_d: 1.0
+    comfort_decel: 0.8
+    creep_gain: 0.25
+    brake_safety_factor: 1.05
