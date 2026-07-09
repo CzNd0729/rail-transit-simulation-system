@@ -161,6 +161,16 @@ def test_traction_when_below_target_speed():
     assert ctrl.signal_state.phase == Phase.TRACTION
 
 
+def test_traction_pid_partial_near_target():
+    """接近目标速度时 PID 应输出部分牵引（非满）。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
+    # v_cruise=64, 当前速度 60 → error=4, P=0.08*4=0.32 → traction=0.32
+    train = _make_train(position=10.0, speed=60.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    assert 0.15 < cmd.traction_level < 0.6
+    assert ctrl.signal_state.phase == Phase.TRACTION
+
+
 def test_traction_transition_to_coasting():
     """速度达到 target_speed 时切换到惰行。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
@@ -288,20 +298,42 @@ def test_coasting_to_braking_when_near_station():
     # 列车高速接近 ST02 (1000m)，制动距离应足够触发
     train = _make_train(position=900.0, speed=60.0)
     cmd = ctrl.compute_commands(train, dt=0.1)
-    # 计算制动距离：v_ms = 60/3.6 ≈ 16.67, max_decel = 350000/260000 ≈ 1.346
-    # brake_dist = (16.67^2)/(2*1.346)*1.1 ≈ 113.6m
-    # position + brake_dist = 900 + 113.6 = 1013.6 > 1000 → 应触发制动
+    # 计算制动距离：v_ms = 60/3.6 ≈ 16.67, comfort_decel=0.8
+    # brake_dist = (16.67²)/(2×0.8)×1.05 ≈ 182.3m
+    # position + brake_dist = 900 + 182.3 = 1082.3 > 1000 → 应触发制动
     assert cmd.brake_level == 1.0
     assert ctrl.signal_state.phase == Phase.BRAKING
 
 
 def test_braking_command():
-    """制动阶段输出满制动。"""
+    """制动阶段由 PID 输出制动力（超速时满制动，接近目标时逐渐减小）。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
     ctrl._state.phase = Phase.BRAKING
-    train = _make_train(position=990.0, speed=10.0)
+    # 距站台 40m，速度 50 km/h → 制动曲线目标 ≈ 28.8 km/h → 明显超速 → PID 饱和输出 1.0
+    train = _make_train(position=960.0, speed=50.0)
     cmd = ctrl.compute_commands(train, dt=0.1)
-    assert cmd.brake_level == 1.0
+    assert cmd.brake_level == pytest.approx(1.0, abs=0.01)
+    assert cmd.traction_level == 0.0
+
+
+def test_braking_pid_partial_near_target():
+    """接近制动曲线目标时 PID 输出部分制动力（非满）。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
+    ctrl._state.phase = Phase.BRAKING
+    # 距站台 50m，速度 33 km/h → 制动曲线目标 ≈ 32.2 km/h → 接近 → 小制动
+    train = _make_train(position=950.0, speed=33.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    assert 0.02 < cmd.brake_level < 0.3
+
+
+def test_braking_creep_mode():
+    """距站台 ≤ deadband_d(1m) 且速度 < 3 km/h → 蠕行模式（小制动）。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
+    ctrl._state.phase = Phase.BRAKING
+    train = _make_train(position=999.5, speed=1.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    # remaining = 0.5m, creep = min(0.5*0.25, 0.5) = 0.125, max(0.125, 0.02) = 0.125
+    assert 0.02 <= cmd.brake_level <= 0.3
 
 
 # ── SIG-02: 站停时间 ────────────────────────────────────────────────
@@ -373,13 +405,12 @@ def test_stuck_midway_restarts_traction():
 # ── SIG-03: 制动触发距离计算 ────────────────────────────────────────
 
 def test_brake_trigger_distance_formula():
-    """制动触发距离 = v²/(2a) × 1.1（10% 安全余量）。"""
+    """制动触发距离 = v²/(2·comfort_decel) × safety_factor。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
-    # 速度 72 km/h = 20 m/s, mass=260000, max_brake=350000
+    # 速度 72 km/h = 20 m/s, comfort_decel=0.8, safety=1.05
     train = _make_train(speed=72.0, mass=260000.0)
     v_ms = 72.0 / 3.6  # 20.0 m/s
-    max_decel = 350000.0 / 260000.0  # ≈ 1.346 m/s²
-    expected = (v_ms * v_ms) / (2 * max_decel) * 1.1
+    expected = (v_ms * v_ms) / (2 * 0.8) * 1.05  # = 400/1.6*1.05 = 262.5
     assert ctrl._brake_trigger_distance(train) == pytest.approx(expected)
 
 
@@ -390,12 +421,11 @@ def test_brake_trigger_distance_zero_speed():
 
 
 def test_brake_trigger_distance_zero_mass():
+    """新公式不再依赖 mass，mass=0 时应与正常质量一致。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
     train = _make_train(speed=50.0, mass=0.0)
-    # mass=0 时 fallback 到 empty_mass=200000
     v_ms = 50.0 / 3.6
-    max_decel = 350000.0 / 200000.0
-    expected = (v_ms * v_ms) / (2 * max_decel) * 1.1
+    expected = (v_ms * v_ms) / (2 * 0.8) * 1.05
     assert ctrl._brake_trigger_distance(train) == pytest.approx(expected)
 
 
