@@ -41,6 +41,7 @@ export default function ParamStepper({
       <div style={styles.stepper}>
         <input
           type="number"
+          className="param-stepper-input"
           value={value ?? ''}
           onChange={(e) => handleInput(e.target.value)}
           style={styles.input}
