@@ -1,6 +1,6 @@
 /**
  * StationNode — 站内多股道 SVG 渲染
- * 正线贯穿全站，侧线通过贝塞尔曲线从正线平滑分岔
+ * 支持双向正线（上行/下行），侧线通过贝塞尔曲线从正线平滑分岔
  */
 import { memo } from 'react';
 import type { StationLayout } from '../../../types/simulation';
@@ -13,9 +13,12 @@ interface StationNodeProps {
   onClick?: (stationId: string) => void;
   /** 是否选中 */
   selected: boolean;
+  /** 是否启用双向轨道 */
+  dualTrack?: boolean;
 }
 
 const MAIN_TRACK_Y = 40;
+const DUAL_TRACK_Y = { up: 25, down: 55 };
 const MAIN_STROKE = 4;
 const SIDING_STROKE = 2.5;
 const TRACK_SPACING = 14;
@@ -30,6 +33,7 @@ function StationNodeInner({
   showDetail,
   onClick,
   selected,
+  dualTrack = false,
 }: StationNodeProps) {
   const x = station.chainage;
   const w = station.length;
@@ -37,14 +41,14 @@ function StationNodeInner({
 
   const totalHeight = showDetail
     ? Math.max((sidings.length + 1) * TRACK_SPACING + 20, 30)
-    : 20;
+    : dualTrack ? 60 : 20;
 
   return (
     <g
       onClick={() => onClick?.(station.id)}
       style={{ cursor: 'pointer' }}
     >
-      {/* 透明命中区 — 覆盖整个车站范围，确保鼠标事件可靠触发 */}
+      {/* 透明命中区 */}
       <rect
         x={x}
         y={MAIN_TRACK_Y - totalHeight / 2 - 4}
@@ -70,16 +74,42 @@ function StationNodeInner({
         />
       )}
 
-      {/* 正线 — 贯穿车站的连续粗线 */}
-      <line
-        x1={x}
-        y1={MAIN_TRACK_Y}
-        x2={x + w}
-        y2={MAIN_TRACK_Y}
-        stroke={MAIN_COLOR}
-        strokeWidth={MAIN_STROKE}
-        strokeLinecap="round"
-      />
+      {/* 正线渲染 */}
+      {dualTrack ? (
+        <>
+          {/* 上行正线 */}
+          <line
+            x1={x}
+            y1={DUAL_TRACK_Y.up}
+            x2={x + w}
+            y2={DUAL_TRACK_Y.up}
+            stroke={MAIN_COLOR}
+            strokeWidth={MAIN_STROKE}
+            strokeLinecap="round"
+          />
+          {/* 下行正线 */}
+          <line
+            x1={x}
+            y1={DUAL_TRACK_Y.down}
+            x2={x + w}
+            y2={DUAL_TRACK_Y.down}
+            stroke={MAIN_COLOR}
+            strokeWidth={MAIN_STROKE}
+            strokeLinecap="round"
+          />
+        </>
+      ) : (
+        /* 单正线（向后兼容） */
+        <line
+          x1={x}
+          y1={MAIN_TRACK_Y}
+          x2={x + w}
+          y2={MAIN_TRACK_Y}
+          stroke={MAIN_COLOR}
+          strokeWidth={MAIN_STROKE}
+          strokeLinecap="round"
+        />
+      )}
 
       {/* 车站封端标记 */}
       <line x1={x} y1={MAIN_TRACK_Y - 6} x2={x} y2={MAIN_TRACK_Y + 6}
@@ -178,7 +208,7 @@ function StationNodeInner({
       })}
 
       {/* 简略模式 */}
-      {!showDetail && (
+      {!showDetail && !dualTrack && (
         <rect
           x={x}
           y={MAIN_TRACK_Y - 8}

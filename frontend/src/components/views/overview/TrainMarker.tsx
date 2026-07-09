@@ -1,13 +1,15 @@
 /**
  * TrainMarker — 列车图标 SVG 渲染
- * 在正线上显示列车位置，底色跟随工况
+ * 支持双向轨道，根据 direction 选择上行/下行轨道 Y 坐标
  */
 import type { TrainState } from '../../../types/simulation';
 
 interface TrainMarkerProps {
   train: TrainState;
-  /** 正线 Y 坐标 (世界坐标) */
-  trackY: number;
+  /** 正线 Y 坐标 (世界坐标，单轨模式) */
+  trackY?: number;
+  /** 列车方向（双向轨道模式） */
+  direction?: 'up' | 'down';
 }
 
 const MODE_COLORS: Record<string, string> = {
@@ -16,16 +18,28 @@ const MODE_COLORS: Record<string, string> = {
   braking: '#ff4d4f',
 };
 
-export default function TrainMarker({ train, trackY }: TrainMarkerProps) {
+// 双向轨道 Y 坐标
+const DUAL_TRACK_Y = {
+  up: 35,
+  down: 45,
+  default: 35,
+};
+
+export default function TrainMarker({ train, trackY, direction }: TrainMarkerProps) {
   const color = MODE_COLORS[train.mode] || '#999';
   const x = train.position;
+
+  // 确定 Y 坐标：优先 direction，其次 trackY，最后默认值
+  const y = direction
+    ? DUAL_TRACK_Y[direction]
+    : trackY ?? DUAL_TRACK_Y.default;
 
   return (
     <g style={{ transition: 'transform 100ms linear' }}>
       {/* 列车背景色块 */}
       <rect
         x={x - 10}
-        y={trackY - 8}
+        y={y - 8}
         width={20}
         height={16}
         rx={4}
@@ -35,7 +49,7 @@ export default function TrainMarker({ train, trackY }: TrainMarkerProps) {
       {/* 列车图标 */}
       <text
         x={x}
-        y={trackY + 4}
+        y={y + 4}
         textAnchor="middle"
         fontSize={10}
         fill="#fff"
@@ -45,7 +59,7 @@ export default function TrainMarker({ train, trackY }: TrainMarkerProps) {
       {/* 速度标注 */}
       <text
         x={x}
-        y={trackY - 12}
+        y={y - 12}
         textAnchor="middle"
         fontSize={7}
         fill={color}
