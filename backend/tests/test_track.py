@@ -366,3 +366,21 @@ class TestLoadTrack:
         svc = TrackPathService(track)
         assert svc.next_station_ahead(-1.0).id == "S1"  # 最前
         assert svc.next_station_ahead(3200.0) is None   # 最后之后无站
+
+
+class TestSegmentMutation:
+    def test_segment_at_and_update(self):
+        track = default_track()
+        svc = TrackPathService(track)
+        seg = svc.segment_at(2000.0)
+        assert seg is not None
+        assert seg.id == "SEC02"
+
+        updated = svc.update_segment("SEC02", gradient=30.0)
+        assert updated is not None
+        assert updated.gradient == 30.0
+        assert svc.query_at(2000.0).gradient == 30.0
+
+    def test_update_unknown_segment_returns_none(self):
+        svc = TrackPathService(default_track())
+        assert svc.update_segment("NOPE", gradient=1.0) is None

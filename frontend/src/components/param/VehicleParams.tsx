@@ -16,6 +16,7 @@ import type { TractionCurvePoint } from '../../types/simulation';
 
 interface Props {
   send: (data: object) => void;
+  disabled?: boolean;
 }
 
 const PARAM_LABELS: Record<VehicleParamStepKey, string> = {
@@ -29,20 +30,23 @@ const PARAM_LABELS: Record<VehicleParamStepKey, string> = {
   davis_C_front_area: '迎风面积 (m²)',
 };
 
-export default function VehicleParamsForm({ send }: Props) {
-  const { params, vehicleParamBaselines } = useSimulationState();
+export default function VehicleParamsForm({ send, disabled = false }: Props) {
+  const { params, vehicleParamBaselines, runState } = useSimulationState();
   const dispatch = useSimulationDispatch();
   const { updateParams } = useSimulation(send);
 
   const handleChange = (key: VehicleParamStepKey, value: number) => {
+    if (disabled) return;
     updateParams({ vehicle: { ...params.vehicle, [key]: value } });
   };
 
   const handleCurveChange = (traction_curve: TractionCurvePoint[]) => {
+    if (disabled) return;
     updateParams({ vehicle: { ...params.vehicle, traction_curve } });
   };
 
   const handleReset = () => {
+    if (disabled) return;
     dispatch({ type: 'INIT_DEFAULT_PARAMS' });
     updateParams({ vehicle: { ...DEFAULT_VEHICLE_PARAMS } });
   };
@@ -51,9 +55,11 @@ export default function VehicleParamsForm({ send }: Props) {
     <fieldset style={styles.fieldset}>
       <legend style={styles.legend}>🚇 车辆参数</legend>
       <div style={styles.hint}>
-        {USE_MOCK
-          ? '参数在下次点击「运行」时生效'
-          : '参数已提交后端（运行中修改下一步生效）'}
+        {runState === 'running'
+          ? '仿真运行中已锁定，请先暂停或停止'
+          : USE_MOCK
+            ? '参数在下次点击「运行」时生效'
+            : '参数已提交后端（暂停或空闲时可修改）'}
       </div>
       {VEHICLE_PARAM_STEP_KEYS.map((key) => {
         const baseline = vehicleParamBaselines[key] ?? params.vehicle[key] ?? 0;
@@ -64,6 +70,7 @@ export default function VehicleParamsForm({ send }: Props) {
             value={params.vehicle[key]}
             step={computeFixedParamStep(baseline)}
             onChange={(v) => handleChange(key, v)}
+            disabled={disabled}
           />
         );
       })}
@@ -71,12 +78,14 @@ export default function VehicleParamsForm({ send }: Props) {
         curve={params.vehicle.traction_curve}
         onChange={handleCurveChange}
         liveMode={!USE_MOCK}
+        disabled={disabled}
       />
       <button
         type="button"
         className="btn"
         style={styles.resetBtn}
         onClick={handleReset}
+        disabled={disabled}
       >
         恢复默认
       </button>
@@ -84,16 +93,17 @@ export default function VehicleParamsForm({ send }: Props) {
   );
 }
 
-function TractionCurveTable({ curve, onChange, liveMode }: {
+function TractionCurveTable({ curve, onChange, liveMode, disabled = false }: {
   curve: TractionCurvePoint[] | undefined;
   onChange: (curve: TractionCurvePoint[]) => void;
   liveMode?: boolean;
+  disabled?: boolean;
 }) {
   const points = curve ?? DEFAULT_VEHICLE_PARAMS.traction_curve;
   return (
     <div style={styles.curveSection}>
       <div style={styles.curveTitle}>
-        牵引特性曲线{liveMode ? ' (迭代一后端暂不支持同步)' : ''}
+        牵引特性曲线
       </div>
       <table style={styles.table}>
         <thead>
@@ -104,6 +114,7 @@ function TractionCurveTable({ curve, onChange, liveMode }: {
             <tr key={i}>
               <td style={styles.td}>
                 <input type="number" value={pt.speed}
+                  disabled={disabled}
                   onChange={(e) => {
                     const next = [...points];
                     next[i] = { ...pt, speed: Number(e.target.value) };
@@ -112,6 +123,7 @@ function TractionCurveTable({ curve, onChange, liveMode }: {
               </td>
               <td style={styles.td}>
                 <input type="number" step="0.1" min="0" max="1" value={pt.force_percent}
+                  disabled={disabled}
                   onChange={(e) => {
                     const next = [...points];
                     next[i] = { ...pt, force_percent: Number(e.target.value) };

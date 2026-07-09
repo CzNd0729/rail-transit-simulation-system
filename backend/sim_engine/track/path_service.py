@@ -71,6 +71,37 @@ class TrackPathService:
                 return st
         return None
 
+    def segment_at(self, chainage: float) -> Segment | None:
+        """给定公里标，返回所在区段（TRK-02 辅助）。"""
+        return self._segment_at(chainage)
+
+    def get_segment_by_id(self, segment_id: str) -> Segment | None:
+        """按区段 ID 查询。"""
+        for seg in self.track.segments:
+            if seg.id == segment_id:
+                return seg
+        return None
+
+    def update_segment(
+        self,
+        segment_id: str,
+        *,
+        gradient: float | None = None,
+        curvature: float | None = None,
+        speed_limit: float | None = None,
+    ) -> Segment | None:
+        """更新指定区段的坡度/曲率/限速（运行时参数，仅内存）。"""
+        seg = self.get_segment_by_id(segment_id)
+        if seg is None:
+            return None
+        if gradient is not None:
+            seg.gradient = gradient
+        if curvature is not None:
+            seg.curvature = curvature
+        if speed_limit is not None:
+            seg.speed_limit = speed_limit
+        return seg
+
     # ── 内部 ────────────────────────────────────────────────────────
 
     def _segment_at(self, chainage: float) -> Segment | None:

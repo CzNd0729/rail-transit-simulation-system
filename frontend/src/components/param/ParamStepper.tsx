@@ -9,6 +9,7 @@ interface ParamStepperProps {
   step: number;
   onChange: (value: number) => void;
   min?: number;
+  disabled?: boolean;
 }
 
 export default function ParamStepper({
@@ -17,6 +18,7 @@ export default function ParamStepper({
   step,
   onChange,
   min = 0,
+  disabled = false,
 }: ParamStepperProps) {
   const current = value ?? 0;
 
@@ -44,6 +46,7 @@ export default function ParamStepper({
           value={value ?? ''}
           onChange={(e) => handleInput(e.target.value)}
           style={styles.input}
+          disabled={disabled}
         />
         <div style={styles.buttons}>
           <button
@@ -51,6 +54,7 @@ export default function ParamStepper({
             aria-label={`增加 ${label}`}
             style={styles.stepBtn}
             onClick={handleIncrement}
+            disabled={disabled}
           >
             ▲
           </button>
@@ -59,6 +63,7 @@ export default function ParamStepper({
             aria-label={`减少 ${label}`}
             style={styles.stepBtn}
             onClick={handleDecrement}
+            disabled={disabled}
           >
             ▼
           </button>

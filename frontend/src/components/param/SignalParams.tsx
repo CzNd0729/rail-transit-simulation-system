@@ -12,6 +12,7 @@ import {
 
 interface Props {
   send: (data: object) => void;
+  disabled?: boolean;
 }
 
 const PARAM_LABELS: Record<SignalParamStepKey, string> = {
@@ -20,11 +21,12 @@ const PARAM_LABELS: Record<SignalParamStepKey, string> = {
   target_speed_ratio: '目标速度比',
 };
 
-export default function SignalParamsForm({ send }: Props) {
+export default function SignalParamsForm({ send, disabled = false }: Props) {
   const { params, signalParamBaselines } = useSimulationState();
   const { updateParams } = useSimulation(send);
 
   const handleChange = (key: SignalParamStepKey, value: number) => {
+    if (disabled) return;
     updateParams({ signal: { ...params.signal, [key]: value } });
   };
 
@@ -40,6 +42,7 @@ export default function SignalParamsForm({ send }: Props) {
             value={params.signal[key]}
             step={computeFixedParamStep(baseline)}
             onChange={(v) => handleChange(key, v)}
+            disabled={disabled}
           />
         );
       })}

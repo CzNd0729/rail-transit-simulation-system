@@ -81,6 +81,20 @@ describe('toApiParamUpdate', () => {
       signal: { dwellTime: 35, targetSpeedRatio: 0.8 },
     });
   });
+
+  it('maps traction_curve to tractionCurve', () => {
+    const out = toApiParamUpdate({
+      vehicle: {
+        traction_curve: [
+          { speed: 0, force_percent: 1, sort_order: 0 },
+          { speed: 40, force_percent: 0.5, sort_order: 1 },
+        ],
+      },
+    });
+    expect(out.vehicle).toEqual({
+      tractionCurve: [{ speed: 0, forcePercent: 1 }, { speed: 40, forcePercent: 0.5 }],
+    });
+  });
 });
 
 describe('parseApiParams', () => {
@@ -93,6 +107,19 @@ describe('parseApiParams', () => {
     expect(out.vehicle?.empty_mass).toBe(220000);
     expect(out.track?.speed_limit).toBe(80);
     expect(out.signal?.target_speed_ratio).toBe(0.8);
+  });
+
+  it('parses tractionCurve and segmentId', () => {
+    const out = parseApiParams({
+      vehicle: {
+        tractionCurve: [{ speed: 0, forcePercent: 1 }, { speed: 80, forcePercent: 0.5 }],
+      },
+      track: { segmentId: 'SEC02', gradient: 30 },
+    });
+    expect(out.vehicle?.traction_curve).toHaveLength(2);
+    expect(out.vehicle?.traction_curve?.[1].force_percent).toBe(0.5);
+    expect(out.track?.segment_id).toBe('SEC02');
+    expect(out.track?.gradient).toBe(30);
   });
 });
 

@@ -214,6 +214,27 @@ def test_speed_limit_clamp():
     assert result.state.speed <= 80.0 + 1e-9
 
 
+def test_max_speed_clamp_lower_than_track():
+    """车辆 max_speed 低于区段限速时，应以 max_speed 为上限。"""
+    veh = VehicleSystem(make_params(max_speed=50.0))
+    state = veh.create_initial_state(0.0)
+    state.speed = 49.0
+    cmd = ControlCommands(traction_level=1.0)
+    result = veh.step(state, cmd, flat_track(speed_limit=80), dt=1.0)
+    assert result.state.speed <= 50.0 + 1e-9
+
+
+def test_effective_speed_limit_helper():
+    from sim_engine.vehicle.dynamics import effective_speed_limit_kmh
+
+    track = flat_track(speed_limit=80)
+    params = make_params(max_speed=100.0)
+    assert effective_speed_limit_kmh(track, params) == 80.0
+
+    params_low = make_params(max_speed=50.0)
+    assert effective_speed_limit_kmh(track, params_low) == 50.0
+
+
 # --- VHC-08 停车钳位 ---
 
 def test_braking_does_not_reverse():

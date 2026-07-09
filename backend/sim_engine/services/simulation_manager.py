@@ -18,7 +18,7 @@ from sim_engine.track.config import load_track
 from sim_engine.track.models import Track
 from sim_engine.track.path_service import TrackPathService
 from sim_engine.vehicle.config import load_vehicle_params
-from sim_engine.vehicle.models import ForceBreakdown
+from sim_engine.vehicle.models import ForceBreakdown, TractionCurvePoint
 
 from sim_engine.ws.manager import WebSocketConnectionManager
 
@@ -226,10 +226,30 @@ class SimulationManager:
 
     # ==================== 运行时参数 ====================
 
+    @staticmethod
+    def _traction_curve_to_api(curve: list[TractionCurvePoint]) -> list[dict]:
+        return [{"speed": p.speed, "forcePercent": p.force_percent} for p in curve]
+
+    @staticmethod
+    def _traction_curve_from_api(raw: list[dict]) -> list[TractionCurvePoint]:
+        return [
+            TractionCurvePoint(
+                speed=float(point["speed"]),
+                force_percent=float(point.get("forcePercent", point.get("force_percent", 0.0))),
+            )
+            for point in raw
+        ]
+
+    def _current_chainage(self) -> float:
+        state = self.orchestrator.train_state
+        return state.position if state is not None else 0.0
+
     def get_params(self) -> dict:
         orch = self.orchestrator
         vp = orch.vehicle.params
-        tp = orch.track.query_at(orch.train_state.position if orch.train_state else 0.0)
+        chainage = self._current_chainage()
+        seg = orch.track.segment_at(chainage)
+        tp = orch.track.query_at(chainage)
         return {
             "vehicle": {
                 "emptyMass": vp.empty_mass,
@@ -243,8 +263,10 @@ class SimulationManager:
                 "davisCDragCoeff": vp.davis_c_drag_coeff,
                 "curveResistCoeff": vp.curve_resist_coeff,
                 "tunnelResistFactor": vp.tunnel_resist_factor,
+                "tractionCurve": self._traction_curve_to_api(vp.traction_curve),
             },
             "track": {
+                "segmentId": seg.id if seg else None,
                 "gradient": tp.gradient,
                 "curvature": tp.curvature,
                 "speedLimit": tp.speed_limit,
@@ -261,8 +283,19 @@ class SimulationManager:
         }
 
     def update_params(self, updates: dict) -> dict:
-        """更新运行时参数（部分更新，仅内存）。"""
+        """更新运行时参数（部分更新，仅内存）。
+
+        迭代一：空闲/暂停时可改车辆、当前区段线路、目标速度比；
+        运行中拒绝修改（对齐验收场景 4）。
+        """
         orch = self.orchestrator
+        if orch.run_state == RunState.RUNNING:
+            return {
+                "code": 40002,
+                "message": "操作冲突",
+                "detail": "仿真运行中无法修改参数",
+            }
+
         updated: list[str] = []
 
         vehicle_updates = updates.get("vehicle", {})
@@ -285,6 +318,27 @@ class SimulationManager:
                 if camel_key in vehicle_updates:
                     setattr(vp, snake_key, vehicle_updates[camel_key])
                     updated.append(f"vehicle.{camel_key}")
+            if "tractionCurve" in vehicle_updates:
+                vp.traction_curve = self._traction_curve_from_api(vehicle_updates["tractionCurve"])
+                updated.append("vehicle.tractionCurve")
+
+        track_updates = updates.get("track", {})
+        if track_updates:
+            segment_id = track_updates.get("segmentId")
+            if not segment_id:
+                seg = orch.track.segment_at(self._current_chainage())
+                segment_id = seg.id if seg else None
+            if segment_id:
+                seg = orch.track.update_segment(
+                    segment_id,
+                    gradient=track_updates.get("gradient"),
+                    curvature=track_updates.get("curvature"),
+                    speed_limit=track_updates.get("speedLimit"),
+                )
+                if seg is not None:
+                    for key in ("gradient", "curvature", "speedLimit"):
+                        if key in track_updates:
+                            updated.append(f"track.{key}")
 
         signal_updates = updates.get("signal", {})
         if "targetSpeedRatio" in signal_updates:

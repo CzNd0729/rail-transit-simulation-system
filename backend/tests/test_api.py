@@ -230,6 +230,45 @@ def test_update_signal_param():
     assert resp.json()["code"] == 0
 
 
+def test_update_track_segment_params():
+    """迭代一 UI-PARAM-02：按区段 ID 更新坡度。"""
+    client.post("/api/v1/simulation/reset")
+    resp = client.put("/api/v1/params", json={
+        "track": {"segmentId": "SEC02", "gradient": 30},
+    })
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "track.gradient" in data["updated"]
+
+    from sim_engine.app import sim_manager
+    sim_manager.orchestrator.train_state.position = 2000.0
+    params = client.get("/api/v1/params").json()["data"]
+    assert params["track"]["segmentId"] == "SEC02"
+    assert params["track"]["gradient"] == 30
+
+
+def test_update_traction_curve():
+    """迭代一 UI-PARAM-01：牵引特性曲线读写。"""
+    client.post("/api/v1/simulation/reset")
+    curve = [{"speed": 0, "forcePercent": 1.0}, {"speed": 50, "forcePercent": 0.8}]
+    resp = client.put("/api/v1/params", json={"vehicle": {"tractionCurve": curve}})
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "vehicle.tractionCurve" in data["updated"]
+    assert len(data["params"]["vehicle"]["tractionCurve"]) == 2
+
+
+def test_update_params_while_running_rejected():
+    """验收场景 4：运行中禁止改参。"""
+    client.post("/api/v1/simulation/reset")
+    client.post("/api/v1/simulation/start")
+    import time
+    time.sleep(0.1)
+    resp = client.put("/api/v1/params", json={"vehicle": {"emptyMass": 220000}})
+    assert resp.status_code == 409
+    client.post("/api/v1/simulation/stop")
+
+
 # ── 缺失路径 404 ────────────────────────────────────────────────────
 
 def test_nonexistent_endpoint():
