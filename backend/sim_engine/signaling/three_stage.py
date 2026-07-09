@@ -201,14 +201,21 @@ class ThreeStageController:
             return ControlCommands(traction_level=traction)
 
         # ============================================================
-        # COASTING：惰行 + 开环补偿（不变）
+        # COASTING：惰行 + 开环补偿
+        #   动态最低速：距站台越近，允许越低的速度（避免无效重新牵引）
         # ============================================================
         if st.phase == Phase.COASTING:
             if train.position + brake_dist >= target.chainage - tol:
                 st.phase = Phase.BRAKING
                 self._brake_pid.reset()
                 return self._braking_step(train, target, dt)
-            if train.speed < self.sim_params.coasting_min_speed:
+            # 动态最低惰行速度：随站距缩短而降低，上限为 coasting_min_speed
+            curve_speed = PIDController.braking_curve_speed(
+                max(dist_to_station, 1.0), self._brake_pid._p.comfort_decel
+            )
+            dynamic_min = min(curve_speed * 0.4, self.sim_params.coasting_min_speed)
+            dynamic_min = max(dynamic_min, 5.0)  # 绝对下限 5 km/h
+            if train.speed < dynamic_min:
                 st.phase = Phase.TRACTION
                 self._traction_pid.reset()
                 return ControlCommands(traction_level=1.0)

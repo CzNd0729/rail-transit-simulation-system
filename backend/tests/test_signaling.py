@@ -559,3 +559,43 @@ def test_traction_direct_to_braking_short_distance():
     assert ctrl.signal_state.phase == Phase.BRAKING
     assert cmd.brake_level > 0.0
     assert cmd.traction_level == 0.0
+
+
+# ── SIG-06: 惰行动态最低速度 ────────────────────────────────────────
+
+def test_coasting_dynamic_min_speed_near_station():
+    """接近站台时惰行最低速降低，允许更低速度惰行。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params(coasting_min_speed=30.0))
+    ctrl._state.phase = Phase.COASTING
+    # 距站台 80m，curve_speed = sqrt(2×0.8×80)×3.6 ≈ 40.7 km/h
+    # dynamic_min = min(40.7×0.4=16.3, 30) = 16.3 km/h
+    # 速度 20 km/h > 16.3 → 保持惰行（旧逻辑 20 < 30 会切回牵引）
+    train = _make_train(position=920.0, speed=20.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    assert ctrl.signal_state.phase == Phase.COASTING
+    assert cmd.brake_level == 0.0
+
+
+def test_coasting_dynamic_min_speed_far_station():
+    """远离站台时动态最低速仍为 coasting_min_speed。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params(coasting_min_speed=30.0))
+    ctrl._state.phase = Phase.COASTING
+    # 距站台 500m，curve_speed = sqrt(2×0.8×500)×3.6 ≈ 101.8 km/h
+    # dynamic_min = min(101.8×0.4=40.7, 30) = 30 km/h（被 cap）
+    # 速度 25 km/h < 30 → 切回牵引
+    train = _make_train(position=500.0, speed=25.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    assert ctrl.signal_state.phase == Phase.TRACTION
+    assert cmd.traction_level > 0.0
+
+
+def test_coasting_no_oscillation_near_station_uphill():
+    """上坡接近站台时不产生牵引-惰行振荡。"""
+    ctrl = ThreeStageController(_make_track_uphill(), _make_vehicle_params(), _make_sim_params(coasting_min_speed=30.0))
+    ctrl._state.phase = Phase.COASTING
+    # 距站台 90m，上坡 20‰
+    # curve_speed = sqrt(2×0.8×90)×3.6 ≈ 43.2, dynamic_min = min(17.3, 30) = 17.3
+    # 速度 25 km/h > 17.3 → 保持惰行
+    train = _make_train(position=910.0, speed=25.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    assert ctrl.signal_state.phase == Phase.COASTING
