@@ -145,7 +145,7 @@ class TestWebSocketSimControl:
             assert resp.json()["data"]["runState"] == "paused"
 
     def test_stop_from_running(self) -> None:
-        """WS-CTL-04: 运行中 stop 后仿真停止。"""
+        """WS-CTL-04: 运行中 stop 后仿真停止并重置到初始状态。"""
         _reset()
         with client.websocket_connect("/ws") as ws:
             ws.receive_json()  # 丢弃 init_state
@@ -156,7 +156,9 @@ class TestWebSocketSimControl:
             ws.send_json({"type": "sim_control", "action": "stop"})
 
             resp = client.get("/api/v1/simulation/status")
-            assert resp.json()["data"]["runState"] == "stopped"
+            data = resp.json()["data"]
+            assert data["runState"] == "stopped"
+            assert data["simulationTime"] == 0.0
 
     def test_reset_returns_to_idle(self) -> None:
         """WS-CTL-05: reset 后状态回到 idle。"""

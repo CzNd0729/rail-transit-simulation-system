@@ -18,7 +18,7 @@ from sim_engine.track.config import load_track
 from sim_engine.track.models import Track
 from sim_engine.track.path_service import TrackPathService
 from sim_engine.vehicle.config import load_vehicle_params
-from sim_engine.vehicle.models import VehicleParams
+from sim_engine.vehicle.models import ForceBreakdown
 
 from sim_engine.ws.manager import WebSocketConnectionManager
 
@@ -73,20 +73,48 @@ class SimulationManager:
         }
 
     async def stop(self) -> dict:
+        """停止仿真：结束本轮运行、保留摘要，并将引擎重置到初始状态。
+
+        与 pause 不同——pause 冻结当前进度；stop 结束后时钟/位置回到起点，
+        便于用户查看运行摘要后再次从 A 站启动。
+        """
         self.stop_loop()
-        self.orchestrator.stop()
-        # 广播权威状态，覆盖 _run_loop 可能已发出的陈旧 running 消息
+        orch = self.orchestrator
+        summary = orch.recorder.summary()
+        ended_time = orch.clock.elapsed
+        passenger_load = orch.train_state.passenger_load if orch.train_state else 0.6
+
+        orch.reset(passenger_load=passenger_load)
+        orch.run_state = RunState.STOPPED
+
+        assert orch.train_state is not None
+        snapshot = build_simulation_snapshot(
+            orch.clock,
+            orch.sim_params,
+            orch.train_id,
+            orch.train_state,
+            ForceBreakdown(),
+            pantograph_voltage=get_pantograph_voltage(),
+        )
+        await self.ws_manager.broadcast(snapshot)
+        await self.ws_manager.broadcast({
+            "type": "simulation_complete",
+            "data": {
+                "runId": 1,
+                "simulationTime": ended_time,
+                "summary": summary,
+            },
+        })
         await self.ws_manager.broadcast({
             "type": "simulation_status",
             "data": {
                 "runState": "stopped",
-                "simulationTime": self.orchestrator.clock.elapsed,
+                "simulationTime": 0.0,
                 "reason": "user_stopped",
             },
         })
-        summary = self.orchestrator.recorder.summary()
         return {
-            "runState": self.orchestrator.run_state.value,
+            "runState": orch.run_state.value,
             "runId": 1,
             "summary": summary,
         }

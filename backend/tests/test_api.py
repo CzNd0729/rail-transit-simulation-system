@@ -51,8 +51,25 @@ def test_get_params():
     assert "signal" in data
 
 
+def test_stop_resets_to_initial_state():
+    """用户 stop 后应回到初始位置与时间，与 pause 区分。"""
+    client.post("/api/v1/simulation/reset")
+    client.post("/api/v1/simulation/start")
+    import time
+    time.sleep(0.3)
+    resp = client.post("/api/v1/simulation/stop")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["runState"] == "stopped"
+    assert resp.json()["data"]["summary"]["steps"] >= 0
+
+    status = client.get("/api/v1/simulation/status").json()["data"]
+    assert status["runState"] == "stopped"
+    assert status["simulationTime"] == 0.0
+
+
 def test_simulation_lifecycle():
     """测试仿真生命周期：start → pause → resume → stop → reset。"""
+    client.post("/api/v1/simulation/reset")
     # 初始状态
     resp = client.get("/api/v1/simulation/status")
     assert resp.json()["data"]["runState"] == "idle"
