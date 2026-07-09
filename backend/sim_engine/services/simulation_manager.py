@@ -396,13 +396,20 @@ class SimulationManager:
                     and orch.train_state.speed < 0.1
                 )
             ):
-                orch.stop()
+                # 先记录结束时刻的摘要
                 summary = orch.recorder.summary()
+                ended_time = orch.clock.elapsed
+                passenger_load = orch.train_state.passenger_load if orch.train_state else 0.6
+
+                # 自动复位到初始状态（与手动 stop 行为一致）
+                orch.reset(passenger_load=passenger_load)
+                orch.run_state = RunState.STOPPED
+
                 await self.ws_manager.broadcast({
                     "type": "simulation_complete",
                     "data": {
                         "runId": 1,
-                        "simulationTime": orch.clock.elapsed,
+                        "simulationTime": ended_time,
                         "summary": summary,
                     },
                 })
@@ -410,7 +417,7 @@ class SimulationManager:
                     "type": "simulation_status",
                     "data": {
                         "runState": "stopped",
-                        "simulationTime": orch.clock.elapsed,
+                        "simulationTime": 0.0,
                         "reason": "completed",
                     },
                 })

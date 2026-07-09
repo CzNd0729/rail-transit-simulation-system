@@ -147,7 +147,6 @@ class Orchestrator:
         steps = 0
         while self.run_state == RunState.RUNNING:
             if self.clock.elapsed >= self.sim_params.total_time:
-                self.run_state = RunState.STOPPED
                 break
             # 到达终点且停稳
             if (
@@ -156,10 +155,13 @@ class Orchestrator:
                 >= self.track.track.total_length - 1.0
                 and self.train_state.speed < 0.1
             ):
-                self.run_state = RunState.STOPPED
                 break
             self.step_once()
             steps += 1
             if max_steps is not None and steps >= max_steps:
                 break
-        return self.recorder.summary()
+        summary = self.recorder.summary()
+        # 自动复位到初始状态（与 SimulationManager._run_loop 行为一致）
+        self.reset()
+        self.run_state = RunState.STOPPED
+        return summary

@@ -1,7 +1,7 @@
 # 仿真全局参数（迭代一 MVP）
 simulation:
   time_step: 0.1              # 固定步长 (s)
-  total_time: 600               # 最大仿真时长 (s)
+  total_time: 6000               # 最大仿真时长 (s)
   speed_multiplier: 1           # 倍率（编排器实时等待用）
   target_speed_ratio: 0.8       # 三段式目标速度 = 限速 × 此比例
   station_stop_tolerance: 1.0   # 站台停车容差 (m)
