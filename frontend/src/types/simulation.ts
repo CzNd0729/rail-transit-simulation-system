@@ -166,6 +166,8 @@ export interface SignalCommand {
   train_id: string;
   traction_level: number;
   brake_level: number;
+  emergency_brake?: boolean;
+  running_phase?: string;
 }
 
 /** 紧急制动指令 */
@@ -349,8 +351,6 @@ export interface AppState {
   lineLayout: LineLayout | null;
   /** 线路剖面分段（坡度/限速，供纵断面图） */
   profileSegments: import('../data/mvpLineLayout').ProfileSegment[] | null;
-<<<<<<< HEAD
-=======
   /** 车辆参数步进基准值（首次从后端/默认值锁定，步进=基准×10%） */
   vehicleParamBaselines: import('../utils/paramStep').VehicleParamBaselines;
   /** 线路参数步进基准值 */
@@ -359,7 +359,6 @@ export interface AppState {
   signalParamBaselines: import('../utils/paramStep').SignalParamBaselines;
   /** 牵引特性曲线各折点步进基准值 */
   tractionCurveBaselines: import('../utils/paramStep').TractionCurvePointBaseline[];
->>>>>>> b9b3a165a517dee3db6dd21806ed3697074fe3bf
 }
 
 // ==================== API 原始类型（camelCase，适配前） ====================
@@ -379,6 +378,14 @@ export interface ApiTrainState {
   faultAlarm: FaultAlarm | null;
 }
 
+export interface ApiControlCommand {
+  trainId: string;
+  tractionLevel: number;
+  brakeLevel: number;
+  emergencyBrake?: boolean;
+  runningPhase?: string;
+}
+
 export interface ApiSimulationSnapshot {
   clock: { elapsed: number; speedMultiplier: SpeedMultiplier };
   trains: ApiTrainState[];
@@ -388,7 +395,11 @@ export interface ApiSimulationSnapshot {
     totalConsumption: number;
     totalRegeneration: number;
   };
-  signaling: { commands: unknown[]; emergencyBrakes: unknown[] };
+  signaling: {
+    controlCommands?: ApiControlCommand[];
+    commands?: unknown[];
+    emergencyBrakes: unknown[];
+  };
   track: { occupancy: unknown[]; switchStates: unknown[] };
   events: SimulationEvent[];
 }

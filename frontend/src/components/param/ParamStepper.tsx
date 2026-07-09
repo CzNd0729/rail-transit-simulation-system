@@ -10,10 +10,8 @@ interface ParamStepperProps {
   step: number;
   onChange: (value: number) => void;
   min?: number;
-<<<<<<< HEAD
-  disabled?: boolean;
-=======
   max?: number;
+  disabled?: boolean;
   /** 表格内紧凑模式：不显示左侧标签 */
   compact?: boolean;
 }
@@ -24,7 +22,6 @@ function clamp(value: number, min: number, max?: number): number {
     result = Math.min(max, result);
   }
   return result;
->>>>>>> b9b3a165a517dee3db6dd21806ed3697074fe3bf
 }
 
 export default function ParamStepper({
@@ -33,12 +30,9 @@ export default function ParamStepper({
   step,
   onChange,
   min = 0,
-<<<<<<< HEAD
-  disabled = false,
-=======
   max,
+  disabled = false,
   compact = false,
->>>>>>> b9b3a165a517dee3db6dd21806ed3697074fe3bf
 }: ParamStepperProps) {
   const current = value ?? 0;
 
@@ -46,16 +40,17 @@ export default function ParamStepper({
   const atMin = current <= min + 1e-9;
 
   const handleIncrement = () => {
-    if (atMax) return;
+    if (disabled || atMax) return;
     onChange(clamp(applyParamStep(current, step, 1, min), min, max));
   };
 
   const handleDecrement = () => {
-    if (atMin) return;
+    if (disabled || atMin) return;
     onChange(clamp(applyParamStep(current, step, -1, min), min, max));
   };
 
   const handleInput = (raw: string) => {
+    if (disabled) return;
     const parsed = Number(raw);
     if (!Number.isNaN(parsed)) {
       onChange(clamp(parsed, min, max));
@@ -71,12 +66,8 @@ export default function ParamStepper({
           className="param-stepper-input"
           value={value ?? ''}
           onChange={(e) => handleInput(e.target.value)}
-<<<<<<< HEAD
-          style={styles.input}
-          disabled={disabled}
-=======
           style={compact ? styles.inputCompact : styles.input}
->>>>>>> b9b3a165a517dee3db6dd21806ed3697074fe3bf
+          disabled={disabled}
         />
         <div style={styles.buttons}>
           <button
@@ -84,13 +75,12 @@ export default function ParamStepper({
             aria-label={label ? `增加 ${label}` : '增加'}
             style={{
               ...styles.stepBtn,
-              opacity: atMax ? 0.35 : 1,
-              cursor: atMax ? 'not-allowed' : 'pointer',
+              opacity: disabled || atMax ? 0.35 : 1,
+              cursor: disabled || atMax ? 'not-allowed' : 'pointer',
             }}
-            disabled={atMax}
+            disabled={disabled || atMax}
             title={atMax ? '已达上限' : undefined}
             onClick={handleIncrement}
-            disabled={disabled}
           >
             ▲
           </button>
@@ -99,13 +89,12 @@ export default function ParamStepper({
             aria-label={label ? `减少 ${label}` : '减少'}
             style={{
               ...styles.stepBtn,
-              opacity: atMin ? 0.35 : 1,
-              cursor: atMin ? 'not-allowed' : 'pointer',
+              opacity: disabled || atMin ? 0.35 : 1,
+              cursor: disabled || atMin ? 'not-allowed' : 'pointer',
             }}
-            disabled={atMin}
+            disabled={disabled || atMin}
             title={atMin ? '已达下限' : undefined}
             onClick={handleDecrement}
-            disabled={disabled}
           >
             ▼
           </button>

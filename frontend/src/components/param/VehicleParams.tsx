@@ -31,13 +31,8 @@ const PARAM_LABELS: Record<VehicleParamStepKey, string> = {
   davis_C_front_area: '迎风面积 (m²)',
 };
 
-<<<<<<< HEAD
 export default function VehicleParamsForm({ send, disabled = false }: Props) {
-  const { params, vehicleParamBaselines, runState } = useSimulationState();
-=======
-export default function VehicleParamsForm({ send }: Props) {
-  const { params, vehicleParamBaselines, tractionCurveBaselines } = useSimulationState();
->>>>>>> b9b3a165a517dee3db6dd21806ed3697074fe3bf
+  const { params, vehicleParamBaselines, tractionCurveBaselines, runState } = useSimulationState();
   const dispatch = useSimulationDispatch();
   const { updateParams } = useSimulation(send);
 
@@ -84,7 +79,6 @@ export default function VehicleParamsForm({ send }: Props) {
         curve={params.vehicle.traction_curve}
         baselines={tractionCurveBaselines}
         onChange={handleCurveChange}
-        liveMode={!USE_MOCK}
         disabled={disabled}
       />
       <button
@@ -100,20 +94,21 @@ export default function VehicleParamsForm({ send }: Props) {
   );
 }
 
-<<<<<<< HEAD
-function TractionCurveTable({ curve, onChange, liveMode, disabled = false }: {
-=======
-function TractionCurveTable({ curve, baselines, onChange, liveMode }: {
->>>>>>> b9b3a165a517dee3db6dd21806ed3697074fe3bf
+function TractionCurveTable({
+  curve,
+  baselines,
+  onChange,
+  disabled = false,
+}: {
   curve: TractionCurvePoint[] | undefined;
   baselines: TractionCurvePointBaseline[];
   onChange: (curve: TractionCurvePoint[]) => void;
-  liveMode?: boolean;
   disabled?: boolean;
 }) {
   const points = curve ?? DEFAULT_VEHICLE_PARAMS.traction_curve;
 
   const updatePoint = (index: number, patch: Partial<TractionCurvePoint>) => {
+    if (disabled) return;
     const next = [...points];
     next[index] = { ...next[index], ...patch };
     onChange(next);
@@ -121,38 +116,12 @@ function TractionCurveTable({ curve, baselines, onChange, liveMode }: {
 
   return (
     <div style={styles.curveSection}>
-      <div style={styles.curveTitle}>
-        牵引特性曲线
-      </div>
+      <div style={styles.curveTitle}>牵引特性曲线</div>
       <table style={styles.table}>
         <thead>
           <tr><th style={styles.th}>速度 (km/h)</th><th style={styles.th}>牵引力 %</th></tr>
         </thead>
         <tbody>
-<<<<<<< HEAD
-          {points.map((pt, i) => (
-            <tr key={i}>
-              <td style={styles.td}>
-                <input type="number" value={pt.speed}
-                  disabled={disabled}
-                  onChange={(e) => {
-                    const next = [...points];
-                    next[i] = { ...pt, speed: Number(e.target.value) };
-                    onChange(next);
-                  }} style={styles.inputPlain} />
-              </td>
-              <td style={styles.td}>
-                <input type="number" step="0.1" min="0" max="1" value={pt.force_percent}
-                  disabled={disabled}
-                  onChange={(e) => {
-                    const next = [...points];
-                    next[i] = { ...pt, force_percent: Number(e.target.value) };
-                    onChange(next);
-                  }} style={styles.inputPlain} />
-              </td>
-            </tr>
-          ))}
-=======
           {points.map((pt, i) => {
             const base = baselines[i] ?? { speed: pt.speed, force_percent: pt.force_percent };
             return (
@@ -163,6 +132,7 @@ function TractionCurveTable({ curve, baselines, onChange, liveMode }: {
                     value={pt.speed}
                     step={computeFixedParamStep(base.speed)}
                     onChange={(speed) => updatePoint(i, { speed })}
+                    disabled={disabled}
                   />
                 </td>
                 <td style={styles.td}>
@@ -173,12 +143,12 @@ function TractionCurveTable({ curve, baselines, onChange, liveMode }: {
                     min={0}
                     max={100}
                     onChange={(pct) => updatePoint(i, { force_percent: pct / 100 })}
+                    disabled={disabled}
                   />
                 </td>
               </tr>
             );
           })}
->>>>>>> b9b3a165a517dee3db6dd21806ed3697074fe3bf
         </tbody>
       </table>
     </div>

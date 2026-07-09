@@ -12,7 +12,8 @@ from sim_engine.core.config import SimulationParams
 from sim_engine.track.models import Station
 from sim_engine.track.path_service import TrackPathService
 from sim_engine.vehicle.dynamics import effective_speed_limit_kmh
-from sim_engine.vehicle.models import ControlCommands, TrainState, VehicleParams
+from sim_engine.vehicle.models import GRAVITY, ControlCommands, TrainState, VehicleParams
+from sim_engine.vehicle.traction import interpolate_force_percent
 
 
 class Phase(str, Enum):
@@ -91,10 +92,33 @@ class ThreeStageController:
             if train.position + brake_dist >= target.chainage - tol:
                 st.phase = Phase.BRAKING
                 return ControlCommands(brake_level=1.0)
-            return ControlCommands()
+            comp = self._coasting_compensation(train, track_params)
+            return ControlCommands(traction_level=comp)
 
         # BRAKING
         return ControlCommands(brake_level=1.0)
+
+    def _coasting_compensation(self, train: TrainState, track_params) -> float:
+        """惰行时施加少量牵引力，抵消滚动摩擦与上坡坡度阻力。"""
+        v_ms = abs(train.speed) / 3.6
+        mass = train.mass if train.mass > 0 else self.vehicle_params.empty_mass
+        p = self.vehicle_params
+
+        rolling = (p.davis_a + p.davis_b * v_ms) * mass * GRAVITY
+        grad = max(track_params.gradient, 0.0)
+        gradient_force = mass * GRAVITY * (grad / 1000.0)
+
+        f_target = rolling + gradient_force
+        if f_target <= 0:
+            return 0.0
+
+        percent = interpolate_force_percent(p.traction_curve, train.speed)
+        max_available = p.max_traction_force * percent
+        if max_available <= 0:
+            return 0.0
+
+        level = f_target / max_available
+        return min(max(level, 0.0), 1.0)
 
     def _brake_trigger_distance(self, train: TrainState) -> float:
         v_ms = max(train.speed, 0.0) / 3.6
