@@ -9,13 +9,32 @@ import StationNode from './StationNode';
 import TrainMarker from './TrainMarker';
 import StationInfoCard from './StationInfoCard';
 import ViewportControls from './ViewportControls';
+import type { StationLayout } from '../../../types/simulation';
 
 // 双向轨道 Y 坐标
 const DUAL_TRACK_Y = { up: 35, down: 45 };
 const STATION_TRACK_Y = { up: 25, down: 55 };
+const TRAIN_LENGTH = 120; // 列车长度 (m)
 
-// 贝塞尔过渡参数
-const TRANSITION_LENGTH = 500; // 过渡区长度 (m)
+/** 动态计算过渡区长度 */
+function calcTransitionLength(stations: StationLayout[]): number {
+  if (stations.length < 2) return 200;
+
+  const gaps = stations.slice(1).map((s, i) => {
+    const prevEnd = stations[i].chainage + stations[i].length;
+    return s.chainage - prevEnd;
+  });
+
+  const minGap = Math.min(...gaps);
+
+  // 站间距 < 200m 时，过渡区为间距的 40%
+  if (minGap < 200) {
+    return Math.max(50, minGap * 0.4);
+  }
+
+  // 否则为最小间距的 30%，限制在 100-500m
+  return Math.max(100, Math.min(500, minGap * 0.3));
+}
 
 /** 生成贝塞尔过渡路径 */
 function generateTransitionPath(
@@ -38,6 +57,9 @@ export default function LineDiagram() {
 
   const trainPosition = trains[0]?.position;
   const totalLength = lineLayout?.total_length ?? 3200;
+
+  // 动态计算过渡区长度
+  const TRANSITION_LENGTH = lineLayout ? calcTransitionLength(lineLayout.stations) : 200;
 
   const viewport = useViewport({
     trainPosition,
@@ -215,6 +237,7 @@ export default function LineDiagram() {
             train={train}
             direction="up" // TODO: 从 train 对象获取 direction
             stations={lineLayout.stations}
+            transitionLength={TRANSITION_LENGTH}
           />
         ))}
       </svg>

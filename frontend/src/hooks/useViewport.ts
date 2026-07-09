@@ -60,21 +60,32 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     totalLength,
     containerRef,
     worldHeight = 80,
-    maxZoom = 5.0,
+    maxZoom: maxZoomProp,
     initialZoom = 1.0,
     initialFollowMode = true,
     clampPan = false,
   } = options;
 
+  // 动态计算 maxZoom：根据轨道总长，确保能看清细节
+  // 18.6km 轨道，maxZoom ≈ 18.6；3.2km 轨道，maxZoom ≈ 5
+  const maxZoom = maxZoomProp ?? Math.max(5, Math.min(30, totalLength / 1000));
   const minZoom = 1.0;
-  const clampedInitialZoom = Math.max(minZoom, Math.min(maxZoom, initialZoom));
-  const initialViewW = totalLength / clampedInitialZoom;
 
-  const [state, setState] = useState<ViewportState>(() => ({
-    zoom: clampedInitialZoom,
-    panX: clampPan ? clampPanX(0, initialViewW, totalLength) : 0,
-    followMode: initialFollowMode,
-  }));
+  // 初始 zoom：如果 initialZoom 为默认值 1.0，则根据容器宽度动态计算
+  const [state, setState] = useState<ViewportState>(() => {
+    let zoom = initialZoom;
+    if (initialZoom === 1.0) {
+      const containerWidth = containerRef.current?.clientWidth ?? 800;
+      zoom = Math.max(minZoom, containerWidth / totalLength);
+    }
+    const clampedZoom = Math.max(minZoom, Math.min(maxZoom, zoom));
+    const viewW = totalLength / clampedZoom;
+    return {
+      zoom: clampedZoom,
+      panX: clampPan ? Math.max(0, Math.min(0, totalLength - viewW)) : 0,
+      followMode: initialFollowMode,
+    };
+  });
   const [isAnimating, setIsAnimating] = useState(false);
 
   // 用 ref 追踪最新状态，供动画闭包读取
