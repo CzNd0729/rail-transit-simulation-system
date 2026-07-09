@@ -27,6 +27,7 @@ class Phase(str, Enum):
 class TrainSignalState:
     phase: Phase = Phase.TRACTION
     dwell_remaining: float = 0.0
+    _dwell_station_id: str = ""
 
 
 class ThreeStageController:
@@ -42,6 +43,9 @@ class ThreeStageController:
         self.vehicle_params = vehicle_params
         self.sim_params = sim_params
         self._state = TrainSignalState()
+        # 标记首站为已停靠，防止兜底检测误判刚离站的列车
+        if self.track._stations:
+            self._state._dwell_station_id = self.track._stations[0].id
 
     @property
     def signal_state(self) -> TrainSignalState:
@@ -49,6 +53,8 @@ class ThreeStageController:
 
     def reset(self) -> None:
         self._state = TrainSignalState()
+        if self.track._stations:
+            self._state._dwell_station_id = self.track._stations[0].id
 
     def compute_commands(self, train: TrainState, dt: float) -> ControlCommands:
         st = self._state
@@ -72,11 +78,23 @@ class ThreeStageController:
         brake_dist = self._brake_trigger_distance(train)
         dist_to_station = target.chainage - train.position
 
-        # 到站停稳 → 站停
+        # 到站停稳 → 站停（next_station_ahead 仍指向当前站）
         if train.speed < 0.1 and abs(dist_to_station) <= tol:
             st.phase = Phase.DWELL
             st.dwell_remaining = target.dwell_time
+            st._dwell_station_id = target.id
             return ControlCommands()
+
+        # 到站停稳兜底：next_station_ahead 已指向下一站（制动偏差超过 tol），
+        # 但列车实际停在站台附近。half_length=50.0 比 tol(1m) 更宽松，
+        # 覆盖上坡/下坡/弯道对实际制动距离的影响（典型 ±2~4m 偏差）。
+        if train.speed < 0.1 and dist_to_station > tol and train.position > tol:
+            current_station = self.track.station_at(train.position, half_length=50.0)
+            if current_station is not None and current_station.id != st._dwell_station_id:
+                st.phase = Phase.DWELL
+                st.dwell_remaining = current_station.dwell_time
+                st._dwell_station_id = current_station.id
+                return ControlCommands()
 
         # 中途停住（制动不足等）→ 重新牵引
         if train.speed < 0.1 and dist_to_station > tol:
