@@ -160,17 +160,6 @@ select:focus {
   border-color: var(--color-primary);
 }
 
-/* 参数步进器：隐藏浏览器原生 number 微调按钮 */
-.param-stepper-input {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-.param-stepper-input::-webkit-outer-spin-button,
-.param-stepper-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
 /* 标签 */
 label {
   font-size: 12px;
