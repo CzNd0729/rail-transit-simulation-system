@@ -1,16 +1,21 @@
 /**
- * TrainMarker — 列车图标 SVG 渲染
- * 支持双向轨道，根据 direction 选择上行/下行轨道 Y 坐标
+ * TrainMarker — 列车多车厢 SVG 渲染
+ * 120m 总长，6 节车厢，跟随工况着色，沿轨道曲线行驶
  */
-import type { TrainState } from '../../../types/simulation';
+import type { TrainState, StationLayout } from '../../../types/simulation';
 
 interface TrainMarkerProps {
   train: TrainState;
-  /** 正线 Y 坐标 (世界坐标，单轨模式) */
-  trackY?: number;
-  /** 列车方向（双向轨道模式） */
   direction?: 'up' | 'down';
+  stations?: StationLayout[];
 }
+
+const TRAIN_LENGTH = 120; // 列车总长 (m)
+const CAR_COUNT = 6;
+const CAR_LENGTH = TRAIN_LENGTH / CAR_COUNT; // 20m
+const CAR_GAP = 1; // 车厢间距 (m)
+const TRAIN_HEIGHT = 12; // 车身高度 (px)
+const TRANSITION_LENGTH = 500; // 过渡区长度 (m)
 
 const MODE_COLORS: Record<string, string> = {
   traction: '#1890ff',
@@ -18,55 +23,109 @@ const MODE_COLORS: Record<string, string> = {
   braking: '#ff4d4f',
 };
 
-// 双向轨道 Y 坐标
-const DUAL_TRACK_Y = {
-  up: 35,
-  down: 45,
-  default: 35,
-};
+// 轨道 Y 坐标
+const SEGMENT_Y = { up: 35, down: 45 };
+const STATION_Y = { up: 25, down: 55 };
 
-export default function TrainMarker({ train, trackY, direction }: TrainMarkerProps) {
+/** 计算三次贝塞尔曲线上的 Y 值 */
+function bezierY(t: number, y0: number, y1: number, y2: number, y3: number): number {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const mt3 = mt2 * mt;
+  return mt3 * y0 + 3 * mt2 * t * y1 + 3 * mt * t2 * y2 + t3 * y3;
+}
+
+/** 根据 X 坐标计算列车所在轨道的 Y 坐标 */
+function getTrackY(x: number, direction: 'up' | 'down', stations?: StationLayout[]): number {
+  if (!stations) return SEGMENT_Y[direction];
+
+  for (const station of stations) {
+    const stationStart = station.chainage;
+    const stationEnd = station.chainage + station.length;
+
+    // 在车站内
+    if (x >= stationStart && x <= stationEnd) {
+      return STATION_Y[direction];
+    }
+
+    // 进站过渡区（车站前 500m）
+    const entryStart = stationStart - TRANSITION_LENGTH;
+    if (x >= entryStart && x < stationStart) {
+      const t = (x - entryStart) / TRANSITION_LENGTH;
+      // Bezier: (entryStart, SEGMENT_Y) -> (stationStart, STATION_Y)
+      // 控制点: (mid, SEGMENT_Y) 和 (mid, STATION_Y)
+      return bezierY(t, SEGMENT_Y[direction], SEGMENT_Y[direction], STATION_Y[direction], STATION_Y[direction]);
+    }
+
+    // 出站过渡区（车站后 500m）
+    const exitEnd = stationEnd + TRANSITION_LENGTH;
+    if (x > stationEnd && x <= exitEnd) {
+      const t = (x - stationEnd) / TRANSITION_LENGTH;
+      // Bezier: (stationEnd, STATION_Y) -> (exitEnd, SEGMENT_Y)
+      return bezierY(t, STATION_Y[direction], STATION_Y[direction], SEGMENT_Y[direction], SEGMENT_Y[direction]);
+    }
+  }
+
+  return SEGMENT_Y[direction];
+}
+
+export default function TrainMarker({ train, direction = 'up', stations }: TrainMarkerProps) {
   const color = MODE_COLORS[train.mode] || '#999';
-  const x = train.position;
 
-  // 确定 Y 坐标：优先 direction，其次 trackY，最后默认值
-  const y = direction
-    ? DUAL_TRACK_Y[direction]
-    : trackY ?? DUAL_TRACK_Y.default;
+  // position 是列车车尾位置，车身向前延伸
+  const trainStart = train.position;
 
   return (
-    <g style={{ transition: 'transform 100ms linear' }}>
-      {/* 列车背景色块 */}
-      <rect
-        x={x - 10}
-        y={y - 8}
-        width={20}
-        height={16}
-        rx={4}
-        fill={color}
-        opacity={0.9}
-      />
-      {/* 列车图标 */}
-      <text
-        x={x}
-        y={y + 4}
-        textAnchor="middle"
-        fontSize={10}
-        fill="#fff"
-      >
-        🚇
-      </text>
+    <g>
+      {/* 6 节车厢，每节根据位置计算 Y 坐标 */}
+      {Array.from({ length: CAR_COUNT }).map((_, i) => {
+        const carX = trainStart + i * (CAR_LENGTH + CAR_GAP);
+        const carCenterX = carX + (CAR_LENGTH - CAR_GAP) / 2;
+        const y = getTrackY(carCenterX, direction, stations);
+        return (
+          <rect
+            key={i}
+            x={carX}
+            y={y - TRAIN_HEIGHT / 2}
+            width={CAR_LENGTH - CAR_GAP}
+            height={TRAIN_HEIGHT}
+            fill={color}
+            rx={2}
+          />
+        );
+      })}
+
+      {/* 车头箭头 */}
+      {(() => {
+        const headX = trainStart + TRAIN_LENGTH;
+        const headY = getTrackY(headX, direction, stations);
+        return (
+          <polygon
+            points={`${headX},${headY - 4} ${headX + 4},${headY} ${headX},${headY + 4}`}
+            fill={color}
+          />
+        );
+      })()}
+
       {/* 速度标注 */}
-      <text
-        x={x}
-        y={y - 12}
-        textAnchor="middle"
-        fontSize={7}
-        fill={color}
-        fontWeight={600}
-      >
-        {train.speed.toFixed(0)}km/h
-      </text>
+      {(() => {
+        const centerX = trainStart + TRAIN_LENGTH / 2;
+        const centerY = getTrackY(centerX, direction, stations);
+        return (
+          <text
+            x={centerX}
+            y={centerY - TRAIN_HEIGHT / 2 - 4}
+            textAnchor="middle"
+            fontSize={8}
+            fill={color}
+            fontWeight={600}
+          >
+            {train.speed.toFixed(0)}km/h
+          </text>
+        );
+      })()}
     </g>
   );
 }
