@@ -19,7 +19,7 @@ describe('parseServerSnapshot', () => {
         faultAlarm: null,
       }],
       power: { substations: [], voltageProfile: [], totalConsumption: 0, totalRegeneration: 0 },
-      signaling: { commands: [], emergencyBrakes: [] },
+      signaling: { controlCommands: [], emergencyBrakes: [] },
       track: { occupancy: [], switchStates: [] },
       events: [],
     };
@@ -39,11 +39,34 @@ describe('parseServerSnapshot', () => {
         faultAlarm: null,
       }],
       power: { substations: [], voltageProfile: [], totalConsumption: 0, totalRegeneration: 0 },
-      signaling: { commands: [], emergencyBrakes: [] },
+      signaling: { controlCommands: [], emergencyBrakes: [] },
       track: { occupancy: [], switchStates: [] },
       events: [],
     };
     expect(parseServerSnapshot(raw).trains[0].mode).toBe('stopped');
+  });
+
+  it('maps runningPhase from controlCommands', () => {
+    const raw = {
+      clock: { elapsed: 30, speedMultiplier: 1 as const },
+      trains: [{
+        id: 'T1', position: 1500, speed: 0, acceleration: 0,
+        mode: 'stopped' as const, mass: 200000, passengerCount: 900,
+        pantographVoltage: 1500, powerDemand: 0, doorStatus: 'closed' as const,
+        faultAlarm: null,
+      }],
+      power: { substations: [], voltageProfile: [], totalConsumption: 0, totalRegeneration: 0 },
+      signaling: {
+        controlCommands: [{
+          trainId: 'T1', tractionLevel: 0, brakeLevel: 0, emergencyBrake: false, runningPhase: 'dwell',
+        }],
+        emergencyBrakes: [],
+      },
+      track: { occupancy: [], switchStates: [] },
+      events: [],
+    };
+    const snap = parseServerSnapshot(raw);
+    expect(snap.signaling.commands[0]?.running_phase).toBe('dwell');
   });
 });
 
@@ -58,6 +81,20 @@ describe('toApiParamUpdate', () => {
       signal: { dwellTime: 35, targetSpeedRatio: 0.8 },
     });
   });
+
+  it('maps traction_curve to tractionCurve', () => {
+    const out = toApiParamUpdate({
+      vehicle: {
+        traction_curve: [
+          { speed: 0, force_percent: 1, sort_order: 0 },
+          { speed: 40, force_percent: 0.5, sort_order: 1 },
+        ],
+      },
+    });
+    expect(out.vehicle).toEqual({
+      tractionCurve: [{ speed: 0, forcePercent: 1 }, { speed: 40, forcePercent: 0.5 }],
+    });
+  });
 });
 
 describe('parseApiParams', () => {
@@ -70,6 +107,19 @@ describe('parseApiParams', () => {
     expect(out.vehicle?.empty_mass).toBe(220000);
     expect(out.track?.speed_limit).toBe(80);
     expect(out.signal?.target_speed_ratio).toBe(0.8);
+  });
+
+  it('parses tractionCurve and segmentId', () => {
+    const out = parseApiParams({
+      vehicle: {
+        tractionCurve: [{ speed: 0, forcePercent: 1 }, { speed: 80, forcePercent: 0.5 }],
+      },
+      track: { segmentId: 'SEC02', gradient: 30 },
+    });
+    expect(out.vehicle?.traction_curve).toHaveLength(2);
+    expect(out.vehicle?.traction_curve?.[1].force_percent).toBe(0.5);
+    expect(out.track?.segment_id).toBe('SEC02');
+    expect(out.track?.gradient).toBe(30);
   });
 });
 

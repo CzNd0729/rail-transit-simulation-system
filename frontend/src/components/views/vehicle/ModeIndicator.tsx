@@ -4,14 +4,13 @@
  * 当前工况（牵引/惰行/制动）彩色标识
  */
 import { useSimulationState } from '../../../context/SimulationContext';
-import { getModeLabel, getModeColor } from '../../../utils/format';
+import { getModeLabel, getModeColor, getDisplayMode } from '../../../utils/format';
 
 export default function ModeIndicator() {
-  const { trains } = useSimulationState();
+  const { trains, signaling } = useSimulationState();
   const train = trains[0];
-  const displayMode = train?.mode === 'coasting' && train.speed < 0.5
-    ? 'stopped'
-    : train?.mode;
+  const runningPhase = signaling.commands[0]?.running_phase;
+  const displayMode = getDisplayMode(train?.mode, train?.speed ?? 0, runningPhase);
 
   const modes = ['traction', 'coasting', 'braking', 'stopped'] as const;
 

@@ -9,7 +9,7 @@
  * - UI-VW-04: 关键状态速览面板 — 4 个小卡片：当前速度、网压、工况、信号授权
  * - UI-VW-05: 子系统状态指示器 — 供电/信号/轨道/车辆各系统状态灯
  */
-import LineProfile from '../components/views/overview/LineProfile';
+import CollapsiblePanel from '../components/common/CollapsiblePanel';
 import LineDiagram from '../components/views/overview/LineDiagram';
 import SpeedPositionCurve from '../components/views/overview/SpeedPositionCurve';
 import StatusCards from '../components/views/overview/StatusCards';
@@ -18,24 +18,23 @@ import SubsystemIndicators from '../components/views/overview/SubsystemIndicator
 export default function OverviewView() {
   return (
     <div style={styles.container}>
-      {/* 顶部：关键状态速览 + 子系统状态指示器 */}
+      {/* 顶部：关键状态速览 + 子系统状态（并排） */}
       <div style={styles.topRow}>
         <StatusCards />
         <SubsystemIndicators />
       </div>
 
-      {/* 中部：线路纵断面 + 交互式线路图 */}
-      <div style={styles.middleRow}>
-        <div style={styles.lineSection}>
-          <LineProfile />
-          <LineDiagram />
-        </div>
+      {/* 线路图（固定大小，不可折叠） */}
+      <div style={styles.lineDiagramWrapper}>
+        <LineDiagram />
       </div>
 
-      {/* 底部：速度-位置曲线 */}
-      <div style={styles.bottomRow}>
-        <SpeedPositionCurve />
-      </div>
+      {/* 速度-位置曲线（可折叠） */}
+      <CollapsiblePanel title="速度-位置曲线" icon="📊" defaultOpen={true}>
+        <div style={styles.chartWrapper}>
+          <SpeedPositionCurve />
+        </div>
+      </CollapsiblePanel>
     </div>
   );
 }
@@ -45,25 +44,20 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
-    height: '100%',
+    minHeight: '100%',
+    padding: '0 4px',
   },
   topRow: {
     display: 'flex',
     gap: '12px',
     flexShrink: 0,
   },
-  middleRow: {
-    flex: 1,
-    minHeight: '200px',
-  },
-  lineSection: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    height: '100%',
-  },
-  bottomRow: {
-    height: '250px',
+  lineDiagramWrapper: {
+    height: '350px',
     flexShrink: 0,
+  },
+  chartWrapper: {
+    height: '300px',
+    padding: '12px',
   },
 };

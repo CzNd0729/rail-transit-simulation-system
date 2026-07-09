@@ -11,6 +11,7 @@ from enum import Enum
 from sim_engine.core.config import SimulationParams
 from sim_engine.track.models import Station
 from sim_engine.track.path_service import TrackPathService
+from sim_engine.vehicle.dynamics import effective_speed_limit_kmh
 from sim_engine.vehicle.models import GRAVITY, ControlCommands, TrainState, VehicleParams
 from sim_engine.vehicle.traction import interpolate_force_percent
 
@@ -66,7 +67,8 @@ class ThreeStageController:
             return ControlCommands()
 
         track_params = self.track.query_at(train.position)
-        v_target = self.sim_params.target_speed_ratio * track_params.speed_limit
+        speed_limit = effective_speed_limit_kmh(track_params, self.vehicle_params)
+        v_target = self.sim_params.target_speed_ratio * speed_limit
         brake_dist = self._brake_trigger_distance(train)
         dist_to_station = target.chainage - train.position
 
@@ -124,7 +126,6 @@ class ThreeStageController:
         mass = train.mass if train.mass > 0 else self.vehicle_params.empty_mass
         p = self.vehicle_params
 
-        # 滚动摩擦阻力 (Davis A + B·v 部分，不含空气项)
         rolling = (p.davis_a + p.davis_b * v_ms) * mass * GRAVITY
 
         # 坡度阻力：上坡为正（需补偿），下坡为负（减少补偿）
@@ -134,7 +135,6 @@ class ThreeStageController:
         if f_target <= 0:
             return 0.0
 
-        # 当前速度下最大可用牵引力
         percent = interpolate_force_percent(p.traction_curve, train.speed)
         max_available = p.max_traction_force * percent
         if max_available <= 0:
@@ -142,3 +142,11 @@ class ThreeStageController:
 
         level = f_target / max_available
         return min(max(level, 0.0), 1.0)
+
+    def _brake_trigger_distance(self, train: TrainState) -> float:
+        v_ms = max(train.speed, 0.0) / 3.6
+        mass = train.mass if train.mass > 0 else self.vehicle_params.empty_mass
+        max_decel = self.vehicle_params.max_brake_force / mass
+        if max_decel <= 0:
+            return 0.0
+        return (v_ms * v_ms) / (2 * max_decel) * 1.1

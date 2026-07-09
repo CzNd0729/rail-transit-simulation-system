@@ -1,4 +1,5 @@
 import type {
+  ApiControlCommand,
   ApiSimulationSnapshot,
   SimulationParams,
   SimulationSnapshot,
@@ -41,7 +42,18 @@ function mapTrain(t: ApiSimulationSnapshot['trains'][0]): TrainState {
   };
 }
 
+function mapControlCommand(c: ApiControlCommand) {
+  return {
+    train_id: c.trainId,
+    traction_level: c.tractionLevel,
+    brake_level: c.brakeLevel,
+    emergency_brake: c.emergencyBrake,
+    running_phase: c.runningPhase,
+  };
+}
+
 export function parseServerSnapshot(raw: ApiSimulationSnapshot): SimulationSnapshot {
+  const controlCommands = raw.signaling?.controlCommands ?? [];
   return {
     clock: {
       elapsed: raw.clock.elapsed,
@@ -55,7 +67,11 @@ export function parseServerSnapshot(raw: ApiSimulationSnapshot): SimulationSnaps
       total_regeneration: raw.power.totalRegeneration,
       regeneration_rate: 0,
     },
-    signaling: { commands: [], emergency_brake: [], train_intervals: [] },
+    signaling: {
+      commands: controlCommands.map(mapControlCommand),
+      emergency_brake: [],
+      train_intervals: [],
+    },
     track: { occupancy: [], switch_states: [] },
     events: raw.events ?? [],
   };
@@ -67,6 +83,13 @@ export function toApiParamUpdate(params: Partial<SimulationParams>): Record<stri
     const v: Record<string, unknown> = {};
     for (const [k, val] of Object.entries(params.vehicle)) {
       if (val === undefined) continue;
+      if (k === 'traction_curve' && Array.isArray(val)) {
+        v.tractionCurve = val.map((p) => ({
+          speed: p.speed,
+          forcePercent: p.force_percent,
+        }));
+        continue;
+      }
       v[VEHICLE_KEY_MAP[k] ?? k] = val;
     }
     result.vehicle = v;
@@ -84,6 +107,7 @@ export function toApiParamUpdate(params: Partial<SimulationParams>): Record<stri
   }
   if (params.track) {
     result.track = {
+      ...(params.track.segment_id !== undefined && { segmentId: params.track.segment_id }),
       ...(params.track.gradient !== undefined && { gradient: params.track.gradient }),
       ...(params.track.curvature !== undefined && { curvature: params.track.curvature }),
       ...(params.track.speed_limit !== undefined && { speedLimit: params.track.speed_limit }),
@@ -100,6 +124,17 @@ export function parseApiParams(raw: Record<string, unknown>): Partial<Simulation
     const vehicle: SimulationParams['vehicle'] = {};
     for (const [k, val] of Object.entries(vehicleRaw)) {
       if (val === undefined) continue;
+      if (k === 'tractionCurve' && Array.isArray(val)) {
+        vehicle.traction_curve = val.map((p, i) => {
+          const point = p as Record<string, unknown>;
+          return {
+            speed: Number(point.speed),
+            force_percent: Number(point.forcePercent ?? point.force_percent),
+            sort_order: i,
+          };
+        });
+        continue;
+      }
       const snakeKey = VEHICLE_KEY_REVERSE[k] ?? k;
       (vehicle as Record<string, unknown>)[snakeKey] = val;
     }
@@ -109,6 +144,7 @@ export function parseApiParams(raw: Record<string, unknown>): Partial<Simulation
   const trackRaw = raw.track as Record<string, unknown> | undefined;
   if (trackRaw) {
     result.track = {
+      ...(trackRaw.segmentId !== undefined && { segment_id: String(trackRaw.segmentId) }),
       ...(trackRaw.gradient !== undefined && { gradient: trackRaw.gradient as number }),
       ...(trackRaw.curvature !== undefined && { curvature: trackRaw.curvature as number }),
       ...(trackRaw.speedLimit !== undefined && { speed_limit: trackRaw.speedLimit as number }),

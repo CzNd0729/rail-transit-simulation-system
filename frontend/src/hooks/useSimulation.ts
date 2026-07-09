@@ -4,7 +4,7 @@
  * 注意：不乐观更新 runState——按钮状态完全依赖服务端推送的 simulation_status
  */
 import { useCallback } from 'react';
-import { useSimulationDispatch } from '../context/SimulationContext';
+import { useSimulationDispatch, useSimulationState } from '../context/SimulationContext';
 import { toApiParamUpdate } from '../utils/apiAdapter';
 import { USE_MOCK } from '../utils/constants';
 import { updateParams as apiUpdateParams } from '../services/api';
@@ -35,9 +35,10 @@ interface UseSimulationReturn {
  */
 export function useSimulation(send: (data: object) => void): UseSimulationReturn {
   const dispatch = useSimulationDispatch();
+  const { runState } = useSimulationState();
 
   const startSimulation = useCallback(() => {
-    dispatch({ type: 'CLEAR_CHART_HISTORY' });
+    dispatch({ type: 'RESET_RUN_DATA' });
     send({ type: 'sim_control', action: 'start' });
   }, [send, dispatch]);
 
@@ -51,8 +52,7 @@ export function useSimulation(send: (data: object) => void): UseSimulationReturn
 
   const stopSimulation = useCallback(() => {
     send({ type: 'sim_control', action: 'stop' });
-    dispatch({ type: 'CLEAR_CHART_HISTORY' });
-  }, [send, dispatch]);
+  }, [send]);
 
   const stepSimulation = useCallback(() => {
     send({ type: 'sim_control', action: 'step' });
@@ -63,6 +63,7 @@ export function useSimulation(send: (data: object) => void): UseSimulationReturn
   }, [dispatch]);
 
   const updateParams = useCallback(async (params: Partial<SimulationParams>) => {
+    if (runState === 'running') return;
     dispatch({ type: 'UPDATE_PARAMS', payload: params });
     if (USE_MOCK) {
       send({ type: 'param_update', params });
@@ -74,7 +75,7 @@ export function useSimulation(send: (data: object) => void): UseSimulationReturn
         console.error('参数提交失败:', err);
       }
     }
-  }, [dispatch, send]);
+  }, [dispatch, send, runState]);
 
   return {
     startSimulation,

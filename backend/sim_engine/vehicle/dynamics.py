@@ -26,6 +26,15 @@ MODE_COASTING = "coasting"
 MODE_BRAKING = "braking"
 
 
+def effective_speed_limit_kmh(track: TrackPointParams, params: VehicleParams) -> float:
+    """VHC-07：有效限速 = min(区段限速, 车辆构造速度)。"""
+    track_limit = max(track.speed_limit, 0.0)
+    vehicle_limit = max(params.max_speed, 0.0)
+    if vehicle_limit <= 0:
+        return track_limit
+    return min(track_limit, vehicle_limit)
+
+
 class VehicleSystem:
     """单质点列车动力学模型。"""
 
@@ -95,8 +104,9 @@ class VehicleSystem:
             new_v_ms = 0.0
             accel = (new_v_ms - v_ms) / dt if dt > 0 else 0.0
 
-        # VHC-07：限速约束
-        speed_limit_ms = max(track.speed_limit, 0.0) * KMH_TO_MS
+        # VHC-07：限速约束（区段限速与车辆最大速度取较低者）
+        speed_limit_kmh = effective_speed_limit_kmh(track, params)
+        speed_limit_ms = speed_limit_kmh * KMH_TO_MS
         if new_v_ms > speed_limit_ms:
             new_v_ms = speed_limit_ms
             accel = (new_v_ms - v_ms) / dt if dt > 0 else 0.0

@@ -171,6 +171,18 @@ def test_traction_transition_to_coasting():
     assert ctrl.signal_state.phase == Phase.COASTING
 
 
+def test_traction_target_respects_vehicle_max_speed():
+    """max_speed 低于区段限速时，目标速度按 max_speed × ratio 计算。"""
+    vp = _make_vehicle_params()
+    vp.max_speed = 50.0
+    ctrl = ThreeStageController(_make_track(), vp, _make_sim_params())
+    # 0.8 × 50 = 40
+    train = _make_train(position=10.0, speed=40.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    assert ctrl.signal_state.phase == Phase.COASTING
+    assert cmd.traction_level == 0.0
+
+
 # ── SIG-01: 惰行阶段 ────────────────────────────────────────────────
 
 def test_coasting_outputs_neutral():

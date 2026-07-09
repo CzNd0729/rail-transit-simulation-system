@@ -7,27 +7,37 @@ import { useSimulation } from '../../hooks/useSimulation';
 
 interface Props {
   send: (data: object) => void;
+  disabled?: boolean;
 }
 
-export default function TrackParamsForm({ send }: Props) {
+export default function TrackParamsForm({ send, disabled = false }: Props) {
   const { params } = useSimulationState();
   const { updateParams } = useSimulation(send);
 
   const handleChange = (key: string, value: number) => {
+    if (disabled) return;
     updateParams({ track: { ...params.track, [key]: value } });
   };
 
   return (
     <fieldset style={styles.fieldset}>
       <legend style={styles.legend}>🛤️ 线路参数</legend>
-      <ParamRow label="坡度 (‰)" value={params.track.gradient} onChange={(v) => handleChange('gradient', v)} />
-      <ParamRow label="曲率半径 (m)" value={params.track.curvature} onChange={(v) => handleChange('curvature', v)} />
-      <ParamRow label="限速 (km/h)" value={params.track.speed_limit} onChange={(v) => handleChange('speed_limit', v)} />
+      {params.track.segment_id && (
+        <div style={styles.hint}>当前区段：{params.track.segment_id}</div>
+      )}
+      <ParamRow label="坡度 (‰)" value={params.track.gradient} onChange={(v) => handleChange('gradient', v)} disabled={disabled} />
+      <ParamRow label="曲率半径 (m)" value={params.track.curvature} onChange={(v) => handleChange('curvature', v)} disabled={disabled} />
+      <ParamRow label="限速 (km/h)" value={params.track.speed_limit} onChange={(v) => handleChange('speed_limit', v)} disabled={disabled} />
     </fieldset>
   );
 }
 
-function ParamRow({ label, value, onChange }: { label: string; value: number | undefined; onChange: (v: number) => void }) {
+function ParamRow({ label, value, onChange, disabled = false }: {
+  label: string;
+  value: number | undefined;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+}) {
   return (
     <div style={styles.row}>
       <label>{label}</label>
@@ -37,6 +47,7 @@ function ParamRow({ label, value, onChange }: { label: string; value: number | u
         onChange={(e) => onChange(Number(e.target.value))}
         style={styles.input}
         placeholder="默认值"
+        disabled={disabled}
       />
     </div>
   );
@@ -52,6 +63,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: 'var(--text-highlight)',
     padding: '0 4px',
+  },
+  hint: {
+    fontSize: '11px',
+    color: 'var(--text-secondary)',
+    marginBottom: '4px',
   },
   row: {
     display: 'flex',

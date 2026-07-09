@@ -16,10 +16,18 @@ import type {
 import type { ProfileSegment } from '../data/mvpLineLayout';
 import { DEFAULT_VEHICLE_PARAMS } from '../data/mockVehicleParams';
 import { EMPTY_CHART_HISTORY, appendChartHistory, clearChartHistory } from '../utils/chartHistory';
+import {
+  extractVehicleParamBaselines,
+  extractTrackParamBaselines,
+  extractSignalParamBaselines,
+  extractTractionCurveBaselines,
+  DEFAULT_TRACK_PARAMS,
+  DEFAULT_SIGNAL_PARAMS,
+} from '../utils/paramStep';
 
 // ==================== 初始状态 ====================
 
-const initialState: AppState = {
+export const initialState: AppState = {
   connection: 'disconnected',
   runState: 'idle',
   activeView: 'overview',
@@ -43,9 +51,9 @@ const initialState: AppState = {
   },
   params: {
     vehicle: { ...DEFAULT_VEHICLE_PARAMS },
-    track: { gradient: 30, curvature: 1200, speed_limit: 80 },
+    track: { ...DEFAULT_TRACK_PARAMS },
     power: {},
-    signal: { dwell_time: 30, target_speed_ratio: 0.8 },
+    signal: { ...DEFAULT_SIGNAL_PARAMS },
   },
   stats: {
     total_distance: 0,
@@ -61,6 +69,10 @@ const initialState: AppState = {
   chartHistory: { ...EMPTY_CHART_HISTORY },
   lineLayout: null,
   profileSegments: null,
+  vehicleParamBaselines: extractVehicleParamBaselines(DEFAULT_VEHICLE_PARAMS),
+  trackParamBaselines: extractTrackParamBaselines(DEFAULT_TRACK_PARAMS),
+  signalParamBaselines: extractSignalParamBaselines(DEFAULT_SIGNAL_PARAMS),
+  tractionCurveBaselines: extractTractionCurveBaselines(DEFAULT_VEHICLE_PARAMS.traction_curve),
 };
 
 // ==================== Action 类型 ====================
@@ -76,6 +88,7 @@ export type SimulationAction =
   | { type: 'RESET_STATE' }
   | { type: 'SET_FPS'; payload: number }
   | { type: 'CLEAR_CHART_HISTORY' }
+  | { type: 'RESET_RUN_DATA' }
   | { type: 'INIT_DEFAULT_PARAMS' }
   | { type: 'INIT_PARAMS'; payload: Partial<SimulationParams> }
   | { type: 'SET_SPEED_MULTIPLIER'; payload: SpeedMultiplier }
@@ -84,7 +97,7 @@ export type SimulationAction =
 
 // ==================== Reducer ====================
 
-function simulationReducer(state: AppState, action: SimulationAction): AppState {
+export function simulationReducer(state: AppState, action: SimulationAction): AppState {
   switch (action.type) {
     case 'WS_CONNECTED':
       return { ...state, connection: 'connected' };
@@ -136,6 +149,12 @@ function simulationReducer(state: AppState, action: SimulationAction): AppState 
       return {
         ...state,
         chartHistory: clearChartHistory(),
+      };
+
+    case 'RESET_RUN_DATA':
+      return {
+        ...state,
+        chartHistory: clearChartHistory(),
         stats: { ...initialState.stats },
       };
 
@@ -156,18 +175,29 @@ function simulationReducer(state: AppState, action: SimulationAction): AppState 
           ...state.params,
           vehicle: { ...DEFAULT_VEHICLE_PARAMS },
         },
+        vehicleParamBaselines: extractVehicleParamBaselines(DEFAULT_VEHICLE_PARAMS),
+        tractionCurveBaselines: extractTractionCurveBaselines(DEFAULT_VEHICLE_PARAMS.traction_curve),
       };
 
-    case 'INIT_PARAMS':
+    case 'INIT_PARAMS': {
+      const mergedVehicle = { ...DEFAULT_VEHICLE_PARAMS, ...action.payload.vehicle };
+      const mergedTrack = { ...DEFAULT_TRACK_PARAMS, ...state.params.track, ...action.payload.track };
+      const mergedSignal = { ...DEFAULT_SIGNAL_PARAMS, ...state.params.signal, ...action.payload.signal };
+      const mergedCurve = mergedVehicle.traction_curve ?? DEFAULT_VEHICLE_PARAMS.traction_curve;
       return {
         ...state,
         params: {
-          vehicle: { ...DEFAULT_VEHICLE_PARAMS, ...action.payload.vehicle },
-          track: { ...state.params.track, ...action.payload.track },
+          vehicle: mergedVehicle,
+          track: mergedTrack,
           power: { ...state.params.power, ...action.payload.power },
-          signal: { ...state.params.signal, ...action.payload.signal },
+          signal: mergedSignal,
         },
+        vehicleParamBaselines: extractVehicleParamBaselines(mergedVehicle),
+        trackParamBaselines: extractTrackParamBaselines(mergedTrack),
+        signalParamBaselines: extractSignalParamBaselines(mergedSignal),
+        tractionCurveBaselines: extractTractionCurveBaselines(mergedCurve),
       };
+    }
 
     case 'SET_SPEED_MULTIPLIER':
       return {

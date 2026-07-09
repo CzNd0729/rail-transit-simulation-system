@@ -10,6 +10,7 @@
  * - UI-PARAM-04: 信号参数编辑（迭代三）
  * - UI-PARAM-06: 参数预设方案保存/加载（迭代三）
  */
+import { useSimulationState } from '../../context/SimulationContext';
 import VehicleParamsForm from './VehicleParams';
 import TrackParamsForm from './TrackParams';
 import PowerParamsForm from './PowerParams';
@@ -21,14 +22,20 @@ interface Props {
 }
 
 export default function ParamPanel({ send }: Props) {
+  const { runState } = useSimulationState();
+  const locked = runState === 'running';
+
   return (
     <div className="panel">
       <div className="panel-title">⚙️ 参数配置</div>
-      <div style={styles.content}>
-        <VehicleParamsForm send={send} />
-        <TrackParamsForm send={send} />
-        <PowerParamsForm send={send} />
-        <SignalParamsForm send={send} />
+      {locked && (
+        <div style={styles.lockBanner}>仿真运行中，请先暂停或停止后再修改参数</div>
+      )}
+      <div style={{ ...styles.content, ...(locked ? styles.contentLocked : {}) }}>
+        <VehicleParamsForm send={send} disabled={locked} />
+        <TrackParamsForm send={send} disabled={locked} />
+        <PowerParamsForm send={send} disabled={locked} />
+        <SignalParamsForm send={send} disabled={locked} />
         <PresetManager />
       </div>
     </div>
@@ -36,9 +43,24 @@ export default function ParamPanel({ send }: Props) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  lockBanner: {
+    fontSize: '11px',
+    color: 'var(--color-warning)',
+    backgroundColor: 'rgba(250, 173, 20, 0.1)',
+    border: '1px solid var(--color-warning)',
+    borderRadius: '4px',
+    padding: '6px 8px',
+    marginBottom: '8px',
+    lineHeight: 1.4,
+  },
   content: {
     display: 'flex',
     flexDirection: 'column',
     gap: '10px',
+  },
+  contentLocked: {
+    opacity: 0.55,
+    pointerEvents: 'none',
+    userSelect: 'none',
   },
 };

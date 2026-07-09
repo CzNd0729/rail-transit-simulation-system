@@ -14,8 +14,12 @@ function circuitColor(occupied: boolean): { fill: string; stroke: string } {
 }
 
 export default function OccupancyDisplay() {
-  const { trains } = useSimulationState();
-  const { segments, stations, total_length } = mockLineData;
+  const { trains, lineLayout } = useSimulationState();
+
+  // 使用后端数据，fallback 到 mock
+  const segments = lineLayout?.segments ?? mockLineData.segments;
+  const stations = lineLayout?.stations ?? mockLineData.stations;
+  const total_length = lineLayout?.total_length ?? mockLineData.total_length;
 
   const flatCircuits: TrackCircuit[] = useMemo(
     () => segments.flatMap((seg) => seg.circuits),

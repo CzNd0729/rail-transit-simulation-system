@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/api/v1")
 
@@ -20,4 +20,6 @@ async def get_params() -> dict:
 @router.put("/params")
 async def update_params(body: dict) -> dict:
     result = _get_sim_manager().update_params(body)
+    if "code" in result:
+        raise HTTPException(status_code=409, detail=result["detail"])
     return {"code": 0, "message": "success", "data": result}

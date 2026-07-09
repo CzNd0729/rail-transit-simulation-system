@@ -7,13 +7,15 @@ import { useSimulation } from '../../hooks/useSimulation';
 
 interface Props {
   send: (data: object) => void;
+  disabled?: boolean;
 }
 
-export default function PowerParamsForm({ send }: Props) {
+export default function PowerParamsForm({ send, disabled = false }: Props) {
   const { params } = useSimulationState();
   const { updateParams } = useSimulation(send);
 
   const handleChange = (key: string, value: number) => {
+    if (disabled) return;
     updateParams({ power: { ...params.power, [key]: value } });
   };
 
@@ -24,17 +26,24 @@ export default function PowerParamsForm({ send }: Props) {
         label="网压 (V)"
         value={params.power.pantograph_voltage}
         onChange={(v) => handleChange('pantograph_voltage', v)}
+        disabled={disabled}
       />
       <ParamRow
         label="变电所容量 (kW)"
         value={params.power.substation_capacity}
         onChange={(v) => handleChange('substation_capacity', v)}
+        disabled={disabled}
       />
     </fieldset>
   );
 }
 
-function ParamRow({ label, value, onChange }: { label: string; value: number | undefined; onChange: (v: number) => void }) {
+function ParamRow({ label, value, onChange, disabled = false }: {
+  label: string;
+  value: number | undefined;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+}) {
   return (
     <div style={styles.row}>
       <label>{label}</label>
@@ -44,6 +53,7 @@ function ParamRow({ label, value, onChange }: { label: string; value: number | u
         onChange={(e) => onChange(Number(e.target.value))}
         style={styles.input}
         placeholder="默认值"
+        disabled={disabled}
       />
     </div>
   );

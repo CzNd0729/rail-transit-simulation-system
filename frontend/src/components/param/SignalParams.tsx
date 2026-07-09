@@ -1,45 +1,52 @@
 /**
  * SignalParams — 信号参数编辑表单
- * 基于《需求文档》UI-PARAM-04（迭代三）
  */
 import { useSimulationState } from '../../context/SimulationContext';
 import { useSimulation } from '../../hooks/useSimulation';
+import ParamStepper from './ParamStepper';
+import {
+  SIGNAL_PARAM_STEP_KEYS,
+  computeFixedParamStep,
+  type SignalParamStepKey,
+} from '../../utils/paramStep';
 
 interface Props {
   send: (data: object) => void;
+  disabled?: boolean;
 }
 
-export default function SignalParamsForm({ send }: Props) {
-  const { params } = useSimulationState();
+const PARAM_LABELS: Record<SignalParamStepKey, string> = {
+  dwell_time: '站停时间 (s)',
+  departure_interval: '发车间隔 (s)',
+  target_speed_ratio: '目标速度比',
+};
+
+export default function SignalParamsForm({ send, disabled = false }: Props) {
+  const { params, signalParamBaselines } = useSimulationState();
   const { updateParams } = useSimulation(send);
 
-  const handleChange = (key: string, value: number) => {
+  const handleChange = (key: SignalParamStepKey, value: number) => {
+    if (disabled) return;
     updateParams({ signal: { ...params.signal, [key]: value } });
   };
 
   return (
     <fieldset style={styles.fieldset}>
       <legend style={styles.legend}>🚦 信号参数</legend>
-      <ParamRow label="站停时间 (s)" value={params.signal.dwell_time} onChange={(v) => handleChange('dwell_time', v)} />
-      <ParamRow label="发车间隔 (s)" value={params.signal.departure_interval} onChange={(v) => handleChange('departure_interval', v)} />
-      <ParamRow label="目标速度比" value={params.signal.target_speed_ratio} onChange={(v) => handleChange('target_speed_ratio', v)} />
+      {SIGNAL_PARAM_STEP_KEYS.map((key) => {
+        const baseline = signalParamBaselines[key] ?? params.signal[key] ?? 0;
+        return (
+          <ParamStepper
+            key={key}
+            label={PARAM_LABELS[key]}
+            value={params.signal[key]}
+            step={computeFixedParamStep(baseline)}
+            onChange={(v) => handleChange(key, v)}
+            disabled={disabled}
+          />
+        );
+      })}
     </fieldset>
-  );
-}
-
-function ParamRow({ label, value, onChange }: { label: string; value: number | undefined; onChange: (v: number) => void }) {
-  return (
-    <div style={styles.row}>
-      <label>{label}</label>
-      <input
-        type="number"
-        value={value ?? ''}
-        onChange={(e) => onChange(Number(e.target.value))}
-        style={styles.input}
-        placeholder="默认值"
-        step={label === '目标速度比' ? 0.05 : 1}
-      />
-    </div>
   );
 }
 
@@ -53,15 +60,5 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: 'var(--text-highlight)',
     padding: '0 4px',
-  },
-  row: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '3px 0',
-  },
-  input: {
-    width: '100px',
-    textAlign: 'right' as const,
   },
 };
