@@ -356,6 +356,8 @@ export interface AppState {
   trackParamBaselines: import('../utils/paramStep').TrackParamBaselines;
   /** 信号参数步进基准值 */
   signalParamBaselines: import('../utils/paramStep').SignalParamBaselines;
+  /** 牵引特性曲线各折点步进基准值 */
+  tractionCurveBaselines: import('../utils/paramStep').TractionCurvePointBaseline[];
 }
 
 // ==================== API 原始类型（camelCase，适配前） ====================

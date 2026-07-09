@@ -5,6 +5,7 @@ import {
   extractVehicleParamBaselines,
   extractTrackParamBaselines,
   extractSignalParamBaselines,
+  extractTractionCurveBaselines,
   DEFAULT_TRACK_PARAMS,
   DEFAULT_SIGNAL_PARAMS,
 } from './paramStep';
@@ -68,5 +69,22 @@ describe('extractParamBaselines', () => {
     const baselines = extractSignalParamBaselines(DEFAULT_SIGNAL_PARAMS);
     expect(baselines.dwell_time).toBe(30);
     expect(baselines.target_speed_ratio).toBe(0.8);
+  });
+});
+
+describe('extractTractionCurveBaselines', () => {
+  it('locks per-point speed and force_percent baselines', () => {
+    const baselines = extractTractionCurveBaselines(DEFAULT_VEHICLE_PARAMS.traction_curve);
+    expect(baselines).toHaveLength(3);
+    expect(baselines[0]).toEqual({ speed: 0, force_percent: 1 });
+    expect(baselines[1]).toEqual({ speed: 40, force_percent: 1 });
+    expect(baselines[2]).toEqual({ speed: 80, force_percent: 0.5 });
+  });
+
+  it('computes fixed steps for curve points on percent scale', () => {
+    const baselines = extractTractionCurveBaselines(DEFAULT_VEHICLE_PARAMS.traction_curve);
+    expect(computeFixedParamStep(baselines[1]!.speed)).toBe(4);
+    expect(computeFixedParamStep(baselines[1]!.force_percent * 100)).toBe(10);
+    expect(computeFixedParamStep(baselines[2]!.force_percent * 100)).toBe(5);
   });
 });

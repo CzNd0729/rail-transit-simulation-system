@@ -20,6 +20,7 @@ import {
   extractVehicleParamBaselines,
   extractTrackParamBaselines,
   extractSignalParamBaselines,
+  extractTractionCurveBaselines,
   DEFAULT_TRACK_PARAMS,
   DEFAULT_SIGNAL_PARAMS,
 } from '../utils/paramStep';
@@ -71,6 +72,7 @@ export const initialState: AppState = {
   vehicleParamBaselines: extractVehicleParamBaselines(DEFAULT_VEHICLE_PARAMS),
   trackParamBaselines: extractTrackParamBaselines(DEFAULT_TRACK_PARAMS),
   signalParamBaselines: extractSignalParamBaselines(DEFAULT_SIGNAL_PARAMS),
+  tractionCurveBaselines: extractTractionCurveBaselines(DEFAULT_VEHICLE_PARAMS.traction_curve),
 };
 
 // ==================== Action 类型 ====================
@@ -174,12 +176,14 @@ export function simulationReducer(state: AppState, action: SimulationAction): Ap
           vehicle: { ...DEFAULT_VEHICLE_PARAMS },
         },
         vehicleParamBaselines: extractVehicleParamBaselines(DEFAULT_VEHICLE_PARAMS),
+        tractionCurveBaselines: extractTractionCurveBaselines(DEFAULT_VEHICLE_PARAMS.traction_curve),
       };
 
     case 'INIT_PARAMS': {
       const mergedVehicle = { ...DEFAULT_VEHICLE_PARAMS, ...action.payload.vehicle };
       const mergedTrack = { ...DEFAULT_TRACK_PARAMS, ...state.params.track, ...action.payload.track };
       const mergedSignal = { ...DEFAULT_SIGNAL_PARAMS, ...state.params.signal, ...action.payload.signal };
+      const mergedCurve = mergedVehicle.traction_curve ?? DEFAULT_VEHICLE_PARAMS.traction_curve;
       return {
         ...state,
         params: {
@@ -191,6 +195,7 @@ export function simulationReducer(state: AppState, action: SimulationAction): Ap
         vehicleParamBaselines: extractVehicleParamBaselines(mergedVehicle),
         trackParamBaselines: extractTrackParamBaselines(mergedTrack),
         signalParamBaselines: extractSignalParamBaselines(mergedSignal),
+        tractionCurveBaselines: extractTractionCurveBaselines(mergedCurve),
       };
     }
 
