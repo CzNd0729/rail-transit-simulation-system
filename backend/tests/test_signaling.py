@@ -63,6 +63,26 @@ def _make_track() -> TrackPathService:
     return TrackPathService(Track(name="test-line", stations=stations, segments=segments))
 
 
+def _make_track_uphill() -> TrackPathService:
+    """上坡 20‰ 的测试线路。"""
+    stations = [
+        Station(id="ST01", name="A站", chainage=0.0, dwell_time=30.0),
+        Station(id="ST02", name="B站", chainage=1000.0, dwell_time=30.0),
+    ]
+    segments = [
+        Segment(
+            id="SEC01",
+            start_chainage=0.0,
+            end_chainage=1000.0,
+            gradient=20.0,
+            curvature=0.0,
+            speed_limit=80.0,
+            is_tunnel=False,
+        ),
+    ]
+    return TrackPathService(Track(name="test-uphill", stations=stations, segments=segments))
+
+
 def _make_sim_params(**overrides) -> SimulationParams:
     d = dict(
         time_step=0.1,
@@ -134,13 +154,42 @@ def test_traction_transition_to_coasting():
 # ── SIG-01: 惰行阶段 ────────────────────────────────────────────────
 
 def test_coasting_outputs_neutral():
-    """惰行阶段输出零牵引零制动。"""
+    """惰行阶段输出补偿牵引力抵消滚动摩擦（非纯零）。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
     ctrl._state.phase = Phase.COASTING
     train = _make_train(position=500.0, speed=60.0)
     cmd = ctrl.compute_commands(train, dt=0.1)
-    assert cmd.traction_level == 0.0
+    # 制动始终为 0
     assert cmd.brake_level == 0.0
+    # 应有少量补偿牵引力，抵消滚动摩擦
+    assert cmd.traction_level > 0.0
+    assert cmd.traction_level < 0.3
+
+
+def test_coasting_compensation_uphill_higher():
+    """上坡路段惰行补偿应大于平坡。"""
+    track = _make_track_uphill()
+    ctrl = ThreeStageController(track, _make_vehicle_params(), _make_sim_params())
+    ctrl._state.phase = Phase.COASTING
+    train = _make_train(position=200.0, speed=50.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    assert cmd.traction_level > 0.05  # 上坡应有可观补偿
+
+
+def test_coasting_compensation_formula_match():
+    """验证惰行补偿数值：级位 ≈ (A+B·v)·mg / (F_max × 曲线比)。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
+    ctrl._state.phase = Phase.COASTING
+    train = _make_train(position=300.0, speed=60.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+
+    # 手动计算预期值
+    v_ms = 60.0 / 3.6
+    mass = 260000.0
+    rolling = (0.01 + 0.0001 * v_ms) * mass * 9.81
+    percent = 1.0 + (60 - 40) / (80 - 40) * (0.5 - 1.0)  # = 0.75
+    expected = rolling / (400000.0 * percent)
+    assert cmd.traction_level == pytest.approx(expected, rel=1e-6)
 
 
 # ── SIG-02~03: 制动触发与站停 ───────────────────────────────────────

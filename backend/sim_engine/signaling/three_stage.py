@@ -11,7 +11,8 @@ from enum import Enum
 from sim_engine.core.config import SimulationParams
 from sim_engine.track.models import Station
 from sim_engine.track.path_service import TrackPathService
-from sim_engine.vehicle.models import ControlCommands, TrainState, VehicleParams
+from sim_engine.vehicle.models import GRAVITY, ControlCommands, TrainState, VehicleParams
+from sim_engine.vehicle.traction import interpolate_force_percent
 
 
 class Phase(str, Enum):
@@ -89,7 +90,8 @@ class ThreeStageController:
             if train.position + brake_dist >= target.chainage - tol:
                 st.phase = Phase.BRAKING
                 return ControlCommands(brake_level=1.0)
-            return ControlCommands()
+            comp = self._coasting_compensation(train, track_params)
+            return ControlCommands(traction_level=comp)
 
         # BRAKING
         return ControlCommands(brake_level=1.0)
@@ -101,3 +103,37 @@ class ThreeStageController:
         if max_decel <= 0:
             return 0.0
         return (v_ms * v_ms) / (2 * max_decel) * 1.1
+
+    def _coasting_compensation(
+        self, train: TrainState, track_params
+    ) -> float:
+        """计算惰行补偿牵引级位。
+
+        惰行时施加少量牵引力，抵消滚动摩擦与上坡坡度阻力，
+        避免速度过快衰减。空气阻力与弯道阻力忽略不计。
+
+        返回牵引级位 [0, 1]。
+        """
+        v_ms = abs(train.speed) / 3.6
+        mass = train.mass if train.mass > 0 else self.vehicle_params.empty_mass
+        p = self.vehicle_params
+
+        # 滚动摩擦阻力 (Davis A + B·v 部分，不含空气项)
+        rolling = (p.davis_a + p.davis_b * v_ms) * mass * GRAVITY
+
+        # 坡度阻力：仅补偿上坡（正值），下坡不补偿
+        grad = max(track_params.gradient, 0.0)
+        gradient_force = mass * GRAVITY * (grad / 1000.0)
+
+        f_target = rolling + gradient_force
+        if f_target <= 0:
+            return 0.0
+
+        # 当前速度下最大可用牵引力
+        percent = interpolate_force_percent(p.traction_curve, train.speed)
+        max_available = p.max_traction_force * percent
+        if max_available <= 0:
+            return 0.0
+
+        level = f_target / max_available
+        return min(max(level, 0.0), 1.0)
