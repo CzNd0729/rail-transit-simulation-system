@@ -1,8 +1,8 @@
-"""三段式运行模式控制器（PID 闭环版）。
+"""三段式运行模式控制器（前馈制动版）。
 
-牵引 → 惰行 → 制动，牵引与制动阶段由 PID 闭环调节：
-- 牵引：PID 平滑逼近目标巡航速度
-- 制动：PID 跟踪 ATO 制动曲线 v=√(2a·d)，精确停靠站台
+牵引 → 惰行 → 制动：
+- 牵引：开环满牵引，接近巡航速度时切惰行
+- 制动：前馈（运动学公式）+ P 微调，精确停靠站台
 - 接近站台时切换为蠕行模式，确保柔和停车
 
 到站停车后等待站停时间再发车。
@@ -38,14 +38,10 @@ class TrainSignalState:
 
 
 class ThreeStageController:
-    """为单列车生成 PID 闭环控车指令。
+    """为单列车生成控车指令。
 
-    牵引阶段使用 PID 平滑逼近目标速度，避免满牵引-切断-再满牵引
-    的锯齿；制动阶段使用 ATO 制动曲线 v=√(2a·d) 作为 setpoint，
-    PID 实时调节制动力以实现精确停车。
-
-    注意：惰行阶段仍使用开环补偿，不做 PID 调节；惰行本身已是
-    "收油门"的过渡态，PID 调节价值有限。
+    牵引阶段：开环满牵引，无 PID。
+    制动阶段：前馈（运动学公式）+ P 微调。
     """
 
     def __init__(
@@ -59,30 +55,8 @@ class ThreeStageController:
         self.sim_params = sim_params
         self._state = TrainSignalState()
 
-        # --- PID 控制器 ---
-        pid = sim_params.pid
-        # 牵引 PID：输出限制为 [0, 1]（仅牵引）
-        self._traction_pid = PIDController(PidParams(
-            kp=pid.kp,
-            ki=pid.ki,
-            kd=pid.kd * 0.5,           # 牵引对微分需求低，减半
-            integral_max=pid.integral_max,
-            output_min=0.0,
-            output_max=1.0,
-            comfort_decel=pid.comfort_decel,
-            deadband_v=pid.deadband_v,
-        ))
-        # 制动 PID：输出限制为 [0, 1]（仅制动）
-        self._brake_pid = PIDController(PidParams(
-            kp=pid.kp,
-            ki=pid.ki,
-            kd=pid.kd,
-            integral_max=pid.integral_max,
-            output_min=0.0,
-            output_max=1.0,
-            comfort_decel=pid.comfort_decel,
-            deadband_v=pid.deadband_v,
-        ))
+        # P-only 制动微调控制器
+        self._brake_pid = PIDController(kp=sim_params.pid.kp_brake)
 
         # 标记首站为已停靠，防止兜底检测误判刚离站的列车
         if self.track._stations:
@@ -95,52 +69,40 @@ class ThreeStageController:
     @property
     def pid_params(self) -> PidParams:
         """制动 PID 参数（测试可通过此属性验证配置）。"""
-        return self._brake_pid._p
+        return self.sim_params.pid
 
     def reset(self) -> None:
         self._state = TrainSignalState()
-        self._traction_pid.reset()
         self._brake_pid.reset()
         if self.track._stations:
             self._state._dwell_station_id = self.track._stations[0].id
-
-    # ── 主入口 ───────────────────────────────────────────────────────
 
     def compute_commands(self, train: TrainState, dt: float) -> ControlCommands:
         st = self._state
         tol = self.sim_params.station_stop_tolerance
 
-        # ============================================================
-        # DWELL：站停倒计时
-        # ============================================================
+        # ── DWELL 站停倒计时 ──
         if st.phase == Phase.DWELL:
             st.dwell_remaining = max(0.0, st.dwell_remaining - dt)
             if st.dwell_remaining <= 0:
                 st.phase = Phase.TRACTION
-                self._traction_pid.reset()
             return ControlCommands()
 
         target = self.track.next_station_ahead(train.position)
 
-        # ── 跳站检测：目标站发生变化时检查是否跳过了某一站 ──
+        # ── 跳站检测 ──
         if st._last_target_station_id and target is not None and target.id != st._last_target_station_id:
             old_station = self.track.get_station_by_id(st._last_target_station_id)
             if old_station is not None and train.position > old_station.chainage:
                 if old_station.id != st._dwell_station_id:
                     if train.speed < 0.1 and abs(train.position - old_station.chainage) <= 50.0:
-                        # 已停稳在旧站附近 → 恢复停靠
                         st.phase = Phase.DWELL
                         st.dwell_remaining = old_station.dwell_time
                         st._dwell_station_id = old_station.id
-                        self._traction_pid.reset()
-                        self._brake_pid.reset()
                         return ControlCommands()
-                    # 仍在移动中，标记为已过站（避免重复处理）
                     st._dwell_station_id = old_station.id
-        # 更新目标站追踪
         if target is not None:
             st._last_target_station_id = target.id
-        # ── 跳站检测结束 ──
 
         if target is None:
             if train.speed > 0.1:
@@ -153,153 +115,144 @@ class ThreeStageController:
         brake_dist = self._brake_trigger_distance(train)
         dist_to_station = target.chainage - train.position
 
-        # ============================================================
-        # 到站停稳检测（两阶段，同上一版）
-        # ============================================================
-
-        # 主检测：next_station_ahead 仍指向当前站
+        # ── 到站停稳检测 ──
         if train.speed < 0.1 and abs(dist_to_station) <= tol:
             st.phase = Phase.DWELL
             st.dwell_remaining = target.dwell_time
             st._dwell_station_id = target.id
-            self._traction_pid.reset()
             self._brake_pid.reset()
             return ControlCommands()
 
-        # 兜底检测：制动偏差超出 tol，但确实停在站台附近
         if train.speed < 0.1 and dist_to_station > tol and train.position > tol:
             current_station = self.track.station_at(train.position, half_length=50.0)
             if current_station is not None and current_station.id != st._dwell_station_id:
                 st.phase = Phase.DWELL
                 st.dwell_remaining = current_station.dwell_time
                 st._dwell_station_id = current_station.id
-                self._traction_pid.reset()
                 self._brake_pid.reset()
                 return ControlCommands()
 
-        # 中途停住 → 重新牵引
         if train.speed < 0.1 and dist_to_station > tol:
             st.phase = Phase.TRACTION
-            self._traction_pid.reset()
 
-        # ============================================================
-        # TRACTION：PID 平滑加速到巡航速度
-        #   短站间距 → 直接切入制动（跳过惰行）
-        # ============================================================
+        # ── TRACTION: 开环满牵引 ──
         if st.phase == Phase.TRACTION:
-            # 短站间距：刹车触发距离已达站台 → 跳过惰行，直接制动
             if train.position + brake_dist >= target.chainage - tol:
                 st.phase = Phase.BRAKING
-                self._brake_pid.reset()
                 return self._braking_step(train, target, dt)
-            # 达到巡航速度 → 惰行；+0.5 防止频繁抖动
-            if train.speed >= v_cruise - 0.5:
+            if train.speed >= v_cruise - 2.0:
                 st.phase = Phase.COASTING
-                self._traction_pid.reset()
                 return ControlCommands()
-            traction = self._traction_pid.compute(v_cruise, train.speed, dt)
-            return ControlCommands(traction_level=traction)
+            return ControlCommands(traction_level=1.0)
 
-        # ============================================================
-        # COASTING：惰行 + 开环补偿
-        #   动态最低速：距站台越近，允许越低的速度（避免无效重新牵引）
-        # ============================================================
+        # ── COASTING: 惰行 + 开环补偿 ──
         if st.phase == Phase.COASTING:
             if train.position + brake_dist >= target.chainage - tol:
                 st.phase = Phase.BRAKING
-                self._brake_pid.reset()
                 return self._braking_step(train, target, dt)
-            # 动态最低惰行速度：随站距缩短而降低，上限为 coasting_min_speed
             curve_speed = PIDController.braking_curve_speed(
-                max(dist_to_station, 1.0), self._brake_pid._p.comfort_decel
+                max(dist_to_station, 1.0), self.sim_params.pid.comfort_decel
             )
             dynamic_min = min(curve_speed * 0.4, self.sim_params.coasting_min_speed)
-            dynamic_min = max(dynamic_min, 5.0)  # 绝对下限 5 km/h
+            dynamic_min = max(dynamic_min, 5.0)
             if train.speed < dynamic_min:
                 st.phase = Phase.TRACTION
-                self._traction_pid.reset()
                 return ControlCommands(traction_level=1.0)
             comp = self._coasting_compensation(train, track_params)
             return ControlCommands(traction_level=comp, phase="coasting")
 
-        # ============================================================
-        # BRAKING：PID 跟踪 ATO 制动曲线
-        # ============================================================
+        # ── BRAKING: 前馈 + P 微调 ──
         return self._braking_step(train, target, dt)
 
-    # ── 制动阶段逻辑 ──────────────────────────────────────────────────
+    # ── 制动阶段核心 ──
 
     def _braking_step(
         self, train: TrainState, target: Station, dt: float
     ) -> ControlCommands:
-        """PID 闭环制动：跟踪制动曲线，接近站台时切换蠕行。
+        """前馈制动 + P 微调。
 
-        制动 PID 的误差约定：
-            setpoint = 实际速度, pv = 目标速度
-            → error = actual - target
-            → 超速时 error > 0 → PID 输出正 → brake_level ↑
-            → 偏慢时 error < 0 → PID 输出负 → 钳位为 0 → coast/微牵引
+        前馈：根据运动学 a = v²/2d 计算所需减速度，减去阻力贡献后反推制动级位。
+        P 微调：以 ATO 制动曲线为目标做归一化误差修正。
         """
         remaining = max(target.chainage - train.position, 0.0)
-        pid = self._brake_pid
-        pp = pid._p
+        pp = self.sim_params.pid
 
-        # 距站台 ≤ deadband_d 且低速 → 蠕行模式（避免 Zeno 振荡）
+        # 蠕行
         if remaining <= pp.deadband_d and train.speed < 3.0:
             return self._creep_brake(remaining)
 
-        # PID 跟踪制动曲线（swap setpoint/pv 使超速→正输出→制动）
+        v_ms = train.speed / 3.6
+        mass = train.mass if train.mass > 0 else self.vehicle_params.empty_mass
+
+        # 前馈：运动学所需减速度
+        if remaining > 0.1:
+            a_required = (v_ms * v_ms) / (2.0 * remaining)
+        else:
+            a_required = 0.0
+
+        # 当前阻力也在帮忙减速
+        track_params = self.track.query_at(train.position)
+        resistance = self._calc_resistance(train, track_params)
+        a_from_resistance = resistance / mass
+
+        # 制动力需要提供的减速度
+        a_from_brake = max(0.0, a_required - a_from_resistance)
+        brake_ff = (mass * a_from_brake) / self.vehicle_params.max_brake_force
+        brake_ff = min(brake_ff, 1.0)
+
+        # P 微调：以 ATO 制动曲线为目标
         v_target_kmh = PIDController.braking_curve_speed(remaining, pp.comfort_decel)
-        brake = pid.compute(train.speed, v_target_kmh, dt)
+        if v_target_kmh > 1.0:
+            error = (train.speed - v_target_kmh) / v_target_kmh
+        else:
+            error = 0.0
+        trim = self._brake_pid.compute(error)
+
+        brake = max(0.0, min(brake_ff + trim, 1.0))
         return ControlCommands(brake_level=brake)
 
     def _creep_brake(self, remaining_m: float) -> ControlCommands:
-        """蠕行模式：制动力与剩余距离成正比，距离越小越柔和。"""
-        pp = self._brake_pid._p
+        """蠕行模式：制动力与剩余距离成正比。"""
+        pp = self.sim_params.pid
         brake = min(remaining_m * pp.creep_gain, 0.5)
-        brake = max(brake, 0.02)  # 至少保留微弱制动，确保最终停下
+        brake = max(brake, 0.02)
         return ControlCommands(brake_level=brake)
 
-    # ── 制动触发距离（惰行→制动切换判定，保留原公式）────────────────
+    # ── 制动触发距离 ──
 
     def _brake_trigger_distance(self, train: TrainState) -> float:
-        """制动触发距离，基于 PID 实际跟踪的 comfort_decel 计算。
-
-        与 _braking_step 中的 ATO 制动曲线保持一致：
-        v_target = sqrt(2 * comfort_decel * d)，因此制动距离
-        d = v² / (2 * comfort_decel)，乘以安全系数留出余量。
-        """
         v_ms = max(train.speed, 0.0) / 3.6
-        decel = self._brake_pid._p.comfort_decel
+        decel = self.sim_params.pid.comfort_decel
         if decel <= 0:
             return 0.0
-        safety = self._brake_pid._p.brake_safety_factor
+        safety = self.sim_params.pid.brake_safety_factor
         return (v_ms * v_ms) / (2 * decel) * safety
 
-    # ── 惰行补偿（不变）───────────────────────────────────────────────
+    # ── 阻力计算（前馈用） ──
+
+    def _calc_resistance(self, train: TrainState, track_params) -> float:
+        """计算当前总阻力 (N)。"""
+        from sim_engine.vehicle import resistance as R
+
+        mass = train.mass if train.mass > 0 else self.vehicle_params.empty_mass
+        p = self.vehicle_params
+        r_davis = R.davis_resistance(p, mass, train.speed)
+        r_gradient = R.gradient_resistance(mass, track_params.gradient)
+        r_curve = R.curve_resistance(mass, track_params.curvature, p.curve_resist_coeff)
+        r_tunnel = R.tunnel_resistance(r_davis, track_params.is_tunnel, p.tunnel_resist_factor)
+        return r_davis + r_curve + r_tunnel + r_gradient
+
+    # ── 惰行补偿（与原相同） ──
 
     def _coasting_compensation(
         self, train: TrainState, track_params
     ) -> float:
-        """计算惰行补偿牵引级位。
-
-        惰行时施加少量牵引力，抵消滚动摩擦 + 坡度阻力。
-        - 平坡：仅补偿滚动摩擦
-        - 上坡（正梯度）：补偿滚动摩擦 + 上坡额外阻力
-        - 下坡（负梯度）：下坡助力自动减少补偿，坡度足够大时级位为 0
-        空气阻力与弯道阻力忽略不计。
-
-        返回牵引级位 [0, 1]。
-        """
         v_ms = abs(train.speed) / 3.6
         mass = train.mass if train.mass > 0 else self.vehicle_params.empty_mass
         p = self.vehicle_params
 
         rolling = (p.davis_a + p.davis_b * v_ms) * mass * GRAVITY
-
-        # 坡度阻力：上坡为正（需补偿），下坡为负（减少补偿）
         gradient_force = mass * GRAVITY * (track_params.gradient / 1000.0)
-
         f_target = rolling + gradient_force
         if f_target <= 0:
             return 0.0

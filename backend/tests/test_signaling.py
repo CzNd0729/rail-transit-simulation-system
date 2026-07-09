@@ -180,20 +180,21 @@ def test_traction_when_below_target_speed():
     assert ctrl.signal_state.phase == Phase.TRACTION
 
 
-def test_traction_pid_partial_near_target():
-    """接近目标速度时 PID 应输出部分牵引（非满）。"""
+def test_traction_open_loop_full_near_target():
+    """接近目标速度时仍是开环满牵引。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
-    # v_cruise=64, 当前速度 60 → error=4, P=0.08*4=0.32 → traction=0.32
+    # v_cruise=64, 当前速度 60 → 低于 64-2=62 → 满牵引
     train = _make_train(position=10.0, speed=60.0)
     cmd = ctrl.compute_commands(train, dt=0.1)
-    assert 0.15 < cmd.traction_level < 0.6
+    assert cmd.traction_level == 1.0
     assert ctrl.signal_state.phase == Phase.TRACTION
 
 
 def test_traction_transition_to_coasting():
-    """速度达到 target_speed 时切换到惰行。"""
+    """速度达到 target_speed 附近时切换到惰行。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
-    train = _make_train(position=10.0, speed=64.0)  # = target
+    # v_cruise=64, 切换阈值 v_cruise-2=62, 64 >= 62 → 切惰行
+    train = _make_train(position=10.0, speed=64.0)
     cmd = ctrl.compute_commands(train, dt=0.1)
     assert cmd.traction_level == 0.0
     assert cmd.brake_level == 0.0
@@ -318,9 +319,10 @@ def test_coasting_to_braking_when_near_station():
     train = _make_train(position=900.0, speed=60.0)
     cmd = ctrl.compute_commands(train, dt=0.1)
     # 计算制动距离：v_ms = 60/3.6 ≈ 16.67, comfort_decel=0.8
-    # brake_dist = (16.67²)/(2×0.8)×1.05 ≈ 182.3m
-    # position + brake_dist = 900 + 182.3 = 1082.3 > 1000 → 应触发制动
-    assert cmd.brake_level == 1.0
+    # brake_dist = (16.67²)/(2×0.8)×1.02 ≈ 177.1m
+    # position + brake_dist = 900 + 177.1 = 1077.1 > 1000 → 应触发制动
+    # 前馈制动输出 ≈ 0.95（运动学前馈主导）
+    assert cmd.brake_level == pytest.approx(0.95, abs=0.05)
     assert ctrl.signal_state.phase == Phase.BRAKING
 
 
@@ -339,10 +341,10 @@ def test_braking_pid_partial_near_target():
     """接近制动曲线目标时 PID 输出部分制动力（非满）。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
     ctrl._state.phase = Phase.BRAKING
-    # 距站台 50m，速度 33 km/h → 制动曲线目标 ≈ 32.2 km/h → 接近 → 小制动
+    # 距站台 50m，速度 33 km/h → 制动曲线目标 ≈ 32.2 km/h → 接近 → 前馈约 0.55
     train = _make_train(position=950.0, speed=33.0)
     cmd = ctrl.compute_commands(train, dt=0.1)
-    assert 0.02 < cmd.brake_level < 0.3
+    assert 0.4 < cmd.brake_level < 0.7
 
 
 def test_braking_creep_mode():
@@ -426,10 +428,10 @@ def test_stuck_midway_restarts_traction():
 def test_brake_trigger_distance_formula():
     """制动触发距离 = v²/(2·comfort_decel) × safety_factor。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
-    # 速度 72 km/h = 20 m/s, comfort_decel=0.8, safety=1.05
+    # 速度 72 km/h = 20 m/s, comfort_decel=0.8, safety=1.02
     train = _make_train(speed=72.0, mass=260000.0)
     v_ms = 72.0 / 3.6  # 20.0 m/s
-    expected = (v_ms * v_ms) / (2 * 0.8) * 1.05  # = 400/1.6*1.05 = 262.5
+    expected = (v_ms * v_ms) / (2 * 0.8) * 1.02  # = 400/1.6*1.02 = 255.0
     assert ctrl._brake_trigger_distance(train) == pytest.approx(expected)
 
 
@@ -444,7 +446,7 @@ def test_brake_trigger_distance_zero_mass():
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
     train = _make_train(speed=50.0, mass=0.0)
     v_ms = 50.0 / 3.6
-    expected = (v_ms * v_ms) / (2 * 0.8) * 1.05
+    expected = (v_ms * v_ms) / (2 * 0.8) * 1.02
     assert ctrl._brake_trigger_distance(train) == pytest.approx(expected)
 
 
