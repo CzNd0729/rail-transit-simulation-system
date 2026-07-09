@@ -7,6 +7,18 @@
  */
 import { useState, useCallback, useRef, useEffect, type RefObject } from 'react';
 
+/** 解析 useViewport 输出的 viewBox 字符串 */
+export function parseViewBox(viewBox: string): { panX: number; viewW: number } {
+  const [panX = 0, , viewW = 0] = viewBox.split(' ').map(Number);
+  return { panX, viewW };
+}
+
+/** 将 panX 限制在 [0, totalLength - viewW] 内，避免视口超出线路范围 */
+export function clampPanX(panX: number, viewW: number, totalLength: number): number {
+  if (totalLength <= 0 || viewW >= totalLength) return 0;
+  return Math.max(0, Math.min(panX, totalLength - viewW));
+}
+
 interface ViewportState {
   zoom: number;
   panX: number;
@@ -16,9 +28,15 @@ interface ViewportState {
 interface UseViewportOptions {
   trainPosition?: number;
   totalLength: number;
-  containerRef: RefObject<SVGSVGElement | null>;
+  containerRef: RefObject<SVGSVGElement | HTMLElement | null>;
   worldHeight?: number;
   maxZoom?: number;
+  /** 初始缩放倍率，默认 1（全线）；>1 为局部放大 */
+  initialZoom?: number;
+  /** 初始是否锁定跟随列车，默认 true */
+  initialFollowMode?: boolean;
+  /** 是否限制平移不超出 [0, totalLength]，默认 false（线路图端点可留白） */
+  clampPan?: boolean;
 }
 
 interface UseViewportReturn {
@@ -43,15 +61,20 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     containerRef,
     worldHeight = 80,
     maxZoom = 5.0,
+    initialZoom = 1.0,
+    initialFollowMode = true,
+    clampPan = false,
   } = options;
 
   const minZoom = 1.0;
+  const clampedInitialZoom = Math.max(minZoom, Math.min(maxZoom, initialZoom));
+  const initialViewW = totalLength / clampedInitialZoom;
 
-  const [state, setState] = useState<ViewportState>({
-    zoom: 1.0,
-    panX: 0,
-    followMode: true,
-  });
+  const [state, setState] = useState<ViewportState>(() => ({
+    zoom: clampedInitialZoom,
+    panX: clampPan ? clampPanX(0, initialViewW, totalLength) : 0,
+    followMode: initialFollowMode,
+  }));
   const [isAnimating, setIsAnimating] = useState(false);
 
   // 用 ref 追踪最新状态，供动画闭包读取
@@ -76,12 +99,17 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     return panX + (screenX / containerW) * viewW;
   }, [getContainerWidth, totalLength]);
 
+  const applyPan = useCallback((panX: number, zoom: number) => {
+    if (!clampPan) return panX;
+    return clampPanX(panX, totalLength / zoom, totalLength);
+  }, [clampPan, totalLength]);
+
   // 平滑动画: 从当前状态过渡到目标 (通过 ref 读取最新值)
   const animateTo = useCallback((targetPanX: number, targetZoom: number, duration = 300) => {
     cancelAnimationFrame(animFrameRef.current);
     setIsAnimating(true);
 
-    // 从 ref 读取当前最新值作为起点
+    const clampedTargetPanX = applyPan(targetPanX, targetZoom);
     const startPanX = stateRef.current.panX;
     const startZoom = stateRef.current.zoom;
     const startTime = performance.now();
@@ -90,8 +118,9 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
       const t = Math.min((now - startTime) / duration, 1);
       const eased = t * (2 - t);
 
-      const currentPanX = startPanX + (targetPanX - startPanX) * eased;
       const currentZoom = startZoom + (targetZoom - startZoom) * eased;
+      const rawPanX = startPanX + (clampedTargetPanX - startPanX) * eased;
+      const currentPanX = applyPan(rawPanX, currentZoom);
 
       setState(prev => ({ ...prev, panX: currentPanX, zoom: currentZoom }));
 
@@ -103,7 +132,7 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     };
 
     animFrameRef.current = requestAnimationFrame(animate);
-  }, []); // 无依赖: 始终通过 stateRef 读取
+  }, [applyPan]);
 
   // 跟随模式
   useEffect(() => {
@@ -111,22 +140,29 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
 
     const followZoom = Math.max(state.zoom, 2.0);
     const viewW = getViewWidth(followZoom);
-    // 列车始终居中，不 clamp：端点处允许视口超出轨道边界
-    const targetPanX = trainPosition - viewW * 0.5;
+    const rawTargetPanX = trainPosition - viewW * 0.5;
+    const targetPanX = clampPan ? clampPanX(rawTargetPanX, viewW, totalLength) : rawTargetPanX;
 
     setState(prev => {
       if (Math.abs(prev.panX - targetPanX) < 0.5 && Math.abs(prev.zoom - followZoom) < 0.01) return prev;
       return { ...prev, panX: targetPanX, zoom: followZoom };
     });
-  }, [trainPosition, state.followMode, state.zoom, getViewWidth, totalLength, isAnimating]);
+  }, [trainPosition, state.followMode, state.zoom, getViewWidth, totalLength, isAnimating, clampPan]);
 
   // viewBox 字符串 (跟随模式下不 clamp，允许端点外空白)
   const viewW = getViewWidth(state.zoom);
   const viewBox = `${state.panX} 0 ${viewW} ${worldHeight}`;
 
   const setZoom = useCallback((z: number) => {
-    setState(prev => ({ ...prev, zoom: Math.max(minZoom, Math.min(maxZoom, z)) }));
-  }, [minZoom, maxZoom]);
+    setState(prev => {
+      const newZoom = Math.max(minZoom, Math.min(maxZoom, z));
+      return {
+        ...prev,
+        zoom: newZoom,
+        panX: applyPan(prev.panX, newZoom),
+      };
+    });
+  }, [minZoom, maxZoom, applyPan]);
 
   const toggleFollow = useCallback(() => {
     const cur = stateRef.current;
@@ -134,12 +170,14 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
       setState(prev => ({ ...prev, followMode: true }));
       const viewW = totalLength / cur.zoom;
       const targetPanX = trainPosition - viewW * 0.5;
-      const clamped = Math.max(0, Math.min(targetPanX, totalLength - viewW));
+      const clamped = clampPan
+        ? clampPanX(targetPanX, viewW, totalLength)
+        : targetPanX;
       animateTo(clamped, cur.zoom, 300);
     } else {
       setState(prev => ({ ...prev, followMode: false }));
     }
-  }, [trainPosition, totalLength, animateTo]);
+  }, [trainPosition, totalLength, animateTo, clampPan]);
 
   const fitAll = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
@@ -152,11 +190,11 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     const clampedZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
     const viewW = totalLength / clampedZoom;
     const targetPanX = worldX - viewW * 0.5;
-    const clampedPanX = Math.max(0, Math.min(targetPanX, totalLength - viewW));
+    const clampedPanX = clampPan ? clampPanX(targetPanX, viewW, totalLength) : targetPanX;
 
     setState(prev => ({ ...prev, followMode: false }));
     animateTo(clampedPanX, clampedZoom, duration);
-  }, [minZoom, maxZoom, totalLength, animateTo]);
+  }, [minZoom, maxZoom, totalLength, animateTo, clampPan]);
 
   // 滚轮缩放 — 通过原生事件绑定避免 passive 警告
   const handleWheel = useCallback((e: WheelEvent) => {
@@ -172,16 +210,21 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
       const containerW = getContainerWidth();
       const newViewW = totalLength / newZoom;
       const newPanX = worldXBefore - (mouseX / containerW) * newViewW;
-      return { ...prev, zoom: newZoom, panX: newPanX, followMode: false };
+      return {
+        ...prev,
+        zoom: newZoom,
+        panX: applyPan(newPanX, newZoom),
+        followMode: false,
+      };
     });
-  }, [containerRef, screenToWorldX, minZoom, maxZoom, getContainerWidth, totalLength]);
+  }, [containerRef, screenToWorldX, minZoom, maxZoom, getContainerWidth, totalLength, applyPan]);
 
   // 原生事件绑定 — 绕过 React 默认 passive 限制
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
+    el.addEventListener('wheel', handleWheel as unknown as EventListener, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel as unknown as EventListener);
   }, [containerRef, handleWheel]);
 
   // 鼠标拖拽: 仅水平
@@ -198,9 +241,10 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
       const viewW = totalLength / prev.zoom;
       const dx = e.clientX - dragStart.current.x;
       const worldDx = -(dx / containerW) * viewW;
-      return { ...prev, panX: dragStart.current.panX + worldDx };
+      const rawPanX = dragStart.current.panX + worldDx;
+      return { ...prev, panX: applyPan(rawPanX, prev.zoom) };
     });
-  }, [getContainerWidth, totalLength]);
+  }, [getContainerWidth, totalLength, applyPan]);
 
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;

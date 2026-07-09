@@ -16,7 +16,6 @@ const STATION_TRACK_Y = { up: 25, down: 55 };
 
 // 贝塞尔过渡参数
 const TRANSITION_LENGTH = 500; // 过渡区长度 (m)
-const TRAIN_LENGTH = 120; // 列车长度 (m)
 
 /** 生成贝塞尔过渡路径 */
 function generateTransitionPath(
