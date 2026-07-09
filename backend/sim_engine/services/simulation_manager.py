@@ -11,14 +11,12 @@ import yaml
 from sim_engine.core.clock import RunState
 from sim_engine.core.config import SimulationParams, load_simulation_params
 from sim_engine.data.recorder import DataRecorder
-from sim_engine.data.snapshot import build_simulation_snapshot
 from sim_engine.orchestrator import Orchestrator, CONFIG_DIR
-from sim_engine.power.static_power import get_pantograph_voltage
 from sim_engine.track.config import load_track
 from sim_engine.track.models import Track
 from sim_engine.track.path_service import TrackPathService
 from sim_engine.vehicle.config import load_vehicle_params
-from sim_engine.vehicle.models import ForceBreakdown, TractionCurvePoint
+from sim_engine.vehicle.models import TractionCurvePoint
 
 from sim_engine.ws.manager import WebSocketConnectionManager
 
@@ -87,16 +85,6 @@ class SimulationManager:
         orch.reset(passenger_load=passenger_load)
         orch.run_state = RunState.STOPPED
 
-        assert orch.train_state is not None
-        snapshot = build_simulation_snapshot(
-            orch.clock,
-            orch.sim_params,
-            orch.train_id,
-            orch.train_state,
-            ForceBreakdown(),
-            pantograph_voltage=get_pantograph_voltage(),
-        )
-        await self.ws_manager.broadcast(snapshot)
         await self.ws_manager.broadcast({
             "type": "simulation_complete",
             "data": {
