@@ -27,6 +27,9 @@ class PidParams:
     brake_safety_factor: float = 1.02
     """刹车触发距离安全系数。前馈响应快，不再需要大的安全余量。"""
 
+    max_jerk: float = 0.75
+    """冲击率上限 (m/s³)，用于牵引/制动级位斜率限制。"""
+
 
 @dataclass
 class SimulationParams:
@@ -47,6 +50,7 @@ def _load_pid_params(data: dict) -> PidParams:
         creep_gain=float(pid_data.get("creep_gain", 0.25)),
         deadband_d=float(pid_data.get("deadband_d", 1.0)),
         brake_safety_factor=float(pid_data.get("brake_safety_factor", 1.02)),
+        max_jerk=float(pid_data.get("max_jerk", 0.75)),
     )
 
 

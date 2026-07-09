@@ -11,3 +11,4 @@ simulation:
     creep_gain: 0.25
     deadband_d: 1.0
     kp_brake: 0.02
+    max_jerk: 0.75

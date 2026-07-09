@@ -101,7 +101,9 @@ class Orchestrator:
         dt = self.clock.time_step
         track_params = self.track.query_at(self.train_state.position)
         cmd = self.signaling.compute_commands(self.train_state, dt)
-        result = self.vehicle.step(self.train_state, cmd, track_params, dt)
+        result = self.vehicle.step(
+            self.train_state, cmd, track_params, dt, self.sim_params.pid.max_jerk
+        )
         self.train_state = result.state
         self.last_step = result
 

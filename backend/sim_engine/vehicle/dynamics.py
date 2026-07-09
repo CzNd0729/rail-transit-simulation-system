@@ -68,6 +68,7 @@ class VehicleSystem:
         cmd: ControlCommands,
         track: TrackPointParams,
         dt: float,
+        max_jerk: float = 0.75,
     ) -> StepResult:
         """推进一个仿真步长 ``dt`` 秒，返回新状态与受力分解。"""
         params = self.params
@@ -101,8 +102,16 @@ class VehicleSystem:
         accel = net / mass
         new_v_ms = v_ms + accel * dt
 
-        # VHC-08：制动/阻力使速度过零时钳位为 0，不允许倒退
-        if new_v_ms < 0:
+        # VHC-08：近静止且合力向后时保持零速；否则制动过零则钳位
+        creep_stop_kmh = 0.05
+        if state.speed <= creep_stop_kmh and net <= 0:
+            new_v_ms = 0.0
+            if prev_accel < -1e-6:
+                # 停车后渐近归零加速度，避免速度钳位引发冲击率尖峰
+                accel = min(0.0, prev_accel + max_jerk * dt)
+            else:
+                accel = 0.0
+        elif new_v_ms < 0:
             new_v_ms = 0.0
             accel = (new_v_ms - v_ms) / dt if dt > 0 else 0.0
 

@@ -145,6 +145,14 @@ def _make_train(position: float = 0.0, speed: float = 0.0, mass: float = 260000.
     )
 
 
+def _converge_commands(ctrl, train, dt=0.1, steps=25):
+    """多步运行直至级位斜率限制收敛到目标值。"""
+    cmd = ControlCommands()
+    for _ in range(steps):
+        cmd = ctrl.compute_commands(train, dt)
+    return cmd
+
+
 # ── TrainSignalState ────────────────────────────────────────────────
 
 def test_initial_phase_is_traction():
@@ -174,7 +182,7 @@ def test_traction_when_below_target_speed():
     """速度低于 target_speed (0.8 × 80 = 64 km/h) 时应输出牵引指令。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
     train = _make_train(position=10.0, speed=30.0)
-    cmd = ctrl.compute_commands(train, dt=0.1)
+    cmd = _converge_commands(ctrl, train, dt=0.1)
     assert cmd.traction_level == 1.0
     assert cmd.brake_level == 0.0
     assert ctrl.signal_state.phase == Phase.TRACTION
@@ -185,7 +193,7 @@ def test_traction_open_loop_full_near_target():
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
     # v_cruise=64, 当前速度 60 → 低于 64-2=62 → 满牵引
     train = _make_train(position=10.0, speed=60.0)
-    cmd = ctrl.compute_commands(train, dt=0.1)
+    cmd = _converge_commands(ctrl, train, dt=0.1)
     assert cmd.traction_level == 1.0
     assert ctrl.signal_state.phase == Phase.TRACTION
 
@@ -236,7 +244,7 @@ def test_coasting_compensation_uphill_higher():
     ctrl = ThreeStageController(track, _make_vehicle_params(), _make_sim_params(coasting_min_speed=0.0))
     ctrl._state.phase = Phase.COASTING
     train = _make_train(position=200.0, speed=50.0)
-    cmd = ctrl.compute_commands(train, dt=0.1)
+    cmd = _converge_commands(ctrl, train, dt=0.1)
     assert cmd.traction_level > 0.05  # 上坡应有可观补偿
 
 
@@ -245,7 +253,7 @@ def test_coasting_compensation_formula_match():
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params(coasting_min_speed=0.0))
     ctrl._state.phase = Phase.COASTING
     train = _make_train(position=300.0, speed=60.0)
-    cmd = ctrl.compute_commands(train, dt=0.1)
+    cmd = _converge_commands(ctrl, train, dt=0.1)
 
     # 手动计算预期值
     v_ms = 60.0 / 3.6
@@ -294,7 +302,7 @@ def test_coasting_min_speed_triggers_traction():
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params(coasting_min_speed=30.0))
     ctrl._state.phase = Phase.COASTING
     train = _make_train(position=500.0, speed=25.0)  # < 30 km/h
-    cmd = ctrl.compute_commands(train, dt=0.1)
+    cmd = _converge_commands(ctrl, train, dt=0.1)
     assert ctrl.signal_state.phase == Phase.TRACTION
     assert cmd.traction_level == 1.0
     assert cmd.brake_level == 0.0
@@ -317,7 +325,7 @@ def test_coasting_to_braking_when_near_station():
     ctrl._state.phase = Phase.COASTING
     # 列车高速接近 ST02 (1000m)，制动距离应足够触发
     train = _make_train(position=900.0, speed=60.0)
-    cmd = ctrl.compute_commands(train, dt=0.1)
+    cmd = _converge_commands(ctrl, train, dt=0.1)
     # 计算制动距离：v_ms = 60/3.6 ≈ 16.67, comfort_decel=0.8
     # brake_dist = (16.67²)/(2×0.8)×1.02 ≈ 177.1m
     # position + brake_dist = 900 + 177.1 = 1077.1 > 1000 → 应触发制动
@@ -332,7 +340,7 @@ def test_braking_command():
     ctrl._state.phase = Phase.BRAKING
     # 距站台 40m，速度 50 km/h → 制动曲线目标 ≈ 28.8 km/h → 明显超速 → PID 饱和输出 1.0
     train = _make_train(position=960.0, speed=50.0)
-    cmd = ctrl.compute_commands(train, dt=0.1)
+    cmd = _converge_commands(ctrl, train, dt=0.1)
     assert cmd.brake_level == pytest.approx(1.0, abs=0.01)
     assert cmd.traction_level == 0.0
 
@@ -343,7 +351,7 @@ def test_braking_pid_partial_near_target():
     ctrl._state.phase = Phase.BRAKING
     # 距站台 50m，速度 33 km/h → 制动曲线目标 ≈ 32.2 km/h → 接近 → 前馈约 0.55
     train = _make_train(position=950.0, speed=33.0)
-    cmd = ctrl.compute_commands(train, dt=0.1)
+    cmd = _converge_commands(ctrl, train, dt=0.1)
     assert 0.4 < cmd.brake_level < 0.7
 
 
@@ -602,3 +610,47 @@ def test_coasting_no_oscillation_near_station_uphill():
     train = _make_train(position=910.0, speed=25.0)
     cmd = ctrl.compute_commands(train, dt=0.1)
     assert ctrl.signal_state.phase == Phase.COASTING
+
+
+def test_slew_rate_limits_level_jump():
+    """级位斜率限制应阻止单步从 0 跳到满输出。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
+    train = _make_train(position=10.0, speed=30.0, mass=260000.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    max_delta = ctrl._max_level_delta(train, 0.1)
+    assert cmd.traction_level <= max_delta + 1e-9
+
+
+def test_full_run_jerk_mostly_within_comfort_limit():
+    """全程仿真中冲击率尖峰应极少且幅度受控。"""
+    from sim_engine.orchestrator import Orchestrator
+
+    orch = Orchestrator.from_config_dir()
+    orch.reset()
+    orch.start()
+    limit = orch.sim_params.pid.max_jerk
+    over_soft = 0
+    over_hard = 0
+    total = 0
+    max_jerk = 0.0
+    for _ in range(50000):
+        snap = orch.step_once()
+        if not snap:
+            break
+        j = abs(snap["data"]["trains"][0].get("jerk", 0))
+        max_jerk = max(max_jerk, j)
+        total += 1
+        if j > limit * 1.05:
+            over_soft += 1
+        if j > limit * 2.0:
+            over_hard += 1
+        if (
+            orch.train_state
+            and orch.train_state.position >= orch.track.track.total_length - 1.0
+            and orch.train_state.speed < 0.1
+        ):
+            break
+    assert total > 100
+    assert max_jerk < limit * 4.0
+    assert over_hard / total < 0.01
+    assert over_soft / total < 0.15
