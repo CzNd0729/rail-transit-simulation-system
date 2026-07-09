@@ -14,7 +14,6 @@ import type { StationLayout } from '../../../types/simulation';
 // 双向轨道 Y 坐标
 const DUAL_TRACK_Y = { up: 35, down: 45 };
 const STATION_TRACK_Y = { up: 25, down: 55 };
-const TRAIN_LENGTH = 120; // 列车长度 (m)
 
 /** 动态计算过渡区长度 */
 function calcTransitionLength(stations: StationLayout[]): number {
