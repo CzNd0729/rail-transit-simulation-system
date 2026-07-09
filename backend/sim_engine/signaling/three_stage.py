@@ -2,8 +2,8 @@
 
 牵引 → 惰行 → 制动：
 - 牵引：开环满牵引，接近巡航速度时切惰行
-- 制动：前馈（运动学公式）+ P 微调，精确停靠站台
-- 接近站台时切换为蠕行模式，确保柔和停车
+- 制动：前馈（运动学公式 a = v²/2d）+ P 微调，全程工作到站台停稳
+- 前馈在每个时间步根据 v²/2d 自修正，无需蠕行模式
 
 到站停车后等待站停时间再发车。
 """
@@ -35,6 +35,8 @@ class TrainSignalState:
     dwell_remaining: float = 0.0
     _dwell_station_id: str = ""
     _last_target_station_id: str = ""
+    _brake_target_id: str = ""
+    """制动阶段的目标站 ID，进入 BRAKING 时锁定。防止越站后 next_station_ahead 切换导致制动目标丢失。"""
 
 
 class ThreeStageController:
@@ -86,9 +88,17 @@ class ThreeStageController:
             st.dwell_remaining = max(0.0, st.dwell_remaining - dt)
             if st.dwell_remaining <= 0:
                 st.phase = Phase.TRACTION
-            return ControlCommands()
+                return ControlCommands()
+            return ControlCommands(brake_level=0.20, phase="dwell")  # 保持制动，防止坡道溜车
 
         target = self.track.next_station_ahead(train.position)
+
+        # 制动阶段锁定目标站：进入 BRAKING 时保存的目标站 ID，
+        # 防止越过站台后 next_station_ahead 切换为下一站导致前馈制动归零
+        if st.phase == Phase.BRAKING and st._brake_target_id:
+            brake_target = self.track.get_station_by_id(st._brake_target_id)
+            if brake_target is not None:
+                target = brake_target
 
         # ── 跳站检测 ──
         if st._last_target_station_id and target is not None and target.id != st._last_target_station_id:
@@ -100,7 +110,9 @@ class ThreeStageController:
                         st.dwell_remaining = old_station.dwell_time
                         st._dwell_station_id = old_station.id
                         return ControlCommands()
-                    st._dwell_station_id = old_station.id
+                    # 蠕行模式（≤3 km/h）时不标记已过站，保留兜底检测机会
+                    if train.speed > 3.0:
+                        st._dwell_station_id = old_station.id
         if target is not None:
             st._last_target_station_id = target.id
 
@@ -139,6 +151,7 @@ class ThreeStageController:
         if st.phase == Phase.TRACTION:
             if train.position + brake_dist >= target.chainage - tol:
                 st.phase = Phase.BRAKING
+                st._brake_target_id = target.id
                 return self._braking_step(train, target, dt)
             if train.speed >= v_cruise - 2.0:
                 st.phase = Phase.COASTING
@@ -149,6 +162,7 @@ class ThreeStageController:
         if st.phase == Phase.COASTING:
             if train.position + brake_dist >= target.chainage - tol:
                 st.phase = Phase.BRAKING
+                st._brake_target_id = target.id
                 return self._braking_step(train, target, dt)
             curve_speed = PIDController.braking_curve_speed(
                 max(dist_to_station, 1.0), self.sim_params.pid.comfort_decel
@@ -173,13 +187,14 @@ class ThreeStageController:
 
         前馈：根据运动学 a = v²/2d 计算所需减速度，减去阻力贡献后反推制动级位。
         P 微调：以 ATO 制动曲线为目标做归一化误差修正。
+        全程工作到站台停稳，不使用蠕行模式。
         """
-        remaining = max(target.chainage - train.position, 0.0)
+        remaining = target.chainage - train.position
         pp = self.sim_params.pid
 
-        # 蠕行
-        if remaining <= pp.deadband_d and train.speed < 3.0:
-            return self._creep_brake(remaining)
+        # 已越过站台 → 满制动，等待停稳检测处理
+        if remaining <= 0:
+            return ControlCommands(brake_level=1.0)
 
         v_ms = train.speed / 3.6
         mass = train.mass if train.mass > 0 else self.vehicle_params.empty_mass
@@ -209,13 +224,6 @@ class ThreeStageController:
         trim = self._brake_pid.compute(error)
 
         brake = max(0.0, min(brake_ff + trim, 1.0))
-        return ControlCommands(brake_level=brake)
-
-    def _creep_brake(self, remaining_m: float) -> ControlCommands:
-        """蠕行模式：制动力与剩余距离成正比。"""
-        pp = self.sim_params.pid
-        brake = min(remaining_m * pp.creep_gain, 0.5)
-        brake = max(brake, 0.02)
         return ControlCommands(brake_level=brake)
 
     # ── 制动触发距离 ──

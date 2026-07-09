@@ -347,14 +347,15 @@ def test_braking_pid_partial_near_target():
     assert 0.4 < cmd.brake_level < 0.7
 
 
-def test_braking_creep_mode():
-    """距站台 ≤ deadband_d(1m) 且速度 < 3 km/h → 蠕行模式（小制动）。"""
+def test_braking_near_station_low_speed():
+    """距站台很近且低速时，前馈输出微量制动或零制动（阻力已足够减速）。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
     ctrl._state.phase = Phase.BRAKING
+    # 距站台 0.5m，速度 1 km/h → 前馈输出近零（阻力足以停下）
     train = _make_train(position=999.5, speed=1.0)
     cmd = ctrl.compute_commands(train, dt=0.1)
-    # remaining = 0.5m, creep = min(0.5*0.25, 0.5) = 0.125, max(0.125, 0.02) = 0.125
-    assert 0.02 <= cmd.brake_level <= 0.3
+    # 阻力已够，不需要额外制动
+    assert 0.0 <= cmd.brake_level <= 0.3
 
 
 # ── SIG-02: 站停时间 ────────────────────────────────────────────────

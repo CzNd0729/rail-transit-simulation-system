@@ -6,8 +6,8 @@ simulation:
   station_stop_tolerance: 1.0   # 站台停车容差 (m)
   coasting_min_speed: 30.0      # 惰行最低限速
   pid:
+    brake_safety_factor: 1.02
     comfort_decel: 0.8
-    kp_brake: 0.02
     creep_gain: 0.25
     deadband_d: 1.0
-    brake_safety_factor: 1.02
+    kp_brake: 0.02
