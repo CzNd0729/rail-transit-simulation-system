@@ -11,6 +11,7 @@ import {
   VEHICLE_PARAM_STEP_KEYS,
   computeFixedParamStep,
   type VehicleParamStepKey,
+  type TractionCurvePointBaseline,
 } from '../../utils/paramStep';
 import type { TractionCurvePoint } from '../../types/simulation';
 
@@ -30,8 +31,13 @@ const PARAM_LABELS: Record<VehicleParamStepKey, string> = {
   davis_C_front_area: '迎风面积 (m²)',
 };
 
+<<<<<<< HEAD
 export default function VehicleParamsForm({ send, disabled = false }: Props) {
   const { params, vehicleParamBaselines, runState } = useSimulationState();
+=======
+export default function VehicleParamsForm({ send }: Props) {
+  const { params, vehicleParamBaselines, tractionCurveBaselines } = useSimulationState();
+>>>>>>> b9b3a165a517dee3db6dd21806ed3697074fe3bf
   const dispatch = useSimulationDispatch();
   const { updateParams } = useSimulation(send);
 
@@ -76,6 +82,7 @@ export default function VehicleParamsForm({ send, disabled = false }: Props) {
       })}
       <TractionCurveTable
         curve={params.vehicle.traction_curve}
+        baselines={tractionCurveBaselines}
         onChange={handleCurveChange}
         liveMode={!USE_MOCK}
         disabled={disabled}
@@ -93,13 +100,25 @@ export default function VehicleParamsForm({ send, disabled = false }: Props) {
   );
 }
 
+<<<<<<< HEAD
 function TractionCurveTable({ curve, onChange, liveMode, disabled = false }: {
+=======
+function TractionCurveTable({ curve, baselines, onChange, liveMode }: {
+>>>>>>> b9b3a165a517dee3db6dd21806ed3697074fe3bf
   curve: TractionCurvePoint[] | undefined;
+  baselines: TractionCurvePointBaseline[];
   onChange: (curve: TractionCurvePoint[]) => void;
   liveMode?: boolean;
   disabled?: boolean;
 }) {
   const points = curve ?? DEFAULT_VEHICLE_PARAMS.traction_curve;
+
+  const updatePoint = (index: number, patch: Partial<TractionCurvePoint>) => {
+    const next = [...points];
+    next[index] = { ...next[index], ...patch };
+    onChange(next);
+  };
+
   return (
     <div style={styles.curveSection}>
       <div style={styles.curveTitle}>
@@ -110,6 +129,7 @@ function TractionCurveTable({ curve, onChange, liveMode, disabled = false }: {
           <tr><th style={styles.th}>速度 (km/h)</th><th style={styles.th}>牵引力 %</th></tr>
         </thead>
         <tbody>
+<<<<<<< HEAD
           {points.map((pt, i) => (
             <tr key={i}>
               <td style={styles.td}>
@@ -132,6 +152,33 @@ function TractionCurveTable({ curve, onChange, liveMode, disabled = false }: {
               </td>
             </tr>
           ))}
+=======
+          {points.map((pt, i) => {
+            const base = baselines[i] ?? { speed: pt.speed, force_percent: pt.force_percent };
+            return (
+              <tr key={i}>
+                <td style={styles.td}>
+                  <ParamStepper
+                    compact
+                    value={pt.speed}
+                    step={computeFixedParamStep(base.speed)}
+                    onChange={(speed) => updatePoint(i, { speed })}
+                  />
+                </td>
+                <td style={styles.td}>
+                  <ParamStepper
+                    compact
+                    value={Math.round(pt.force_percent * 1000) / 10}
+                    step={computeFixedParamStep(base.force_percent * 100)}
+                    min={0}
+                    max={100}
+                    onChange={(pct) => updatePoint(i, { force_percent: pct / 100 })}
+                  />
+                </td>
+              </tr>
+            );
+          })}
+>>>>>>> b9b3a165a517dee3db6dd21806ed3697074fe3bf
         </tbody>
       </table>
     </div>
@@ -174,10 +221,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   td: {
     padding: '2px 0',
-  },
-  inputPlain: {
-    width: '100px',
-    textAlign: 'right' as const,
+    verticalAlign: 'middle' as const,
   },
   resetBtn: {
     marginTop: '6px',

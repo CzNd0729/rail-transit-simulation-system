@@ -349,6 +349,17 @@ export interface AppState {
   lineLayout: LineLayout | null;
   /** 线路剖面分段（坡度/限速，供纵断面图） */
   profileSegments: import('../data/mvpLineLayout').ProfileSegment[] | null;
+<<<<<<< HEAD
+=======
+  /** 车辆参数步进基准值（首次从后端/默认值锁定，步进=基准×10%） */
+  vehicleParamBaselines: import('../utils/paramStep').VehicleParamBaselines;
+  /** 线路参数步进基准值 */
+  trackParamBaselines: import('../utils/paramStep').TrackParamBaselines;
+  /** 信号参数步进基准值 */
+  signalParamBaselines: import('../utils/paramStep').SignalParamBaselines;
+  /** 牵引特性曲线各折点步进基准值 */
+  tractionCurveBaselines: import('../utils/paramStep').TractionCurvePointBaseline[];
+>>>>>>> b9b3a165a517dee3db6dd21806ed3697074fe3bf
 }
 
 // ==================== API 原始类型（camelCase，适配前） ====================

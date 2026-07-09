@@ -1,4 +1,5 @@
-import type { VehicleParams } from '../types/simulation';
+import type { TractionCurvePoint, VehicleParams } from '../types/simulation';
+import { DEFAULT_VEHICLE_PARAMS } from '../data/mockVehicleParams';
 
 /** 支持步进调节的车辆数值参数字段 */
 export const VEHICLE_PARAM_STEP_KEYS = [
@@ -78,6 +79,23 @@ export function extractSignalParamBaselines(
   signal: Partial<Record<SignalParamStepKey, number>>,
 ): SignalParamBaselines {
   return extractParamBaselines(SIGNAL_PARAM_STEP_KEYS, signal);
+}
+
+/** 牵引特性曲线各折点的步进基准（按索引锁定） */
+export interface TractionCurvePointBaseline {
+  speed: number;
+  force_percent: number;
+}
+
+export function extractTractionCurveBaselines(
+  curve: TractionCurvePoint[] | undefined,
+  fallback: TractionCurvePoint[] = DEFAULT_VEHICLE_PARAMS.traction_curve,
+): TractionCurvePointBaseline[] {
+  const points = curve?.length ? curve : fallback;
+  return points.map((pt) => ({
+    speed: pt.speed,
+    force_percent: pt.force_percent,
+  }));
 }
 
 /**
