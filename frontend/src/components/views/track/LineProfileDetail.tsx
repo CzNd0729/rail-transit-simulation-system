@@ -22,8 +22,12 @@ function toStepData(
 }
 
 export default function LineProfileDetail() {
-  const { trains } = useSimulationState();
-  const { stations, total_length } = mockLineData;
+  const { trains, lineLayout, profileSegments } = useSimulationState();
+
+  // 使用后端数据，fallback 到 mock
+  const stations = lineLayout?.stations ?? mockLineData.stations;
+  const total_length = lineLayout?.total_length ?? mockLineData.total_length;
+  const segments = profileSegments ?? mockSegmentParams;
   const containerRef = useRef<HTMLDivElement>(null);
 
   const animRef = useRef<number>(0);
@@ -45,8 +49,8 @@ export default function LineProfileDetail() {
     return () => { running = false; cancelAnimationFrame(animRef.current); };
   }, [targetPos]);
 
-  const gradientData = useMemo(() => toStepData(mockSegmentParams, 'gradient'), []);
-  const speedLimitData = useMemo(() => toStepData(mockSegmentParams, 'speed_limit'), []);
+  const gradientData = useMemo(() => toStepData(segments, 'gradient'), [segments]);
+  const speedLimitData = useMemo(() => toStepData(segments, 'speed_limit'), [segments]);
 
   const stationMarkLines = useMemo(() =>
     stations.map((s) => ({
@@ -57,12 +61,12 @@ export default function LineProfileDetail() {
   );
 
   const tunnelAreas = useMemo(() =>
-    mockSegmentParams
+    segments
       .filter((s) => s.is_tunnel)
       .map((s) => [
         { xAxis: s.start_chainage, itemStyle: { color: 'rgba(128,128,128,0.15)' } },
         { xAxis: s.end_chainage },
-      ]), []
+      ]), [segments]
   );
 
   const option = useMemo(() => ({
