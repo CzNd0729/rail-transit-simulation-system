@@ -5,3 +5,4 @@ simulation:
   speed_multiplier: 1           # 倍率（编排器实时等待用）
   target_speed_ratio: 0.8       # 三段式目标速度 = 限速 × 此比例
   station_stop_tolerance: 1.0   # 站台停车容差 (m)
+  coasting_min_speed: 30.0      #惰行最低限速

@@ -15,6 +15,7 @@ class SimulationParams:
     speed_multiplier: float = 1.0
     target_speed_ratio: float = 0.8
     station_stop_tolerance: float = 1.0
+    coasting_min_speed: float = 30.0
 
 
 def load_simulation_params(path: str | Path) -> SimulationParams:
@@ -29,4 +30,5 @@ def load_simulation_params(path: str | Path) -> SimulationParams:
         speed_multiplier=float(data.get("speed_multiplier", 1.0)),
         target_speed_ratio=float(data.get("target_speed_ratio", 0.8)),
         station_stop_tolerance=float(data.get("station_stop_tolerance", 1.0)),
+        coasting_min_speed=float(data.get("coasting_min_speed", 30.0)),
     )

@@ -128,7 +128,9 @@ class VehicleSystem:
 
     @staticmethod
     def _determine_mode(cmd: ControlCommands) -> str:
-        """由控车指令派生工况。制动优先于牵引。"""
+        """由控车指令派生工况。信号 phase 提示优先于牵引/制动判断。"""
+        if cmd.phase == "coasting":
+            return MODE_COASTING
         if cmd.emergency_brake or cmd.brake_level > 0:
             return MODE_BRAKING
         if cmd.traction_level > 0:

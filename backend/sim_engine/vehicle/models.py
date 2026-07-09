@@ -99,6 +99,10 @@ class ControlCommands:
     emergency_brake: bool = False
     """紧急制动标志（触发时按最大制动力）。"""
 
+    phase: str = ""
+    """来自信号系统的工况提示（用于覆盖动力学算出的 mode）。
+    例如惰行补偿时 phase="coasting"，让前端显示为惰行而非牵引。"""
+
 
 @dataclass
 class TrackPointParams:
