@@ -544,3 +544,18 @@ def test_skip_station_not_repeated():
     assert ctrl.signal_state._dwell_station_id == "ST02"
     # _last_target_station_id 应更新为 "ST03"
     assert ctrl.signal_state._last_target_station_id == "ST03"
+
+
+# ── SIG-05: 牵引阶段站台距离感知 ────────────────────────────────────
+
+def test_traction_direct_to_braking_short_distance():
+    """短站间距下牵引阶段应跳过惰行直接切入制动。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
+    # ST02 在 1000m，列车在 800m 以 72 km/h 加速中
+    # brake_dist = (72/3.6)²/(2×0.8)×1.05 = 400/1.6×1.05 = 262.5m
+    # 800 + 262.5 = 1062.5 > 1000 → 应触发制动
+    train = _make_train(position=800.0, speed=72.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    assert ctrl.signal_state.phase == Phase.BRAKING
+    assert cmd.brake_level > 0.0
+    assert cmd.traction_level == 0.0

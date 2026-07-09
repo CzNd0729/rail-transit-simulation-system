@@ -184,8 +184,14 @@ class ThreeStageController:
 
         # ============================================================
         # TRACTION：PID 平滑加速到巡航速度
+        #   短站间距 → 直接切入制动（跳过惰行）
         # ============================================================
         if st.phase == Phase.TRACTION:
+            # 短站间距：刹车触发距离已达站台 → 跳过惰行，直接制动
+            if train.position + brake_dist >= target.chainage - tol:
+                st.phase = Phase.BRAKING
+                self._brake_pid.reset()
+                return self._braking_step(train, target, dt)
             # 达到巡航速度 → 惰行；+0.5 防止频繁抖动
             if train.speed >= v_cruise - 0.5:
                 st.phase = Phase.COASTING
