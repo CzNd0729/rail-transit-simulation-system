@@ -1,23 +1,22 @@
-# 车辆参数配置（迭代一 MVP 默认值，A 型车）
+# 车辆参数配置 — 北京地铁4号线 SFM05 型列车（B型车，6节编组）
 # 所有物理量采用 SI 单位，速度相关字段以 km/h 标注。
 vehicle:
-  id: TYPE_A
-  name: A型车
-  empty_mass: 200000            # 空车质量 (kg)
-  passenger_capacity: 1500      # 满员载客人数
-  max_speed: 100                # 构造速度 (km/h)
-  max_traction_force: 400000    # 最大牵引力 (N)
-  max_brake_force: 350000       # 最大制动力 (N)
-  davis_a: 0.01                 # Davis A 系数（归一化）
-  davis_b: 0.0001               # Davis B 系数（归一化，按 m/s）
-  davis_c_front_area: 10        # 迎风面积 (m^2)
-  davis_c_drag_coeff: 0.5       # 空气阻力系数 Cd
-  curve_resist_coeff: 600       # 弯道阻力经验系数 k
-  tunnel_resist_factor: 1.2     # 隧道空气阻力加成
-  regeneration_efficiency: 0.3  # 再生制动效率（VHC-09 预留）
-  length: 120                   # 列车长度 (m)
-  traction_curve:               # 牵引特性曲线（速度 km/h → 牵引力百分比）
+  id: SFM05
+  name: SFM05型B车
+  empty_mass: 220000          # 空车质量 (kg)，AW0 约 220t
+  passenger_capacity: 1460    # 满员载客人数（AW2，6节B型车）
+  max_speed: 80               # 构造速度 (km/h)
+  max_traction_force: 300000  # 最大牵引力 (N)，VVVF 交流传动
+  max_brake_force: 260000     # 最大常用制动力 (N)
+  davis_a: 0.012              # Davis A 系数（滚动阻力，归一化）
+  davis_b: 0.0001             # Davis B 系数（线性项，按 m/s）
+  davis_c_front_area: 8.5     # 迎风面积 (m^2)，B型车宽 2.8m
+  davis_c_drag_coeff: 0.5     # 空气阻力系数 Cd
+  curve_resist_coeff: 600     # 弯道阻力经验系数 k
+  tunnel_resist_factor: 1.2   # 隧道空气阻力加成
+  regeneration_efficiency: 0.3 # 再生制动效率（VHC-09 预留）
+  length: 120                 # 列车长度 (m)，6节×19.5m+连接处≈120m
+  traction_curve:             # 牵引特性曲线（速度 km/h → 牵引力百分比）
     - { speed: 0, force_percent: 1.0 }
     - { speed: 40, force_percent: 1.0 }
     - { speed: 80, force_percent: 0.5 }
-    - { speed: 100, force_percent: 0.5 }

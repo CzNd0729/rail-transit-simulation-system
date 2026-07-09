@@ -295,9 +295,9 @@ class TestNextStationAhead:
 class TestLoadTrack:
     def test_load_from_yaml(self):
         track = load_track(CONFIG_PATH)
-        assert track.name in ("1号线", "Line 1", "")
-        assert len(track.stations) == 3
-        assert len(track.segments) == 2
+        assert track.name == "4号线（下行）"
+        assert len(track.stations) == 24
+        assert len(track.segments) == 23
         assert track.total_length > 0
 
     def test_load_then_query(self):
