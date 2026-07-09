@@ -44,6 +44,7 @@ interface UseViewportOptions {
 interface UseViewportReturn {
   viewBox: string;
   zoom: number;
+  maxZoom: number;
   followMode: boolean;
   setZoom: (z: number) => void;
   toggleFollow: () => void;
@@ -98,6 +99,7 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, panX: 0 });
   const animFrameRef = useRef<number>(0);
+  const prevFollowMode = useRef(state.followMode);
 
   const getContainerWidth = useCallback(() => {
     return containerRef.current?.clientWidth || 800;
@@ -152,8 +154,18 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
   useEffect(() => {
     if (!state.followMode || trainPosition === undefined || isAnimating) return;
 
-    const currentZoom = stateRef.current.zoom;
-    const followZoom = Math.max(currentZoom, 2.0);
+    // 动态跟随倍率：根据轨道总长计算
+    const minFollowZoom = Math.max(3.0, totalLength / 2000); // 18.6km → 9.3x
+
+    // 初次进入跟随模式时，如果当前倍率过低则自动提升
+    const justEnteredFollow = !prevFollowMode.current && state.followMode;
+    prevFollowMode.current = state.followMode;
+
+    let followZoom = state.zoom;
+    if (justEnteredFollow && state.zoom < minFollowZoom) {
+      followZoom = minFollowZoom;
+    }
+
     const viewW = getViewWidth(followZoom);
     const rawTargetPanX = trainPosition - viewW * 0.5;
     let targetPanX = clampPan ? clampPanX(rawTargetPanX, viewW, totalLength) : rawTargetPanX;
@@ -187,13 +199,17 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
   const toggleFollow = useCallback(() => {
     const cur = stateRef.current;
     if (!cur.followMode && trainPosition !== undefined) {
+      // 动态跟随倍率：如果当前倍率过低则自动提升
+      const minFollowZoom = Math.max(3.0, totalLength / 2000);
+      const targetZoom = cur.zoom < minFollowZoom ? minFollowZoom : cur.zoom;
+
       setState(prev => ({ ...prev, followMode: true }));
-      const viewW = totalLength / cur.zoom;
+      const viewW = totalLength / targetZoom;
       const targetPanX = trainPosition - viewW * 0.5;
       const clamped = clampPan
         ? clampPanX(targetPanX, viewW, totalLength)
         : targetPanX;
-      animateTo(clamped, cur.zoom, 300);
+      animateTo(clamped, targetZoom, 300);
     } else {
       setState(prev => ({ ...prev, followMode: false }));
     }
@@ -277,6 +293,7 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
   return {
     viewBox,
     zoom: state.zoom,
+    maxZoom,
     followMode: state.followMode,
     setZoom,
     toggleFollow,

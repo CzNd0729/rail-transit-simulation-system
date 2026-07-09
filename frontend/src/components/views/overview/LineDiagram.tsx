@@ -111,6 +111,7 @@ export default function LineDiagram() {
         <span className="panel-title" style={{ margin: 0 }}>🚇 线路图</span>
         <ViewportControls
           zoom={viewport.zoom}
+          maxZoom={viewport.maxZoom}
           followMode={viewport.followMode}
           onZoomChange={viewport.setZoom}
           onToggleFollow={viewport.toggleFollow}
@@ -164,7 +165,7 @@ export default function LineDiagram() {
         })}
 
         {/* 车站（双向轨道 + 站台） */}
-        {lineLayout.stations.map((station) => (
+        {lineLayout.stations.map((station, index) => (
           <StationNode
             key={station.id}
             station={station}
@@ -172,6 +173,8 @@ export default function LineDiagram() {
             selected={selectedStation === station.id}
             onClick={handleStationClick}
             dualTrack={true}
+            zoom={viewport.zoom}
+            index={index}
           />
         ))}
 

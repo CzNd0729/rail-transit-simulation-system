@@ -5,6 +5,7 @@
  */
 interface ViewportControlsProps {
   zoom: number;
+  maxZoom: number;
   followMode: boolean;
   onZoomChange: (z: number) => void;
   onToggleFollow: () => void;
@@ -13,6 +14,7 @@ interface ViewportControlsProps {
 
 export default function ViewportControls({
   zoom,
+  maxZoom,
   followMode,
   onZoomChange,
   onToggleFollow,
@@ -30,7 +32,7 @@ export default function ViewportControls({
       <input
         type="range"
         min={1}
-        max={5}
+        max={maxZoom}
         step={0.1}
         value={zoom}
         onChange={(e) => onZoomChange(parseFloat(e.target.value))}
@@ -39,7 +41,7 @@ export default function ViewportControls({
       />
       <button
         style={styles.btn}
-        onClick={() => onZoomChange(Math.min(5, zoom + 0.5))}
+        onClick={() => onZoomChange(Math.min(maxZoom, zoom + 0.5))}
         title="放大"
       >
         +

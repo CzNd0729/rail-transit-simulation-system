@@ -15,6 +15,10 @@ interface StationNodeProps {
   selected: boolean;
   /** 是否启用双向轨道 */
   dualTrack?: boolean;
+  /** 当前缩放倍率（用于固定文字大小） */
+  zoom?: number;
+  /** 车站索引（用于交替上下布局） */
+  index?: number;
 }
 
 const MAIN_TRACK_Y = 40;
@@ -34,6 +38,8 @@ function StationNodeInner({
   onClick,
   selected,
   dualTrack = false,
+  zoom = 1,
+  index = 0,
 }: StationNodeProps) {
   const x = station.chainage;
   const w = station.length;
@@ -42,6 +48,21 @@ function StationNodeInner({
   const totalHeight = showDetail
     ? Math.max((sidings.length + 1) * TRACK_SPACING + 20, 30)
     : dualTrack ? 60 : 20;
+
+  // 固定文字大小：直接计算抵消 viewBox 缩放的字体大小
+  const scaleFactor = 10;
+  const baseNameFontSize = (dualTrack ? 18 : 13) * scaleFactor;
+  const baseChainageFontSize = (dualTrack ? 14 : 9) * scaleFactor;
+  const nameFontSize = baseNameFontSize / zoom;
+  const chainageFontSize = baseChainageFontSize / zoom;
+
+  // 交替布局：偶数索引在上方，奇数索引在下方
+  // 上下间隔固定为最大缩放时的屏幕距离，除以 zoom 保持屏幕空间恒定
+  const isAbove = index % 2 === 0;
+  const verticalOffset = 400 / zoom; // 屏幕空间 400px 的固定间隔
+  const textY = isAbove
+    ? (dualTrack ? DUAL_TRACK_Y.up - verticalOffset : MAIN_TRACK_Y - totalHeight / 2 - verticalOffset)
+    : (dualTrack ? DUAL_TRACK_Y.down + verticalOffset : MAIN_TRACK_Y + totalHeight / 2 + verticalOffset);
 
   return (
     <g
@@ -117,25 +138,23 @@ function StationNodeInner({
       <line x1={x + w} y1={MAIN_TRACK_Y - 6} x2={x + w} y2={MAIN_TRACK_Y + 6}
         stroke="#4a4a6a" strokeWidth={1.5} />
 
-      {/* 站名 */}
+      {/* 站名 + 公里标（固定大小，交替上下布局） */}
       <text
         x={x + w / 2}
-        y={MAIN_TRACK_Y - totalHeight / 2 - 2}
+        y={textY}
         textAnchor="middle"
         fill="#e0e0e0"
-        fontSize={13}
+        fontSize={nameFontSize}
         fontWeight={700}
       >
         {station.name}
       </text>
-
-      {/* 公里标 */}
       <text
         x={x + w / 2}
-        y={MAIN_TRACK_Y + totalHeight / 2 + 2}
+        y={textY + nameFontSize * 1.2}
         textAnchor="middle"
         fill="#a0a0a0"
-        fontSize={9}
+        fontSize={chainageFontSize}
       >
         K{(station.chainage / 1000).toFixed(1)}+{station.length}m
       </text>
