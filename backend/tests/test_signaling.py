@@ -103,6 +103,25 @@ def _make_track_downhill() -> TrackPathService:
     return TrackPathService(Track(name="test-downhill", stations=stations, segments=segments))
 
 
+def _make_track_three_stations() -> TrackPathService:
+    """三站线路，用于跳站检测测试。"""
+    stations = [
+        Station(id="ST01", name="A站", chainage=0.0, dwell_time=30.0),
+        Station(id="ST02", name="B站", chainage=1000.0, dwell_time=30.0),
+        Station(id="ST03", name="C站", chainage=2000.0, dwell_time=30.0),
+    ]
+    segments = [
+        Segment(
+            id="SEC01", start_chainage=0.0, end_chainage=2000.0,
+            gradient=0.0, curvature=0.0, speed_limit=80.0, is_tunnel=False,
+        ),
+    ]
+    return TrackPathService(Track(name="test-three-station", stations=stations, segments=segments))
+
+
+
+
+
 def _make_sim_params(**overrides) -> SimulationParams:
     d = dict(
         time_step=0.1,
@@ -479,3 +498,49 @@ def test_low_target_speed_stays_coasting():
     cmd = ctrl.compute_commands(train, dt=0.1)
     # 目标速度=0，车速=0 已满足，应进入惰行
     assert ctrl.signal_state.phase == Phase.COASTING
+
+
+# ── SIG-04: 跳站检测与恢复 ──────────────────────────────────────────
+
+def test_skip_station_detected_and_recovered():
+    """越过站台后停稳时能检测并恢复到 DWELL。"""
+    ctrl = ThreeStageController(_make_track_three_stations(), _make_vehicle_params(), _make_sim_params())
+    # 模拟：从 ST01 发车，先让 _last_target_station_id 指向 ST02
+    ctrl._state._last_target_station_id = "ST02"
+    # 列车已越过 ST02(1000m)，停在 1005m，速度=0
+    # next_station_ahead(1005) → ST03(2000)
+    train = _make_train(position=1005.0, speed=0.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    # 应检测到跳过了 ST02 并进入 DWELL
+    assert ctrl.signal_state.phase == Phase.DWELL
+    assert ctrl.signal_state._dwell_station_id == "ST02"
+    assert ctrl.signal_state.dwell_remaining == 30.0
+    assert cmd.traction_level == 0.0
+
+
+def test_skip_station_moving_no_recovery():
+    """运动中越过站台时标记为已过站但不恢复 DWELL。"""
+    ctrl = ThreeStageController(_make_track_three_stations(), _make_vehicle_params(), _make_sim_params())
+    ctrl._state._last_target_station_id = "ST02"
+    # 列车仍在运动，位置已过 ST02
+    train = _make_train(position=1010.0, speed=20.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    # 不应进入 DWELL（还在移动）
+    assert ctrl.signal_state.phase != Phase.DWELL
+    # ST02 应被标记为已停靠（避免后续重复告警）
+    assert ctrl.signal_state._dwell_station_id == "ST02"
+
+
+def test_skip_station_not_repeated():
+    """已标记为已停靠的站不会重复触发跳站检测。"""
+    ctrl = ThreeStageController(_make_track_three_stations(), _make_vehicle_params(), _make_sim_params())
+    # 模拟：ST02 已被正常停靠
+    ctrl._state._dwell_station_id = "ST02"
+    ctrl._state._last_target_station_id = "ST02"
+    # 列车在 ST02 和 ST03 之间
+    train = _make_train(position=1500.0, speed=40.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    # _dwell_station_id 应保持 "ST02"（不变）
+    assert ctrl.signal_state._dwell_station_id == "ST02"
+    # _last_target_station_id 应更新为 "ST03"
+    assert ctrl.signal_state._last_target_station_id == "ST03"

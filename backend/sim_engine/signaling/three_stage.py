@@ -34,6 +34,7 @@ class TrainSignalState:
     phase: Phase = Phase.TRACTION
     dwell_remaining: float = 0.0
     _dwell_station_id: str = ""
+    _last_target_station_id: str = ""
 
 
 class ThreeStageController:
@@ -120,6 +121,27 @@ class ThreeStageController:
             return ControlCommands()
 
         target = self.track.next_station_ahead(train.position)
+
+        # ── 跳站检测：目标站发生变化时检查是否跳过了某一站 ──
+        if st._last_target_station_id and target is not None and target.id != st._last_target_station_id:
+            old_station = self.track.get_station_by_id(st._last_target_station_id)
+            if old_station is not None and train.position > old_station.chainage:
+                if old_station.id != st._dwell_station_id:
+                    if train.speed < 0.1 and abs(train.position - old_station.chainage) <= 50.0:
+                        # 已停稳在旧站附近 → 恢复停靠
+                        st.phase = Phase.DWELL
+                        st.dwell_remaining = old_station.dwell_time
+                        st._dwell_station_id = old_station.id
+                        self._traction_pid.reset()
+                        self._brake_pid.reset()
+                        return ControlCommands()
+                    # 仍在移动中，标记为已过站（避免重复处理）
+                    st._dwell_station_id = old_station.id
+        # 更新目标站追踪
+        if target is not None:
+            st._last_target_station_id = target.id
+        # ── 跳站检测结束 ──
+
         if target is None:
             if train.speed > 0.1:
                 return ControlCommands(brake_level=1.0)
