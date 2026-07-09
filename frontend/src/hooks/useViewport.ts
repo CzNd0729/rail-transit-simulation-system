@@ -37,6 +37,8 @@ interface UseViewportOptions {
   initialFollowMode?: boolean;
   /** 是否限制平移不超出 [0, totalLength]，默认 false（线路图端点可留白） */
   clampPan?: boolean;
+  /** 跟随模式下将 panX 四舍五入为整数，减少图表抖动 */
+  snapPan?: boolean;
 }
 
 interface UseViewportReturn {
@@ -64,6 +66,7 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
     initialZoom = 1.0,
     initialFollowMode = true,
     clampPan = false,
+    snapPan = false,
   } = options;
 
   // 动态计算 maxZoom：根据轨道总长，确保能看清细节
@@ -149,16 +152,22 @@ export function useViewport(options: UseViewportOptions): UseViewportReturn {
   useEffect(() => {
     if (!state.followMode || trainPosition === undefined || isAnimating) return;
 
-    const followZoom = Math.max(state.zoom, 2.0);
+    const currentZoom = stateRef.current.zoom;
+    const followZoom = Math.max(currentZoom, 2.0);
     const viewW = getViewWidth(followZoom);
     const rawTargetPanX = trainPosition - viewW * 0.5;
-    const targetPanX = clampPan ? clampPanX(rawTargetPanX, viewW, totalLength) : rawTargetPanX;
+    let targetPanX = clampPan ? clampPanX(rawTargetPanX, viewW, totalLength) : rawTargetPanX;
+    if (snapPan) targetPanX = Math.round(targetPanX);
+
+    const snapThreshold = snapPan ? 1 : 0.5;
 
     setState(prev => {
-      if (Math.abs(prev.panX - targetPanX) < 0.5 && Math.abs(prev.zoom - followZoom) < 0.01) return prev;
+      if (Math.abs(prev.panX - targetPanX) < snapThreshold && Math.abs(prev.zoom - followZoom) < 0.01) {
+        return prev;
+      }
       return { ...prev, panX: targetPanX, zoom: followZoom };
     });
-  }, [trainPosition, state.followMode, state.zoom, getViewWidth, totalLength, isAnimating, clampPan]);
+  }, [trainPosition, state.followMode, getViewWidth, totalLength, isAnimating, clampPan, snapPan]);
 
   // viewBox 字符串 (跟随模式下不 clamp，允许端点外空白)
   const viewW = getViewWidth(state.zoom);

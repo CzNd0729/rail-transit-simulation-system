@@ -51,22 +51,25 @@ export default function LineProfileDetail() {
   const initialZoom = useMemo(() => computeInitialZoom(total_length), [total_length]);
 
   const viewport = useViewport({
-    trainPosition: displayPos,
+    trainPosition: targetPos,
     totalLength: total_length,
     containerRef: chartContainerRef,
     initialZoom,
     initialFollowMode: false,
     clampPan: true,
+    snapPan: true,
   });
 
   const lastLengthRef = useRef(0);
   useEffect(() => {
     if (total_length <= 0 || lastLengthRef.current === total_length) return;
     lastLengthRef.current = total_length;
-    viewport.focusPosition(displayPos, computeInitialZoom(total_length), 0);
-  }, [total_length, displayPos, viewport.focusPosition]);
+    viewport.focusPosition(targetPos, computeInitialZoom(total_length), 0);
+  }, [total_length, targetPos, viewport.focusPosition]);
 
-  const { panX, viewW } = parseViewBox(viewport.viewBox);
+  const { panX: rawPanX, viewW: rawViewW } = parseViewBox(viewport.viewBox);
+  const panX = Math.round(rawPanX);
+  const viewW = Math.round(rawViewW);
   const xMax = panX + viewW;
   const trainInView = displayPos >= panX && displayPos <= xMax;
   const trainScreenRatio = viewW > 0 ? (displayPos - panX) / viewW : 0;
@@ -110,7 +113,10 @@ export default function LineProfileDetail() {
         type: 'value' as const,
         name: '公里标 (m)',
         nameTextStyle: { color: '#a0a0a0' },
-        axisLabel: { color: '#a0a0a0' },
+        axisLabel: {
+          color: '#a0a0a0',
+          formatter: (value: number) => String(Math.round(value)),
+        },
         axisLine: { lineStyle: { color: '#2a2a4a' } },
         min: panX,
         max: xMax,
@@ -198,7 +204,12 @@ export default function LineProfileDetail() {
           onMouseUp={viewport.handleMouseUp}
           onMouseLeave={viewport.handleMouseUp}
         >
-          <ReactECharts option={option} style={{ height: '100%', pointerEvents: 'none' }} notMerge />
+          <ReactECharts
+            option={option}
+            style={{ height: '100%', pointerEvents: 'none' }}
+            notMerge
+            lazyUpdate
+          />
         </div>
 
         <div style={styles.strip}>
