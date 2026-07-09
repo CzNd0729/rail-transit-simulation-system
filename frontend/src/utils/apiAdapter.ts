@@ -1,4 +1,5 @@
 import type {
+  ApiControlCommand,
   ApiSimulationSnapshot,
   SimulationParams,
   SimulationSnapshot,
@@ -41,7 +42,18 @@ function mapTrain(t: ApiSimulationSnapshot['trains'][0]): TrainState {
   };
 }
 
+function mapControlCommand(c: ApiControlCommand) {
+  return {
+    train_id: c.trainId,
+    traction_level: c.tractionLevel,
+    brake_level: c.brakeLevel,
+    emergency_brake: c.emergencyBrake,
+    running_phase: c.runningPhase,
+  };
+}
+
 export function parseServerSnapshot(raw: ApiSimulationSnapshot): SimulationSnapshot {
+  const controlCommands = raw.signaling?.controlCommands ?? [];
   return {
     clock: {
       elapsed: raw.clock.elapsed,
@@ -55,7 +67,11 @@ export function parseServerSnapshot(raw: ApiSimulationSnapshot): SimulationSnaps
       total_regeneration: raw.power.totalRegeneration,
       regeneration_rate: 0,
     },
-    signaling: { commands: [], emergency_brake: [], train_intervals: [] },
+    signaling: {
+      commands: controlCommands.map(mapControlCommand),
+      emergency_brake: [],
+      train_intervals: [],
+    },
     track: { occupancy: [], switch_states: [] },
     events: raw.events ?? [],
   };

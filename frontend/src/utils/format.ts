@@ -63,8 +63,23 @@ export function getModeLabel(mode: string): string {
     coasting: '惰行',
     braking: '制动',
     stopped: '停稳',
+    dwell: '站停',
   };
   return labels[mode] || mode;
+}
+
+/**
+ * 根据列车状态与信号相位推导展示工况
+ */
+export function getDisplayMode(
+  mode: string | undefined,
+  speed: number,
+  runningPhase?: string,
+): string {
+  if (runningPhase === 'dwell') return 'stopped';
+  if (mode === 'stopped') return 'stopped';
+  if (mode === 'coasting' && speed < 0.5) return 'stopped';
+  return mode ?? 'coasting';
 }
 
 /**

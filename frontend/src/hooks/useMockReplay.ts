@@ -81,7 +81,7 @@ export function useMockReplay() {
       const action = msg.action as string;
       switch (action) {
         case 'start':
-          dispatch({ type: 'CLEAR_CHART_HISTORY' });
+          dispatch({ type: 'RESET_RUN_DATA' });
           runStatsRef.current = { sumSpeed: 0, count: 0, maxSpeed: 0, tripTime: 0 };
           replayer.loadScenario(buildScenarioFromParams(paramsRef.current));
           dispatch({ type: 'SET_RUN_STATE', payload: 'running' });
@@ -95,10 +95,20 @@ export function useMockReplay() {
           replayer.resume();
           dispatch({ type: 'SET_RUN_STATE', payload: 'running' });
           break;
-        case 'stop':
+        case 'stop': {
           replayer.stop();
+          const s = runStatsRef.current;
+          dispatch({
+            type: 'SET_STATS',
+            payload: {
+              trip_time: s.tripTime,
+              avg_speed: s.count > 0 ? s.sumSpeed / s.count : 0,
+              max_speed: s.maxSpeed,
+            },
+          });
           dispatch({ type: 'SET_RUN_STATE', payload: 'stopped' });
           break;
+        }
         case 'step':
           replayer.step();
           break;

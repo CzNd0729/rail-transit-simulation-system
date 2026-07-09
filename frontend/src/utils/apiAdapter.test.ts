@@ -19,7 +19,7 @@ describe('parseServerSnapshot', () => {
         faultAlarm: null,
       }],
       power: { substations: [], voltageProfile: [], totalConsumption: 0, totalRegeneration: 0 },
-      signaling: { commands: [], emergencyBrakes: [] },
+      signaling: { controlCommands: [], emergencyBrakes: [] },
       track: { occupancy: [], switchStates: [] },
       events: [],
     };
@@ -39,11 +39,34 @@ describe('parseServerSnapshot', () => {
         faultAlarm: null,
       }],
       power: { substations: [], voltageProfile: [], totalConsumption: 0, totalRegeneration: 0 },
-      signaling: { commands: [], emergencyBrakes: [] },
+      signaling: { controlCommands: [], emergencyBrakes: [] },
       track: { occupancy: [], switchStates: [] },
       events: [],
     };
     expect(parseServerSnapshot(raw).trains[0].mode).toBe('stopped');
+  });
+
+  it('maps runningPhase from controlCommands', () => {
+    const raw = {
+      clock: { elapsed: 30, speedMultiplier: 1 as const },
+      trains: [{
+        id: 'T1', position: 1500, speed: 0, acceleration: 0,
+        mode: 'stopped' as const, mass: 200000, passengerCount: 900,
+        pantographVoltage: 1500, powerDemand: 0, doorStatus: 'closed' as const,
+        faultAlarm: null,
+      }],
+      power: { substations: [], voltageProfile: [], totalConsumption: 0, totalRegeneration: 0 },
+      signaling: {
+        controlCommands: [{
+          trainId: 'T1', tractionLevel: 0, brakeLevel: 0, emergencyBrake: false, runningPhase: 'dwell',
+        }],
+        emergencyBrakes: [],
+      },
+      track: { occupancy: [], switchStates: [] },
+      events: [],
+    };
+    const snap = parseServerSnapshot(raw);
+    expect(snap.signaling.commands[0]?.running_phase).toBe('dwell');
   });
 });
 
