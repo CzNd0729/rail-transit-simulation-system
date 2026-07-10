@@ -95,6 +95,33 @@ export function getModeLabel(mode: string): string {
   return labels[mode] || mode;
 }
 
+/** 信号运行相位中文标签 */
+export function getSignalPhaseLabel(phase: string): string {
+  const labels: Record<string, string> = {
+    traction: '牵引',
+    coasting: '惰行',
+    braking: '制动',
+    dwell: '站停',
+  };
+  return labels[phase] ?? phase;
+}
+
+/**
+ * 解析当前信号相位：优先后端 runningPhase，否则从列车状态推导
+ */
+export function resolveSignalPhase(
+  runningPhase: string | undefined,
+  trainMode: string | undefined,
+  tractionLevel = 0,
+  brakeLevel = 0,
+): string {
+  if (runningPhase) return runningPhase;
+  if (trainMode === 'stopped' || trainMode === 'dwell') return 'dwell';
+  if (brakeLevel > 0.01) return 'braking';
+  if (tractionLevel > 0.01) return 'traction';
+  return trainMode ?? 'coasting';
+}
+
 /**
  * 根据列车状态与信号相位推导展示工况
  */
