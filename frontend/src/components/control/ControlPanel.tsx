@@ -18,7 +18,8 @@ interface Props {
 }
 
 export default function ControlPanel({ send }: Props) {
-  const { runState } = useSimulationState();
+  const { runState, trains } = useSimulationState();
+  const speed = trains[0]?.speed ?? 0;
 
   return (
     <div className="panel">
@@ -26,7 +27,7 @@ export default function ControlPanel({ send }: Props) {
       <div style={styles.content}>
         <RunControlButtons send={send} />
         <SpeedSelector send={send} />
-        <EmergencyBrakeButton send={send} runState={runState} />
+        <EmergencyBrakeButton send={send} runState={runState} speed={speed} />
         <StepButton send={send} />
       </div>
     </div>
