@@ -39,6 +39,8 @@ function mapTrain(t: ApiSimulationSnapshot['trains'][0]): TrainState {
     door_status: t.doorStatus,
     pantograph_voltage: t.pantographVoltage,
     power_demand: t.powerDemand,
+    distance_to_station: t.distanceToStation ?? 0,
+    target_station_id: t.targetStationId ?? '',
     fault_alarm: t.faultAlarm,
   };
 }
