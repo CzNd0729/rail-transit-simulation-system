@@ -277,6 +277,7 @@ export interface ChartHistory {
   accelTime: [number, number][];       // [时间s, 加速度m/s²]
   jerkTime: [number, number][];        // [时间s, 冲击率m/s³]
   speedPosition: [number, number][];   // [位置m, 速度km/h]
+  positionTime: [number, number][];    // [时间s, 位置m]
 }
 
 // ==================== Mock 回放数据 ====================
