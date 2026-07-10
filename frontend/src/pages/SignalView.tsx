@@ -1,12 +1,10 @@
 /**
- * SignalView — 信号视图
- * 基于《需求文档》3.3.3 信号视图设计
+ * SignalView — 信号视图（迭代二单车简化版）
  *
- * 功能：
- * - UI-SIG-01: 移动授权（MA）示意图 — 显示各列车安全包络和追踪间隔
- * - UI-SIG-02: 速度包络线 — ATP 紧急制动触发曲线 vs 实际运行曲线
- * - UI-SIG-03: 运行图（时间-距离图）— 多列车时空轨迹绘制
- * - UI-SIG-04: 联锁状态表 — 进路/道岔/信号机状态列表（迭代四）
+ * - UI-SIG-01: 移动授权示意图 — 列车位置 + 固定 300m 安全包络 + 目标站台
+ * - UI-SIG-02: 速度包络线 — 区段限速 + 目标速度 + 实际速度
+ * - UI-SIG-03: 运行图 — 单列车时间-距离轨迹
+ * - UI-SIG-04~06: 留待迭代三/四
  */
 import MAChart from '../components/views/signal/MAChart';
 import SpeedEnvelope from '../components/views/signal/SpeedEnvelope';
