@@ -1,14 +1,31 @@
 /**
  * StatusCards — 关键状态速览卡片
  * 基于《需求文档》UI-VW-04
- * 4 个小卡片：当前速度、网压、工况、信号授权
+ * 4 个小卡片：当前速度、网压、工况、距站台距离
  */
 import { useSimulationState } from '../../../context/SimulationContext';
 import { formatSpeed, formatVoltage, getModeLabel, getModeColor } from '../../../utils/format';
 
 export default function StatusCards() {
-  const { trains } = useSimulationState();
+  const { trains, lineLayout } = useSimulationState();
   const train = trains[0]; // 默认显示第一列车
+
+  // 距站台距离显示
+  let distanceText = '--';
+  let distanceColor = '#808080';
+  if (train && train.target_station_id) {
+    const station = lineLayout?.stations.find(s => s.id === train.target_station_id);
+    const stationName = station?.name ?? train.target_station_id;
+    const d = train.distance_to_station;
+    if (d > 0) {
+      distanceText = `距 ${stationName} ${d.toFixed(1)}m`;
+    } else if (d === 0) {
+      distanceText = `已到 ${stationName}`;
+    } else {
+      distanceText = `已过 ${stationName} ${Math.abs(d).toFixed(1)}m`;
+    }
+    distanceColor = Math.abs(d) <= 1.0 ? '#52c41a' : '#ff4d4f';
+  }
 
   const cards = [
     {
@@ -30,10 +47,10 @@ export default function StatusCards() {
       color: train ? getModeColor(train.mode) : '#999',
     },
     {
-      label: '信号授权',
-      value: '正常',
-      icon: '🚦',
-      color: '#52c41a',
+      label: '距站台',
+      value: distanceText,
+      icon: '📍',
+      color: distanceColor,
     },
   ];
 
