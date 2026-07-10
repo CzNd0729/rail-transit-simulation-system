@@ -421,7 +421,8 @@ export type ServerMessage =
 /** 客户端发送消息 */
 export type ClientMessage =
   | { type: 'sim_control'; action: 'start' | 'pause' | 'resume' | 'stop' | 'step' }
-  | { type: 'param_update'; params: Partial<SimulationParams> };
+  | { type: 'param_update'; params: Partial<SimulationParams> }
+  | { type: 'manual_control'; emergencyBrake: boolean };
 
 /** 初始化配置 */
 export interface InitConfig {

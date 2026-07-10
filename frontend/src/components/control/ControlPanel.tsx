@@ -10,18 +10,23 @@
 import RunControlButtons from './RunControlButtons';
 import SpeedSelector from './SpeedSelector';
 import StepButton from './StepButton';
+import EmergencyBrakeButton from './EmergencyBrakeButton';
+import { useSimulationState } from '../../context/SimulationContext';
 
 interface Props {
   send: (data: object) => void;
 }
 
 export default function ControlPanel({ send }: Props) {
+  const { runState } = useSimulationState();
+
   return (
     <div className="panel">
       <div className="panel-title">🎮 仿真控制</div>
       <div style={styles.content}>
         <RunControlButtons send={send} />
         <SpeedSelector send={send} />
+        <EmergencyBrakeButton send={send} runState={runState} />
         <StepButton send={send} />
       </div>
     </div>
