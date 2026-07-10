@@ -77,7 +77,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   disabled: {
     backgroundColor: '#6c757d',
-    borderColor: '#5c636a',
+    border: '2px solid #5c636a',
     cursor: 'not-allowed',
     opacity: 0.65,
   },
