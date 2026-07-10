@@ -56,3 +56,39 @@ class TestManualDriveController:
         ctrl.set_emergency_brake(False)
         r2 = ctrl.get_commands(base)
         assert r2 is base
+
+
+# --- 编排器集成测试 ---
+
+
+class TestOrchestratorEBIntegration:
+    """验证手动紧急制动在编排器层面的完整链路。"""
+
+    def test_eb_activates_max_brake_force(self, orchestrator):
+        """EB 激活后一步 → 制动力 = max_brake_force，速度下降。"""
+        orch = orchestrator
+        orch.start()
+
+        # 先跑几步让列车有速度
+        for _ in range(50):
+            orch.step_once()
+        assert orch.train_state.speed > 1.0
+        speed_before = orch.train_state.speed
+
+        # 触发紧急制动
+        orch.set_emergency_brake(True)
+        result = orch.step_once()
+
+        assert result is not None
+        assert result["data"]["signaling"]["controlCommands"][0]["emergencyBrake"] is True
+        assert result["data"]["trains"][0]["brakeForce"] == 260000.0  # max_brake_force
+        assert result["data"]["trains"][0]["speed"] < speed_before  # 制动后速度下降
+
+    def test_eb_clears_on_reset(self, orchestrator):
+        """reset() 后紧急制动状态清除。"""
+        orch = orchestrator
+        orch.set_emergency_brake(True)
+        assert orch.manual_driver.emergency_brake is True
+
+        orch.reset()
+        assert orch.manual_driver.emergency_brake is False
