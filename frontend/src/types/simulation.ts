@@ -115,6 +115,8 @@ export interface TrainState {
   door_status: DoorStatus;
   pantograph_voltage: number; // 受电弓端电压 (V)
   power_demand: number;       // 功率请求 (kW)
+  distance_to_station: number; // 距目标站距离 (m)
+  target_station_id: string;   // 目标站 ID
   fault_alarm: FaultAlarm | null;
 }
 
@@ -379,6 +381,8 @@ export interface ApiTrainState {
   pantographVoltage: number;
   powerDemand: number;
   doorStatus: DoorStatus;
+  distanceToStation: number;
+  targetStationId: string;
   faultAlarm: FaultAlarm | null;
 }
 

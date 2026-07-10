@@ -54,6 +54,8 @@ export function useMockTrain(): TrainState {
     door_status: s.stop ? 'open' : 'closed',
     pantograph_voltage: 1500,
     power_demand: 0,
+    distance_to_station: 0,
+    target_station_id: '',
     fault_alarm: null,
   };
 }

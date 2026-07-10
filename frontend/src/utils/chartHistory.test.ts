@@ -8,6 +8,7 @@ const makeSnapshot = (t: number, speed: number, accel: number, pos: number, jerk
     id: 'TRAIN_01', position: pos, speed, acceleration: accel, jerk,
     mode: 'traction', mass: 200000, passenger_count: 900,
     door_status: 'closed', pantograph_voltage: 1500, power_demand: 100,
+    distance_to_station: 0, target_station_id: '',
     fault_alarm: null,
   }],
   power: { substations: [], voltage_profile: [], total_consumption: 0, total_regeneration: 0, regeneration_rate: 0 },

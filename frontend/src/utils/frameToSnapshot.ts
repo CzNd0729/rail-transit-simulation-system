@@ -18,6 +18,8 @@ export function frameToSnapshot(
       door_status: 'closed',
       pantograph_voltage: frame.pantograph_voltage,
       power_demand: frame.power_demand,
+      distance_to_station: 0,
+      target_station_id: '',
       fault_alarm: null,
     }],
     power: {
