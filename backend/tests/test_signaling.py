@@ -654,3 +654,46 @@ def test_full_run_jerk_mostly_within_comfort_limit():
     assert max_jerk < limit * 4.0
     assert over_hard / total < 0.01
     assert over_soft / total < 0.15
+
+
+# ── SIG-09: 停车精度 ────────────────────────────────────────────────
+
+def test_distance_to_station_running():
+    """列车在区间运行时距站距离为正。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
+    # 列车在 ST01 (0m) 和 ST02 (1000m) 之间
+    train = _make_train(position=500.0, speed=60.0)
+    ctrl.compute_commands(train, dt=0.1)
+    assert ctrl.signal_state.distance_to_station == pytest.approx(500.0, abs=0.1)
+    assert ctrl.signal_state.target_station_id == "ST02"
+
+
+def test_distance_to_station_stopped_accurate():
+    """在站台容差内停稳时距离 ≈ 0。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
+    # ST02 在 1000m，容差 1.0m，停在 999.5m 应在容差内
+    train = _make_train(position=999.5, speed=0.0)
+    ctrl.compute_commands(train, dt=0.1)
+    assert ctrl.signal_state.phase == Phase.DWELL
+    assert ctrl.signal_state.distance_to_station == pytest.approx(0.5, abs=0.01)  # 1000 - 999.5 = 0.5m
+
+
+def test_distance_to_station_stopped_overrun():
+    """冲过站台后停在两站之间时，距离为距前方站的值。"""
+    ctrl = ThreeStageController(_make_track_three_stations(), _make_vehicle_params(), _make_sim_params())
+    # 列车驶过 ST02 (1000m) 并在 1050m 处停稳，前方是 ST03 (2000m)
+    # 兜底检测会将其判定为在 ST02 停靠
+    train = _make_train(position=1050.0, speed=0.05)
+    ctrl.compute_commands(train, dt=0.1)
+    # 兜底检测会进入 DWELL
+    assert ctrl.signal_state.phase == Phase.DWELL
+
+
+def test_distance_to_station_no_target():
+    """无前方目标站时距离为 0。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
+    # 已过最后一个站
+    train = _make_train(position=1100.0, speed=20.0)
+    ctrl.compute_commands(train, dt=0.1)
+    assert ctrl.signal_state.distance_to_station == 0.0
+    assert ctrl.signal_state.target_station_id == ""
