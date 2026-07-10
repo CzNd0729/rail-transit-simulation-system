@@ -15,6 +15,7 @@ from sim_engine.core.config import SimulationParams, load_simulation_params
 from sim_engine.data.recorder import DataRecorder, StepRecord
 from sim_engine.data.snapshot import build_simulation_snapshot
 from sim_engine.power.static_power import get_pantograph_voltage
+from sim_engine.signaling.manual_drive import ManualDriveController
 from sim_engine.signaling.three_stage import ThreeStageController
 from sim_engine.track.config import load_track
 from sim_engine.track.path_service import TrackPathService
@@ -38,6 +39,7 @@ class Orchestrator:
     train_id: str = "TRAIN_01"
     train_state: TrainState | None = None
     run_state: RunState = RunState.IDLE
+    manual_driver: ManualDriveController = field(default_factory=ManualDriveController)
     last_snapshot: dict | None = None
     last_step: StepResult | None = None
     _on_snapshot: Callable[[dict], None] | None = None
@@ -65,6 +67,10 @@ class Orchestrator:
         """注册每步快照回调（供 WebSocket 推送层使用）。"""
         self._on_snapshot = callback
 
+    def set_emergency_brake(self, active: bool) -> None:
+        """设置/解除手动紧急制动。"""
+        self.manual_driver.set_emergency_brake(active)
+
     def reset(self, passenger_load: float = 0.6) -> None:
         self.clock.reset()
         self.recorder.clear()
@@ -75,6 +81,7 @@ class Orchestrator:
         self.run_state = RunState.IDLE
         self.last_snapshot = None
         self.last_step = None
+        self.manual_driver = ManualDriveController()
 
     def start(self, passenger_load: float = 0.6) -> None:
         if self.train_state is None:
@@ -101,6 +108,7 @@ class Orchestrator:
         dt = self.clock.time_step
         track_params = self.track.query_at(self.train_state.position)
         cmd = self.signaling.compute_commands(self.train_state, dt)
+        cmd = self.manual_driver.get_commands(cmd)  # 手动指令叠加（紧急制动覆盖）
         result = self.vehicle.step(
             self.train_state, cmd, track_params, dt, self.sim_params.pid.max_jerk
         )
