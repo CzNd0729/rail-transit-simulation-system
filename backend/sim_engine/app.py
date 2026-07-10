@@ -104,6 +104,10 @@ def create_app() -> FastAPI:
                         sim_manager.step()
                 elif msg_type == "param_update":
                     sim_manager.update_params(data.get("params", {}))
+                elif msg_type == "manual_control":
+                    eb = data.get("emergencyBrake")
+                    if eb is not None:
+                        sim_manager.set_emergency_brake(eb)
         except WebSocketDisconnect:
             ws_manager.disconnect(websocket)
 

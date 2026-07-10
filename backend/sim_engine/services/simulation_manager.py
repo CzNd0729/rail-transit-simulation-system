@@ -125,6 +125,10 @@ class SimulationManager:
         self.orchestrator.sim_params.speed_multiplier = multiplier
         return {"speedMultiplier": multiplier}
 
+    def set_emergency_brake(self, active: bool) -> dict:
+        self.orchestrator.set_emergency_brake(active)
+        return {"emergencyBrake": active}
+
     # ==================== 状态查询 ====================
 
     def get_status(self) -> dict:
