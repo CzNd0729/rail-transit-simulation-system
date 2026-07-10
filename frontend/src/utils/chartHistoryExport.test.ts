@@ -10,7 +10,7 @@ describe('chartHistoryToCsv', () => {
       jerkTime: [[1, 0.8], [2, -0.2]],
     });
     expect(csv).toContain('time,position,speed,acceleration,jerk');
-    expect(csv).toContain('1,100,10,0.5,0.8');
-    expect(csv).toContain('2,200,20,0.3,-0.2');
+    expect(csv).toContain('1.00,100.00,10.00,0.50,0.80');
+    expect(csv).toContain('2.00,200.00,20.00,0.30,-0.20');
   });
 });

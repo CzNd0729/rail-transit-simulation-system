@@ -5,13 +5,14 @@
  */
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
+import { axisTooltip } from '../../../utils/format';
 
 export default function SpeedTimeCurve() {
   const { chartHistory, clock } = useSimulationState();
 
   const option = {
     backgroundColor: 'transparent',
-    tooltip: { trigger: 'axis' as const },
+    tooltip: { trigger: 'axis' as const, formatter: axisTooltip(2) },
     grid: { left: 50, right: 20, top: 20, bottom: 40 },
     xAxis: {
       type: 'value' as const,

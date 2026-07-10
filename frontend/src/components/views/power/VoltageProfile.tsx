@@ -5,13 +5,17 @@
  */
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
+import { axisTooltip } from '../../../utils/format';
 
 export default function VoltageProfile() {
   const { power } = useSimulationState();
 
   const option = {
     backgroundColor: 'transparent',
-    tooltip: { trigger: 'axis' as const, formatter: '{b}: {c} V' },
+    tooltip: { trigger: 'axis' as const, formatter: (params: any) => {
+      const formatted = axisTooltip(2)(params);
+      return formatted.replace(/:\s*([\d.]+)$/, ': $1 V');
+    } },
     grid: { left: 50, right: 20, top: 30, bottom: 40 },
     xAxis: {
       type: 'value' as const,

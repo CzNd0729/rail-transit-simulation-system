@@ -3,6 +3,33 @@
  */
 
 /**
+ * 统一数值格式化，保留指定位数小数（默认 2 位）
+ * 用于图表 tooltip、轴标签等显示
+ */
+export function formatNum(value: number, decimals = 2): string {
+  return value.toFixed(decimals);
+}
+
+/**
+ * ECharts axis-trigger tooltip formatter：将所有数值格式化为指定位数小数
+ * 适用于 trigger: 'axis' 的折线图
+ * @param decimals 小数位数，默认 2
+ */
+export function axisTooltip(decimals = 2) {
+  return (params: any) => {
+    const list = Array.isArray(params) ? params : [params];
+    const axisVal = list[0]?.axisValueLabel ?? '';
+    const body = list
+      .map((p: any) => {
+        const yVal = Array.isArray(p.value) ? p.value[1] : p.value;
+        return `${p.marker} ${p.seriesName}: ${formatNum(yVal, decimals)}`;
+      })
+      .join('<br/>');
+    return axisVal ? `${axisVal}<br/>${body}` : body;
+  };
+}
+
+/**
  * 格式化仿真时间为 HH:MM:SS 格式
  * @param seconds 秒数
  */

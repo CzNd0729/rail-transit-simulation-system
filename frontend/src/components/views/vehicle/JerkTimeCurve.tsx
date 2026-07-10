@@ -4,6 +4,7 @@
  */
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
+import { axisTooltip } from '../../../utils/format';
 
 const COMFORT_JERK_LIMIT = 0.75;
 
@@ -16,7 +17,7 @@ export default function JerkTimeCurve() {
 
   const option = {
     backgroundColor: 'transparent',
-    tooltip: { trigger: 'axis' as const },
+    tooltip: { trigger: 'axis' as const, formatter: axisTooltip(2) },
     grid: { left: 50, right: 20, top: 20, bottom: 40 },
     xAxis: {
       type: 'value' as const,

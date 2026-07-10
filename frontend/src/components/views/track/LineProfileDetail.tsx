@@ -10,6 +10,7 @@ import { mockLineData, mockSegmentParams } from '../../../data/mockLineData';
 import { useViewport, parseViewBox } from '../../../hooks/useViewport';
 import ViewportControls from '../overview/ViewportControls';
 import { toStepData } from '../../../utils/profileChart';
+import { axisTooltip } from '../../../utils/format';
 
 const PROFILE_WINDOW_METERS = 4500;
 
@@ -102,7 +103,7 @@ export default function LineProfileDetail() {
     () => ({
       backgroundColor: 'transparent',
       animation: false,
-      tooltip: { trigger: 'axis' as const },
+      tooltip: { trigger: 'axis' as const, formatter: axisTooltip(2) },
       legend: {
         data: ['坡度 (‰)', '限速 (km/h)'],
         textStyle: { color: '#a0a0a0', fontSize: 11 },
