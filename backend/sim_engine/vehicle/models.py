@@ -152,6 +152,12 @@ class TrainState:
     regen_energy: float = 0.0
     """累计再生制动电量 (J)。VHC-09 预留，迭代一恒为 0。"""
 
+    distance_to_station: float = 0.0
+    """距当前目标站距离 (m)。正值 = 距站台还有多远，负值 = 已冲过站台。"""
+
+    target_station_id: str = ""
+    """当前目标站 ID。无目标站时为空字符串。"""
+
 
 @dataclass
 class ForceBreakdown:
