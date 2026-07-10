@@ -46,6 +46,8 @@ def build_simulation_snapshot(
                     "doorStatus": "closed",
                     "runningBrakeForce": forces.brake,
                     "faultAlarm": None,
+                    "distanceToStation": state.distance_to_station,
+                    "targetStationId": state.target_station_id,
                 }
             ],
             "power": {

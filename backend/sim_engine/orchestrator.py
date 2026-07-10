@@ -115,6 +115,11 @@ class Orchestrator:
         self.train_state = result.state
         self.last_step = result
 
+        # 复制信号系统的距站距离到 TrainState（供 snapshot 输出）
+        sig_st = self.signaling.signal_state
+        self.train_state.distance_to_station = sig_st.distance_to_station
+        self.train_state.target_station_id = sig_st.target_station_id
+
         self.clock.tick()
 
         self.recorder.record(
