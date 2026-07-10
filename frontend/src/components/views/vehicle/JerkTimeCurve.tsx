@@ -23,7 +23,10 @@ export default function JerkTimeCurve() {
       name: '时间 (s)',
       max: xMax,
       nameTextStyle: { color: '#a0a0a0' },
-      axisLabel: { color: '#a0a0a0' },
+      axisLabel: {
+        color: '#a0a0a0',
+        formatter: (value: number) => value.toFixed(2),
+      },
       axisLine: { lineStyle: { color: '#2a2a4a' } },
     },
     yAxis: {

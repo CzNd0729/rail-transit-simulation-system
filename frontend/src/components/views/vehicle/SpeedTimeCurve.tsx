@@ -20,7 +20,10 @@ export default function SpeedTimeCurve() {
         ? Math.max(clock.elapsed + 10, chartHistory.speedTime[chartHistory.speedTime.length - 1][0] + 10)
         : 600,
       nameTextStyle: { color: '#a0a0a0' },
-      axisLabel: { color: '#a0a0a0' },
+      axisLabel: {
+        color: '#a0a0a0',
+        formatter: (value: number) => value.toFixed(2),
+      },
       axisLine: { lineStyle: { color: '#2a2a4a' } },
     },
     yAxis: {
