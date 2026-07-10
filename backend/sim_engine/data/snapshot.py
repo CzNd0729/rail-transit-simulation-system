@@ -14,11 +14,38 @@ def build_simulation_snapshot(
     state: TrainState,
     forces: ForceBreakdown,
     pantograph_voltage: float = 1500.0,
+    power_demand: float = 0.0,
+    voltage_profile: list[dict] | None = None,
+    substation_states: list | None = None,
 ) -> dict:
     """构建单列车 MVP 快照（camelCase，与 API 文档对齐）。"""
     display_mode = state.mode
     if state.speed < 0.01:
         display_mode = "stopped"
+
+    # 变电所状态序列化
+    if substation_states:
+        subs = [
+            {
+                "id": s.id,
+                "name": s.name,
+                "chainage": s.chainage,
+                "ratedVoltage": s.rated_voltage,
+                "ratedPower": s.rated_power,
+                "outputCurrent": s.output_current,
+                "outputPower": s.output_power,
+            }
+            for s in substation_states
+        ]
+    else:
+        subs = []
+
+    # 电压曲线（当前步采样点）
+    vp = voltage_profile or []
+
+    # 能耗数据（J → kWh，供前端展示）
+    total_consumption_kwh = state.traction_energy / 3_600_000.0  # J → kWh
+    total_regeneration_kwh = state.regen_energy / 3_600_000.0
 
     return {
         "type": "simulation_snapshot",
@@ -39,7 +66,7 @@ def build_simulation_snapshot(
                     "mass": state.mass,
                     "passengerCount": int(state.passenger_load * 1500),
                     "pantographVoltage": pantograph_voltage,
-                    "powerDemand": 0.0,
+                    "powerDemand": power_demand,
                     "tractionForce": forces.traction,
                     "totalResistance": forces.resistance_total,
                     "brakeForce": forces.brake,
@@ -51,10 +78,10 @@ def build_simulation_snapshot(
                 }
             ],
             "power": {
-                "substations": [],
-                "voltageProfile": [],
-                "totalConsumption": 0.0,
-                "totalRegeneration": 0.0,
+                "substations": subs,
+                "voltageProfile": vp,
+                "totalConsumption": total_consumption_kwh,
+                "totalRegeneration": total_regeneration_kwh,
             },
             "signaling": {
                 "controlCommands": [

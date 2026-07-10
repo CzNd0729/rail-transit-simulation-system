@@ -9,6 +9,34 @@ import yaml
 
 
 @dataclass
+class SubstationConfig:
+    """变电所配置项（配置文件反序列化用）。"""
+
+    id: str = ""
+    name: str = ""
+    chainage: float = 0.0
+    rated_voltage: float = 1500.0
+    rated_power: float = 5000.0
+
+
+@dataclass
+class PowerConfig:
+    """供电系统配置。"""
+
+    mode: str = "fixed"
+    """供电模式："fixed"=固定网压 / "simple_ohm"=欧姆压降。"""
+
+    substations: list[SubstationConfig] = field(default_factory=list)
+    """变电所列表。"""
+
+    contact_line_resistance: float = 0.02
+    """接触网电阻率 (Ω/km)。"""
+
+    rail_resistance: float = 0.01
+    """钢轨电阻率 (Ω/km)。"""
+
+
+@dataclass
 class PidParams:
     """前馈制动参数（原 PID 参数已精简）。"""
 
@@ -40,6 +68,7 @@ class SimulationParams:
     station_stop_tolerance: float = 1.0
     coasting_min_speed: float = 30.0
     pid: PidParams = field(default_factory=PidParams)
+    power: PowerConfig = field(default_factory=PowerConfig)
 
 
 def _load_pid_params(data: dict) -> PidParams:
@@ -51,6 +80,27 @@ def _load_pid_params(data: dict) -> PidParams:
         deadband_d=float(pid_data.get("deadband_d", 1.0)),
         brake_safety_factor=float(pid_data.get("brake_safety_factor", 1.02)),
         max_jerk=float(pid_data.get("max_jerk", 0.75)),
+    )
+
+
+def _load_power_params(data: dict) -> PowerConfig:
+    power_data = data.get("power", {}) or {}
+    substations = []
+    for s in power_data.get("substations", []) or []:
+        substations.append(
+            SubstationConfig(
+                id=str(s.get("id", "")),
+                name=str(s.get("name", "")),
+                chainage=float(s.get("chainage", 0)),
+                rated_voltage=float(s.get("rated_voltage", 1500)),
+                rated_power=float(s.get("rated_power", 5000)),
+            )
+        )
+    return PowerConfig(
+        mode=str(power_data.get("mode", "fixed")),
+        substations=substations,
+        contact_line_resistance=float(power_data.get("contact_line_resistance", 0.02)),
+        rail_resistance=float(power_data.get("rail_resistance", 0.01)),
     )
 
 
@@ -68,4 +118,5 @@ def load_simulation_params(path: str | Path) -> SimulationParams:
         station_stop_tolerance=float(data.get("station_stop_tolerance", 1.0)),
         coasting_min_speed=float(data.get("coasting_min_speed", 30.0)),
         pid=_load_pid_params(data),
+        power=_load_power_params(data),
     )

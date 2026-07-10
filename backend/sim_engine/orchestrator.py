@@ -14,7 +14,9 @@ from sim_engine.core.clock import RunState, SimulationClock
 from sim_engine.core.config import SimulationParams, load_simulation_params
 from sim_engine.data.recorder import DataRecorder, StepRecord
 from sim_engine.data.snapshot import build_simulation_snapshot
-from sim_engine.power.static_power import get_pantograph_voltage
+from sim_engine.power.load_flow import PowerFlowResult, PowerNetwork, calculate
+from sim_engine.power.regeneration import calculate_regen_power, calculate_traction_power
+from sim_engine.power.substation import Substation
 from sim_engine.signaling.manual_drive import ManualDriveController
 from sim_engine.signaling.three_stage import ThreeStageController
 from sim_engine.track.config import load_track
@@ -35,6 +37,7 @@ class Orchestrator:
     signaling: ThreeStageController
     clock: SimulationClock
     sim_params: SimulationParams
+    power_network: PowerNetwork = field(default_factory=PowerNetwork)
     recorder: DataRecorder = field(default_factory=DataRecorder)
     train_id: str = "TRAIN_01"
     train_state: TrainState | None = None
@@ -55,12 +58,30 @@ class Orchestrator:
             time_step=sim_params.time_step,
             speed_multiplier=sim_params.speed_multiplier,
         )
+
+        # 构建供电网络
+        power_network = PowerNetwork(
+            substations=[
+                Substation(
+                    id=s.id,
+                    name=s.name,
+                    chainage=s.chainage,
+                    rated_voltage=s.rated_voltage,
+                    rated_power=s.rated_power,
+                )
+                for s in sim_params.power.substations
+            ],
+            contact_line_resistance=sim_params.power.contact_line_resistance,
+            rail_resistance=sim_params.power.rail_resistance,
+        )
+
         return cls(
             vehicle=vehicle,
             track=track,
             signaling=signaling,
             clock=clock,
             sim_params=sim_params,
+            power_network=power_network,
         )
 
     def set_snapshot_callback(self, callback: Callable[[dict], None]) -> None:
@@ -136,13 +157,55 @@ class Orchestrator:
             )
         )
 
+        # ── 供电计算 ──
+        v_ms = result.state.speed / 3.6 if result.state.speed > 0 else 0.0
+        power_mode = self.sim_params.power.mode
+
+        # 计算列车功率需求
+        if result.forces.traction > 0:
+            power_demand = calculate_traction_power(result.forces.traction, v_ms)
+        elif result.forces.brake > 0:
+            # 再生制动功率（负值表示回馈，不模拟吸收）
+            power_demand = -calculate_regen_power(
+                result.forces.brake, v_ms,
+                self.vehicle.params.regeneration_efficiency,
+            )
+        else:
+            power_demand = 0.0
+
+        if power_mode == "simple_ohm":
+            power_flow: PowerFlowResult = calculate(
+                self.power_network,
+                result.state.position,
+                power_demand,
+            )
+            pantograph_voltage = power_flow.pantograph_voltage
+            substation_states = power_flow.substation_states
+        else:
+            # "fixed" 模式：固定网压
+            from sim_engine.power.static_power import get_pantograph_voltage
+
+            pantograph_voltage = get_pantograph_voltage()
+            substation_states = []
+
+        # 电压曲线采样点（当前时刻列车位置与网压）
+        voltage_profile = [
+            {
+                "chainage": result.state.position,
+                "voltage": pantograph_voltage,
+            }
+        ]
+
         snapshot = build_simulation_snapshot(
             self.clock,
             self.sim_params,
             self.train_id,
             result.state,
             result.forces,
-            pantograph_voltage=get_pantograph_voltage(),
+            pantograph_voltage=pantograph_voltage,
+            power_demand=power_demand,
+            voltage_profile=voltage_profile,
+            substation_states=substation_states,
         )
         # 写入本步实际控车指令
         snapshot["data"]["signaling"]["controlCommands"][0] = {
