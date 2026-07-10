@@ -37,6 +37,10 @@ class TrainSignalState:
     _last_target_station_id: str = ""
     _brake_target_id: str = ""
     """制动阶段的目标站 ID，进入 BRAKING 时锁定。防止越站后 next_station_ahead 切换导致制动目标丢失。"""
+    distance_to_station: float = 0.0
+    """距当前目标站距离 (m)。"""
+    target_station_id: str = ""
+    """当前目标站 ID。"""
 
 
 class ThreeStageController:
@@ -157,6 +161,16 @@ class ThreeStageController:
             phase=cmd.phase,
         )
 
+    def _update_distance(self, train: TrainState, target: Station | None) -> None:
+        """更新距当前目标站距离。"""
+        st = self._state
+        if target is not None:
+            st.target_station_id = target.id
+            st.distance_to_station = target.chainage - train.position
+        else:
+            st.target_station_id = ""
+            st.distance_to_station = 0.0
+
     def compute_commands(self, train: TrainState, dt: float) -> ControlCommands:
         st = self._state
         tol = self.sim_params.station_stop_tolerance
@@ -189,6 +203,7 @@ class ThreeStageController:
                         st.phase = Phase.DWELL
                         st.dwell_remaining = old_station.dwell_time
                         st._dwell_station_id = old_station.id
+                        self._update_distance(train, old_station)
                         return self._finalize_commands(
                             ControlCommands(brake_level=0.20, phase="dwell"), train, dt
                         )
@@ -199,6 +214,7 @@ class ThreeStageController:
             st._last_target_station_id = target.id
 
         if target is None:
+            self._update_distance(train, None)
             if train.speed > 0.1:
                 return self._finalize_commands(
                     ControlCommands(brake_level=1.0), train, dt, urgent_brake=True
@@ -217,6 +233,7 @@ class ThreeStageController:
             st.dwell_remaining = target.dwell_time
             st._dwell_station_id = target.id
             self._brake_pid.reset()
+            self._update_distance(train, target)
             return self._finalize_commands(
                 ControlCommands(brake_level=0.20, phase="dwell"), train, dt
             )
@@ -228,6 +245,7 @@ class ThreeStageController:
                 st.dwell_remaining = current_station.dwell_time
                 st._dwell_station_id = current_station.id
                 self._brake_pid.reset()
+                self._update_distance(train, current_station)
                 return self._finalize_commands(
                     ControlCommands(brake_level=0.20, phase="dwell"), train, dt
                 )
@@ -240,10 +258,13 @@ class ThreeStageController:
             if train.position + brake_dist >= target.chainage - tol:
                 st.phase = Phase.BRAKING
                 st._brake_target_id = target.id
+                self._update_distance(train, target)
                 return self._braking_output(train, target, dt)
             if train.speed >= v_cruise - 2.0:
                 st.phase = Phase.COASTING
+                self._update_distance(train, target)
                 return self._finalize_commands(ControlCommands(), train, dt)
+            self._update_distance(train, target)
             return self._finalize_commands(
                 ControlCommands(traction_level=1.0), train, dt
             )
@@ -253,6 +274,7 @@ class ThreeStageController:
             if train.position + brake_dist >= target.chainage - tol:
                 st.phase = Phase.BRAKING
                 st._brake_target_id = target.id
+                self._update_distance(train, target)
                 return self._braking_output(train, target, dt)
             curve_speed = PIDController.braking_curve_speed(
                 max(dist_to_station, 1.0), self.sim_params.pid.comfort_decel
@@ -261,15 +283,18 @@ class ThreeStageController:
             dynamic_min = max(dynamic_min, 5.0)
             if train.speed < dynamic_min:
                 st.phase = Phase.TRACTION
+                self._update_distance(train, target)
                 return self._finalize_commands(
                     ControlCommands(traction_level=1.0), train, dt
                 )
             comp = self._coasting_compensation(train, track_params)
+            self._update_distance(train, target)
             return self._finalize_commands(
                 ControlCommands(traction_level=comp, phase="coasting"), train, dt
             )
 
         # ── BRAKING: 前馈 + P 微调 ──
+        self._update_distance(train, target)
         return self._braking_output(train, target, dt)
 
     # ── 制动阶段核心 ──
