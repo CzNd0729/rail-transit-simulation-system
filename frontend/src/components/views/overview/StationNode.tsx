@@ -59,7 +59,7 @@ function StationNodeInner({
   // 交替布局：偶数索引在上方，奇数索引在下方
   // 上下间隔固定为最大缩放时的屏幕距离，除以 zoom 保持屏幕空间恒定
   const isAbove = index % 2 === 0;
-  const verticalOffset = 400 / zoom; // 屏幕空间 400px 的固定间隔
+  const verticalOffset = 600 / zoom; // 屏幕空间 600px 的固定间隔
   const textY = isAbove
     ? (dualTrack ? DUAL_TRACK_Y.up - verticalOffset : MAIN_TRACK_Y - totalHeight / 2 - verticalOffset)
     : (dualTrack ? DUAL_TRACK_Y.down + verticalOffset : MAIN_TRACK_Y + totalHeight / 2 + verticalOffset);
