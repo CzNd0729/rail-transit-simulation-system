@@ -17,6 +17,7 @@ describe('simulationReducer lifecycle', () => {
         accelTime: [[1, 0.5]] as [number, number][],
         jerkTime: [] as [number, number][],
         speedPosition: [[100, 50]] as [number, number][],
+        positionTime: [] as [number, number][],
       },
     };
     const next = simulationReducer(withStats, { type: 'CLEAR_CHART_HISTORY' });
@@ -39,6 +40,7 @@ describe('simulationReducer lifecycle', () => {
         accelTime: [[1, 0.5]] as [number, number][],
         jerkTime: [] as [number, number][],
         speedPosition: [[100, 50]] as [number, number][],
+        positionTime: [] as [number, number][],
       },
     };
     const next = simulationReducer(withData, { type: 'RESET_RUN_DATA' });

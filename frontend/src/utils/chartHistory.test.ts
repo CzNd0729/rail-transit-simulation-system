@@ -24,6 +24,16 @@ describe('appendChartHistory', () => {
     expect(result.accelTime).toEqual([[1.0, 0.8]]);
     expect(result.jerkTime).toEqual([[1.0, 0]]);
     expect(result.speedPosition).toEqual([[100, 50]]);
+    expect(result.positionTime).toEqual([[1.0, 100]]);
+  });
+
+  it('truncates positionTime when exceeding MAX_POINTS', () => {
+    let h = EMPTY_CHART_HISTORY;
+    for (let i = 0; i < 10_001; i++) {
+      h = appendChartHistory(h, makeSnapshot(i * 0.1, 50, 0, i));
+    }
+    expect(h.positionTime).toHaveLength(10_000);
+    expect(h.positionTime[0]).toEqual([0.1, 1]);
   });
 
   it('records jerk from train state', () => {
