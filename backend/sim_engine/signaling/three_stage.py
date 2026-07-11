@@ -15,6 +15,7 @@ from enum import Enum
 
 from sim_engine.core.config import PidParams, SimulationParams
 from sim_engine.signaling.ato import ATOController
+from sim_engine.signaling.ats import ATSController
 from sim_engine.track.models import Station
 from sim_engine.track.path_service import TrackPathService
 from sim_engine.vehicle.dynamics import effective_speed_limit_kmh
@@ -55,10 +56,12 @@ class ThreeStageController:
         track: TrackPathService,
         vehicle_params: VehicleParams,
         sim_params: SimulationParams,
+        ats: ATSController | None = None,
     ):
         self.track = track
         self.vehicle_params = vehicle_params
         self.sim_params = sim_params
+        self._ats = ats
         self._state = TrainSignalState()
         self._prev_traction_level = 0.0
         self._prev_brake_level = 0.0
@@ -171,7 +174,16 @@ class ThreeStageController:
             st.target_station_id = ""
             st.distance_to_station = 0.0
 
-    def compute_commands(self, train: TrainState, dt: float) -> ControlCommands:
+    def _start_dwell(self, st: TrainSignalState, station: Station, elapsed: float) -> None:
+        """进入站停：有 ATS 时按策略 B 调整 dwell_remaining。"""
+        nominal = station.dwell_time
+        if self._ats is not None:
+            adjusted, _ = self._ats.adjust_dwell(station.id, nominal, elapsed)
+            st.dwell_remaining = adjusted
+        else:
+            st.dwell_remaining = nominal
+
+    def compute_commands(self, train: TrainState, dt: float, elapsed: float = 0.0) -> ControlCommands:
         st = self._state
         tol = self.sim_params.station_stop_tolerance
 
@@ -201,7 +213,7 @@ class ThreeStageController:
                 if old_station.id != st._dwell_station_id:
                     if train.speed < 0.1 and abs(train.position - old_station.chainage) <= 50.0:
                         st.phase = Phase.DWELL
-                        st.dwell_remaining = old_station.dwell_time
+                        self._start_dwell(st, old_station, elapsed)
                         st._dwell_station_id = old_station.id
                         self._update_distance(train, old_station)
                         return self._finalize_commands(
@@ -230,7 +242,7 @@ class ThreeStageController:
         # ── 到站停稳检测 ──
         if train.speed < 0.1 and abs(dist_to_station) <= tol:
             st.phase = Phase.DWELL
-            st.dwell_remaining = target.dwell_time
+            self._start_dwell(st, target, elapsed)
             st._dwell_station_id = target.id
             self._ato.reset()
             self._update_distance(train, target)
@@ -242,7 +254,7 @@ class ThreeStageController:
             current_station = self.track.station_at(train.position, half_length=50.0)
             if current_station is not None and current_station.id != st._dwell_station_id:
                 st.phase = Phase.DWELL
-                st.dwell_remaining = current_station.dwell_time
+                self._start_dwell(st, current_station, elapsed)
                 st._dwell_station_id = current_station.id
                 self._ato.reset()
                 self._update_distance(train, current_station)

@@ -6,7 +6,9 @@ import math
 
 import pytest
 
-from sim_engine.core.config import SimulationParams
+from sim_engine.core.config import AtsConfig, SimulationParams
+from sim_engine.signaling.ats import ATSController
+from sim_engine.signaling.models import Timetable, TimetableEntry
 from sim_engine.signaling.three_stage import (
     Phase,
     ThreeStageController,
@@ -409,6 +411,39 @@ def test_dwell_transition_to_traction_after_expiry():
     cmd = ctrl.compute_commands(train, dt=0.2)
     assert ctrl.signal_state.phase == Phase.TRACTION
     assert ctrl.signal_state.dwell_remaining == 0.0
+
+
+@pytest.fixture
+def make_ctrl_with_ats():
+    def _factory(planned_arrival: float = 100.0):
+        tt = Timetable("TRAIN_01", [
+            TimetableEntry("ST02", planned_arrival=planned_arrival, planned_departure=130.0),
+        ])
+        ats = ATSController(AtsConfig(), tt)
+        ctrl = ThreeStageController(
+            _make_track(), _make_vehicle_params(), _make_sim_params(), ats=ats
+        )
+        return ctrl, ats
+
+    return _factory
+
+
+def test_late_arrival_extends_dwell(make_ctrl_with_ats):
+    """晚点到站时 ATS 延长站停时间。"""
+    ctrl, _ = make_ctrl_with_ats()
+    train = _make_train(position=999.5, speed=0.0)
+    cmd = ctrl.compute_commands(train, dt=0.1, elapsed=130.0)
+    assert ctrl.signal_state.phase == Phase.DWELL
+    assert ctrl.signal_state.dwell_remaining == 60.0
+    assert cmd.traction_level == 0.0
+
+
+def test_on_time_arrival_dwell_unchanged_with_ats(make_ctrl_with_ats):
+    """准点到站时站停时间不变。"""
+    ctrl, _ = make_ctrl_with_ats()
+    train = _make_train(position=999.5, speed=0.0)
+    ctrl.compute_commands(train, dt=0.1, elapsed=100.0)
+    assert ctrl.signal_state.dwell_remaining == 30.0
 
 
 # ── 无下一站时制动停车 ──────────────────────────────────────────────
