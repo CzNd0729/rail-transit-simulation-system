@@ -35,5 +35,5 @@ export const VIEW_CONFIG = {
   track: { label: '轨道视图', icon: '🛤️' },
 } as const;
 
-/** 迭代二 MA 示意图固定安全包络长度 (m) */
+/** 迭代二 MA 示意图固定安全包络长度 (m)，迭代三改为动态 ATP 包络 */
 export const MA_ENVELOPE_LENGTH = 300;

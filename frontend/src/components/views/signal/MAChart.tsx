@@ -8,6 +8,11 @@ import { mockLineData } from '../../../data/mockLineData';
 import { MA_ENVELOPE_LENGTH } from '../../../utils/constants';
 import { getSignalPhaseLabel, resolveSignalPhase } from '../../../utils/format';
 
+function pct(chainage: number, totalLength: number): string {
+  if (totalLength <= 0) return '0%';
+  return `${Math.min(100, Math.max(0, (chainage / totalLength) * 100))}%`;
+}
+
 export default function MAChart() {
   const { trains, signaling, lineLayout } = useSimulationState();
   const train = trains[0];
@@ -16,19 +21,21 @@ export default function MAChart() {
 
   const position = train?.position ?? 0;
   const envelopeEnd = Math.min(position + MA_ENVELOPE_LENGTH, totalLength);
+  const envelopeWidth = Math.max(envelopeEnd - position, 0);
   const cmd = signaling.commands[0];
 
-  const targetChainage = useMemo(() => {
-    if (!train) return totalLength;
+  const targetStation = useMemo(() => {
+    if (!train) return stations[stations.length - 1] ?? null;
     if (train.target_station_id) {
-      const st = stations.find((s) => s.id === train.target_station_id);
-      if (st) return st.chainage;
+      return stations.find((s) => s.id === train.target_station_id) ?? null;
     }
     if (train.distance_to_station > 0) {
-      return position + train.distance_to_station;
+      const chainage = position + train.distance_to_station;
+      return stations.find((s) => Math.abs(s.chainage - chainage) < 1) ?? null;
     }
-    return totalLength;
-  }, [train, stations, position, totalLength]);
+    const ahead = stations.find((s) => s.chainage > position + 1);
+    return ahead ?? stations[stations.length - 1] ?? null;
+  }, [train, stations, position]);
 
   const phase = resolveSignalPhase(
     cmd?.running_phase,
@@ -38,93 +45,60 @@ export default function MAChart() {
   );
   const phaseLabel = getSignalPhaseLabel(phase);
 
-  const trackY = 50;
-  const trackH = 12;
+  const startStation = stations[0];
+  const targetChainage = targetStation?.chainage ?? totalLength;
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="panel-title">🛡️ 移动授权 (MA)</div>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <svg
-          viewBox={`0 0 ${totalLength} 100`}
-          preserveAspectRatio="none"
-          style={{ width: '100%', height: 'calc(100% - 8px)' }}
-        >
-          <rect
-            x={0}
-            y={trackY}
-            width={totalLength}
-            height={trackH}
-            fill="#1a2a3a"
-            stroke="#2a4a6a"
-            strokeWidth={1}
-          />
 
-          <rect
-            x={position}
-            y={trackY - 4}
-            width={Math.max(envelopeEnd - position, 0)}
-            height={trackH + 8}
-            fill="rgba(24, 144, 255, 0.25)"
-            stroke="#1890ff"
-            strokeWidth={1}
-            strokeDasharray="8 4"
+      <div style={styles.schematic}>
+        <div style={styles.trackBar}>
+          <div
+            style={{
+              ...styles.envelope,
+              left: pct(position, totalLength),
+              width: pct(envelopeWidth, totalLength),
+            }}
           />
 
           {stations.map((st) => (
-            <g key={st.id}>
-              <line
-                x1={st.chainage}
-                y1={20}
-                x2={st.chainage}
-                y2={80}
-                stroke="#3a3a5a"
-                strokeWidth={1}
-                strokeDasharray="4 4"
-              />
-              <text
-                x={st.chainage}
-                y={16}
-                fill="#a0a0a0"
-                fontSize={totalLength / 80}
-                textAnchor="middle"
-              >
-                {st.name}
-              </text>
-            </g>
+            <div
+              key={st.id}
+              style={{
+                ...styles.stationTick,
+                left: pct(st.chainage, totalLength),
+                borderColor: st.id === targetStation?.id ? '#52c41a' : '#3a3a5a',
+              }}
+              title={st.name}
+            />
           ))}
 
-          <line
-            x1={targetChainage}
-            y1={trackY - 8}
-            x2={targetChainage}
-            y2={trackY + trackH + 8}
-            stroke="#52c41a"
-            strokeWidth={2}
-          />
+          <div style={{ ...styles.trainMarker, left: pct(position, totalLength) }}>
+            <span style={styles.trainIcon}>▶</span>
+            <span style={styles.trainLabel}>列车</span>
+          </div>
+        </div>
 
-          <rect
-            x={position - 20}
-            y={trackY - 2}
-            width={40}
-            height={trackH + 4}
-            fill="#1890ff"
-            stroke="#69c0ff"
-            strokeWidth={1}
-            rx={2}
-          />
-          <text
-            x={position}
-            y={trackY + trackH / 2 + 3}
-            fill="#fff"
-            fontSize={totalLength / 100}
-            textAnchor="middle"
-          >
-            🚃
-          </text>
-        </svg>
+        <div style={styles.labelRow}>
+          <span style={styles.stationLabel}>{startStation?.name ?? '起点'}</span>
+          <span style={{ flex: 1, textAlign: 'center', color: '#1890ff', fontSize: 11 }}>
+            安全包络 {MA_ENVELOPE_LENGTH} m
+          </span>
+          <span style={{ ...styles.stationLabel, color: '#52c41a' }}>
+            {targetStation?.name ?? '终点'}
+          </span>
+        </div>
+
+        <div style={styles.directionRow}>
+          <span style={styles.directionArrow}>→</span>
+          <span style={styles.directionText}>
+            {position.toFixed(0)} m → {targetChainage.toFixed(0)} m
+          </span>
+        </div>
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '4px 8px' }}>
+
+      <div style={styles.footer}>
         相位: {phaseLabel}
         {' · '}
         距目标站: {train ? `${train.distance_to_station.toFixed(0)} m` : '--'}
@@ -134,3 +108,100 @@ export default function MAChart() {
     </div>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  schematic: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: 12,
+    padding: '8px 12px',
+    minHeight: 0,
+  },
+  trackBar: {
+    position: 'relative',
+    height: 36,
+    background: '#1a2a3a',
+    borderRadius: 6,
+    border: '1px solid #2a4a6a',
+  },
+  envelope: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    background: 'rgba(24, 144, 255, 0.28)',
+    border: '1px dashed #1890ff',
+    borderRadius: 4,
+    pointerEvents: 'none',
+  },
+  stationTick: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    marginLeft: -1,
+    borderLeft: '2px solid',
+    pointerEvents: 'none',
+  },
+  trainMarker: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 2,
+    zIndex: 2,
+  },
+  trainIcon: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 28,
+    height: 20,
+    background: '#1890ff',
+    border: '2px solid #69c0ff',
+    borderRadius: 4,
+    color: '#fff',
+    fontSize: 10,
+    lineHeight: 1,
+  },
+  trainLabel: {
+    fontSize: 10,
+    color: '#a0d8ff',
+    whiteSpace: 'nowrap',
+  },
+  labelRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  stationLabel: {
+    fontSize: 12,
+    color: '#a0a0a0',
+    fontWeight: 600,
+  },
+  directionRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    color: '#666',
+    fontSize: 11,
+  },
+  directionArrow: {
+    fontSize: 18,
+    color: '#1890ff',
+  },
+  directionText: {
+    fontFamily: 'monospace',
+  },
+  footer: {
+    fontSize: 12,
+    color: 'var(--text-secondary)',
+    padding: '4px 8px',
+    borderTop: '1px solid var(--border-color)',
+  },
+};
