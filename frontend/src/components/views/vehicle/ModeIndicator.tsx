@@ -65,7 +65,8 @@ const styles: Record<string, React.CSSProperties> = {
   mode: {
     padding: '8px 16px',
     borderRadius: '6px',
-    border: '2px solid',
+    borderWidth: '2px',
+    borderStyle: 'solid',
     transition: 'all 0.3s',
   },
   label: {

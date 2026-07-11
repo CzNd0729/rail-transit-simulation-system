@@ -126,6 +126,18 @@ class VehicleSystem:
 
         jerk = (accel - prev_accel) / dt if dt > 0 else 0.0
 
+        # ── VHC-09: 能耗累计 ──
+        traction_energy = state.traction_energy
+        regen_energy = state.regen_energy
+
+        # 使用积分步起点速度（与受力计算一致）
+        if f_traction > 0 and v_ms > 0:
+            traction_energy += f_traction * v_ms * dt
+        if f_brake > 0 and v_ms > 0:
+            regen_energy += (
+                f_brake * v_ms * self.params.regeneration_efficiency * dt
+            )
+
         new_state = TrainState(
             position=new_position,
             speed=new_v_ms * MS_TO_KMH,
@@ -134,8 +146,8 @@ class VehicleSystem:
             mode=self._determine_mode(cmd),
             mass=mass,
             passenger_load=state.passenger_load,
-            traction_energy=state.traction_energy,  # VHC-09 预留，迭代一不累计
-            regen_energy=state.regen_energy,
+            traction_energy=traction_energy,
+            regen_energy=regen_energy,
         )
 
         forces = ForceBreakdown(

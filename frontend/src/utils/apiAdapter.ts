@@ -64,8 +64,19 @@ export function parseServerSnapshot(raw: ApiSimulationSnapshot): SimulationSnaps
     },
     trains: raw.trains.map(mapTrain),
     power: {
-      substations: [],
-      voltage_profile: [],
+      substations: (raw.power.substations ?? []).map(s => ({
+        id: s.id,
+        name: s.name,
+        chainage: s.chainage,
+        rated_voltage: s.ratedVoltage,
+        rated_power: s.ratedPower,
+        output_current: s.outputCurrent,
+        output_power: s.outputPower,
+      })),
+      voltage_profile: (raw.power.voltageProfile ?? []).map(v => ({
+        chainage: v.chainage,
+        voltage: v.voltage,
+      })),
       total_consumption: raw.power.totalConsumption,
       total_regeneration: raw.power.totalRegeneration,
       regeneration_rate: 0,
