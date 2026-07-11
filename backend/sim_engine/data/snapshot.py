@@ -17,6 +17,7 @@ def build_simulation_snapshot(
     power_demand: float = 0.0,
     voltage_profile: list[dict] | None = None,
     substation_states: list | None = None,
+    signaling_extra: dict | None = None,
 ) -> dict:
     """构建单列车 MVP 快照（camelCase，与 API 文档对齐）。"""
     display_mode = state.mode
@@ -46,6 +47,26 @@ def build_simulation_snapshot(
     # 能耗数据（J → kWh，供前端展示）
     total_consumption_kwh = state.traction_energy / 3_600_000.0  # J → kWh
     total_regeneration_kwh = state.regen_energy / 3_600_000.0
+
+    extra = dict(signaling_extra or {})
+    running_phase = extra.pop("runningPhase", None)
+    control_cmd: dict = {
+        "trainId": train_id,
+        "tractionLevel": 0.0,
+        "brakeLevel": 0.0,
+        "emergencyBrake": False,
+    }
+    if running_phase is not None:
+        control_cmd["runningPhase"] = running_phase
+
+    signaling: dict = {
+        "controlCommands": [control_cmd],
+        "emergencyBrakes": [],
+        "speedLimits": extra.pop("speedLimits", []),
+        "maProfile": extra.pop("maProfile", []),
+        "timetableDeviation": extra.pop("timetableDeviation", []),
+    }
+    signaling.update(extra)
 
     return {
         "type": "simulation_snapshot",
@@ -83,17 +104,7 @@ def build_simulation_snapshot(
                 "totalConsumption": total_consumption_kwh,
                 "totalRegeneration": total_regeneration_kwh,
             },
-            "signaling": {
-                "controlCommands": [
-                    {
-                        "trainId": train_id,
-                        "tractionLevel": 0.0,
-                        "brakeLevel": 0.0,
-                        "emergencyBrake": False,
-                    }
-                ],
-                "emergencyBrakes": [],
-            },
+            "signaling": signaling,
             "track": {"occupancy": [], "switchStates": []},
             "events": [],
         },
