@@ -345,6 +345,17 @@ def test_braking_command():
     assert cmd.traction_level == 0.0
 
 
+def test_braking_uses_ato_controller():
+    """制动阶段通过 ATOController 输出制动力。"""
+    ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())
+    ctrl._state.phase = Phase.BRAKING
+    ctrl._state._brake_target_id = "ST02"
+    train = _make_train(position=950.0, speed=40.0)
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    assert hasattr(ctrl, "_ato")
+    assert cmd.brake_level > 0.0
+
+
 def test_braking_pid_partial_near_target():
     """接近制动曲线目标时 PID 输出部分制动力（非满）。"""
     ctrl = ThreeStageController(_make_track(), _make_vehicle_params(), _make_sim_params())

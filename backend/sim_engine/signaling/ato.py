@@ -25,5 +25,14 @@ class ATOController:
         trim = self._pid.compute(error)
         return min(1.0, max(0.0, ff + trim))
 
+    def compute_trim(self, speed_kmh: float, remaining_m: float) -> float:
+        """P 微调量，叠加在前馈制动级位上。"""
+        v_target = self.target_speed_on_curve(remaining_m)
+        if v_target > 1.0:
+            error = (speed_kmh - v_target) / v_target
+        else:
+            error = 0.0
+        return self._pid.compute(error)
+
     def reset(self) -> None:
         self._pid.reset()
