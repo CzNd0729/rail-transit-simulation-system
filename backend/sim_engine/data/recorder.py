@@ -67,11 +67,19 @@ class DataRecorder:
 
     def summary(self) -> dict:
         if not self.buffer:
-            return {"steps": 0, "total_time": 0.0, "avg_speed": 0.0, "max_speed": 0.0}
+            return {
+                "steps": 0,
+                "total_time": 0.0,
+                "avg_speed": 0.0,
+                "max_speed": 0.0,
+                "max_position": 0.0,
+            }
         speeds = [r.speed for r in self.buffer]
+        positions = [r.position for r in self.buffer]
         return {
             "steps": len(self.buffer),
             "total_time": self.buffer[-1].time,
             "avg_speed": sum(speeds) / len(speeds),
             "max_speed": max(speeds),
+            "max_position": max(positions),
         }

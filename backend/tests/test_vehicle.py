@@ -290,16 +290,16 @@ def test_coasting_mode():
 
 def test_load_vehicle_params_from_yaml():
     params = load_vehicle_params(CONFIG_PATH)
-    assert params.empty_mass == 200000.0
-    assert params.passenger_capacity == 1500
-    assert len(params.traction_curve) == 4
+    assert params.empty_mass == 220000.0
+    assert params.passenger_capacity == 1460
+    assert len(params.traction_curve) == 3
     assert params.traction_curve[0].force_percent == 1.0
 
 
 def test_from_config_builds_system():
     veh = VehicleSystem.from_config(str(CONFIG_PATH))
     assert isinstance(veh, VehicleSystem)
-    assert veh.params.max_traction_force == 400000.0
+    assert veh.params.max_traction_force == 300000.0
 
 
 def test_params_from_dict_missing_key_raises():

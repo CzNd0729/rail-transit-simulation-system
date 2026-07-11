@@ -73,7 +73,13 @@ def test_clear_empties_buffer():
 def test_summary_empty():
     r = DataRecorder()
     s = r.summary()
-    assert s == {"steps": 0, "total_time": 0.0, "avg_speed": 0.0, "max_speed": 0.0}
+    assert s == {
+        "steps": 0,
+        "total_time": 0.0,
+        "avg_speed": 0.0,
+        "max_speed": 0.0,
+        "max_position": 0.0,
+    }
 
 
 def test_summary_single_record():

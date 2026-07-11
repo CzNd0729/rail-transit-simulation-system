@@ -102,7 +102,7 @@ def test_full_run_reaches_near_terminal():
     orch.start()
     summary = orch.run_until(max_steps=15000)
     assert summary["steps"] > 100
-    assert orch.train_state.position > 2500
+    assert summary["max_position"] > 2500
 
 
 # ── 停止/重置状态 ────────────────────────────────────────────────────
@@ -167,7 +167,7 @@ def test_run_until_stops_at_time_limit():
     orch.start()
     summary = orch.run_until()
     assert orch.run_state == RunState.STOPPED
-    assert orch.clock.elapsed >= 1.0
+    assert summary["total_time"] >= 1.0
 
 
 # ── 多次重置复用 ────────────────────────────────────────────────────
