@@ -17,13 +17,17 @@ from sim_engine.data.snapshot import build_simulation_snapshot
 from sim_engine.power.load_flow import PowerFlowResult, PowerNetwork, calculate
 from sim_engine.power.regeneration import calculate_regen_power, calculate_traction_power
 from sim_engine.power.substation import Substation
+from sim_engine.signaling.atp import ATPController
+from sim_engine.signaling.ats import ATSController
 from sim_engine.signaling.manual_drive import ManualDriveController
+from sim_engine.signaling.models import SafetyStatus
 from sim_engine.signaling.three_stage import ThreeStageController
+from sim_engine.signaling.timetable_loader import load_timetable
 from sim_engine.track.config import load_track
 from sim_engine.track.path_service import TrackPathService
 from sim_engine.vehicle.config import load_vehicle_params
-from sim_engine.vehicle.dynamics import VehicleSystem
-from sim_engine.vehicle.models import StepResult, TrainState
+from sim_engine.vehicle.dynamics import VehicleSystem, effective_speed_limit_kmh
+from sim_engine.vehicle.models import ControlCommands, StepResult, TrainState
 
 CONFIG_DIR = Path(__file__).resolve().parent / "config"
 
@@ -35,6 +39,8 @@ class Orchestrator:
     vehicle: VehicleSystem
     track: TrackPathService
     signaling: ThreeStageController
+    atp: ATPController
+    ats: ATSController
     clock: SimulationClock
     sim_params: SimulationParams
     power_network: PowerNetwork = field(default_factory=PowerNetwork)
@@ -53,7 +59,10 @@ class Orchestrator:
         sim_params = load_simulation_params(config_dir / "simulation.yaml")
         vehicle = VehicleSystem(load_vehicle_params(config_dir / "vehicle.yaml"))
         track = TrackPathService(load_track(config_dir / "track.yaml"))
-        signaling = ThreeStageController(track, vehicle.params, sim_params)
+        timetable = load_timetable(config_dir / "timetable.yaml")
+        ats = ATSController(sim_params.signal.ats, timetable)
+        atp = ATPController(sim_params.signal.atp)
+        signaling = ThreeStageController(track, vehicle.params, sim_params, ats=ats)
         clock = SimulationClock(
             time_step=sim_params.time_step,
             speed_multiplier=sim_params.speed_multiplier,
@@ -79,6 +88,8 @@ class Orchestrator:
             vehicle=vehicle,
             track=track,
             signaling=signaling,
+            atp=atp,
+            ats=ats,
             clock=clock,
             sim_params=sim_params,
             power_network=power_network,
@@ -127,8 +138,17 @@ class Orchestrator:
         assert self.train_state is not None
 
         dt = self.clock.time_step
+        elapsed = self.clock.elapsed
         track_params = self.track.query_at(self.train_state.position)
-        cmd = self.signaling.compute_commands(self.train_state, dt)
+        speed_limit = effective_speed_limit_kmh(track_params, self.vehicle.params)
+        cmd = self.signaling.compute_commands(self.train_state, dt, elapsed=elapsed)
+        if self.atp.check_overspeed(self.train_state.speed, speed_limit) == SafetyStatus.EMERGENCY_BRAKE:
+            cmd = ControlCommands(
+                traction_level=0.0,
+                brake_level=0.0,
+                emergency_brake=True,
+                phase=cmd.phase or self.signaling.signal_state.phase.value,
+            )
         cmd = self.manual_driver.get_commands(cmd)  # 手动指令叠加（紧急制动覆盖）
         result = self.vehicle.step(
             self.train_state, cmd, track_params, dt, self.sim_params.pid.max_jerk
@@ -196,6 +216,24 @@ class Orchestrator:
             }
         ]
 
+        running_phase = cmd.phase or sig_st.phase.value
+        target_chainage = (
+            self.track.get_station_chainage(sig_st.target_station_id)
+            if sig_st.target_station_id
+            else None
+        )
+        ma = self.atp.build_ma_profile(self.train_id, self.train_state.position, target_chainage)
+        timetable_dev: list[dict] = []
+        if self.ats.last_deviation is not None:
+            d = self.ats.last_deviation
+            timetable_dev = [{
+                "trainId": d.train_id,
+                "stationId": d.station_id,
+                "delayArrival": d.delay_arrival,
+                "nominalDwell": d.nominal_dwell,
+                "adjustedDwell": d.adjusted_dwell,
+            }]
+
         snapshot = build_simulation_snapshot(
             self.clock,
             self.sim_params,
@@ -206,14 +244,29 @@ class Orchestrator:
             power_demand=power_demand,
             voltage_profile=voltage_profile,
             substation_states=substation_states,
+            signaling_extra={
+                "runningPhase": running_phase,
+                "speedLimits": [{
+                    "trainId": self.train_id,
+                    "permanentLimit": speed_limit,
+                    "atpLimit": self.atp.atp_speed_limit(speed_limit),
+                }],
+                "maProfile": [{
+                    "trainId": ma.train_id,
+                    "maEndChainage": ma.ma_end_chainage,
+                    "safetyDistance": ma.safety_distance,
+                }],
+                "timetableDeviation": timetable_dev,
+            },
         )
         # 写入本步实际控车指令
-        snapshot["data"]["signaling"]["controlCommands"][0] = {
+        snapshot["data"]["signaling"]["controlCommands"][0].update({
             "trainId": self.train_id,
             "tractionLevel": cmd.traction_level,
             "brakeLevel": cmd.brake_level,
             "emergencyBrake": cmd.emergency_brake,
-        }
+            "runningPhase": running_phase,
+        })
         self.last_snapshot = snapshot
         if self._on_snapshot:
             self._on_snapshot(snapshot)

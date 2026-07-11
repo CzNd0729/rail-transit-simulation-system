@@ -60,6 +60,27 @@ class PidParams:
 
 
 @dataclass
+class AtpConfig:
+    safety_distance: float = 300.0
+    overspeed_margin: float = 0.05
+
+
+@dataclass
+class AtsConfig:
+    dwell_adjust_mode: str = "extend"
+    min_dwell_time: float = 15.0
+    max_dwell_time: float = 300.0
+
+
+@dataclass
+class SignalConfig:
+    mode: str = "three_stage"
+    atp: AtpConfig = field(default_factory=AtpConfig)
+    ats: AtsConfig = field(default_factory=AtsConfig)
+    following_min_interval: float = 500.0
+
+
+@dataclass
 class SimulationParams:
     time_step: float = 0.1
     total_time: float = 600.0
@@ -69,6 +90,7 @@ class SimulationParams:
     coasting_min_speed: float = 30.0
     pid: PidParams = field(default_factory=PidParams)
     power: PowerConfig = field(default_factory=PowerConfig)
+    signal: SignalConfig = field(default_factory=SignalConfig)
 
 
 def _load_pid_params(data: dict) -> PidParams:
@@ -104,6 +126,25 @@ def _load_power_params(data: dict) -> PowerConfig:
     )
 
 
+def _load_signal_params(data: dict) -> SignalConfig:
+    atp_data = data.get("atp", {}) or {}
+    ats_data = data.get("ats", {}) or {}
+    following_data = data.get("following", {}) or {}
+    return SignalConfig(
+        mode=str(data.get("signal_mode", "three_stage")),
+        atp=AtpConfig(
+            safety_distance=float(atp_data.get("safety_distance", 300.0)),
+            overspeed_margin=float(atp_data.get("overspeed_margin", 0.05)),
+        ),
+        ats=AtsConfig(
+            dwell_adjust_mode=str(ats_data.get("dwell_adjust_mode", "extend")),
+            min_dwell_time=float(ats_data.get("min_dwell_time", 15.0)),
+            max_dwell_time=float(ats_data.get("max_dwell_time", 300.0)),
+        ),
+        following_min_interval=float(following_data.get("min_interval", 500.0)),
+    )
+
+
 def load_simulation_params(path: str | Path) -> SimulationParams:
     path = Path(path)
     with path.open("r", encoding="utf-8") as fp:
@@ -119,4 +160,5 @@ def load_simulation_params(path: str | Path) -> SimulationParams:
         coasting_min_speed=float(data.get("coasting_min_speed", 30.0)),
         pid=_load_pid_params(data),
         power=_load_power_params(data),
+        signal=_load_signal_params(data),
     )

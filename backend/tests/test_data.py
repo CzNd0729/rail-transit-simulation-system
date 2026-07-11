@@ -273,3 +273,27 @@ def test_snapshot_passenger_count():
     snap = build_simulation_snapshot(clock, sim_params, "T1", state, forces)
     # passengerCount = int(0.8 * 1500) = 1200
     assert snap["data"]["trains"][0]["passengerCount"] == 1200
+
+
+def test_snapshot_signaling_extended_fields():
+    clock = SimulationClock()
+    sim_params = SimulationParams()
+    state = TrainState(mass=260000.0)
+    forces = ForceBreakdown()
+    snap = build_simulation_snapshot(
+        clock,
+        sim_params,
+        "TRAIN_01",
+        state,
+        forces,
+        signaling_extra={
+            "runningPhase": "traction",
+            "speedLimits": [{"trainId": "TRAIN_01", "permanentLimit": 80, "atpLimit": 76.0}],
+            "maProfile": [{"trainId": "TRAIN_01", "maEndChainage": 1000.0, "safetyDistance": 300.0}],
+            "timetableDeviation": [],
+        },
+    )
+    sig = snap["data"]["signaling"]
+    assert sig["controlCommands"][0]["runningPhase"] == "traction"
+    assert sig["speedLimits"][0]["atpLimit"] == 76.0
+    assert sig["maProfile"][0]["maEndChainage"] == 1000.0

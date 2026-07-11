@@ -1,0 +1,14 @@
+# 单列车计划时刻表（相对仿真起点，单位：秒）
+# 站 ID 与 track.yaml 对齐；MVP 仅覆盖前三站
+timetable:
+  train_id: TRAIN_01
+  entries:
+    - station_id: ST01
+      planned_arrival: 0
+      planned_departure: 30
+    - station_id: ST02
+      planned_arrival: 90
+      planned_departure: 120
+    - station_id: ST03
+      planned_arrival: 180
+      planned_departure: 210

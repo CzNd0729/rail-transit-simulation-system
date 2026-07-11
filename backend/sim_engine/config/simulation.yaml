@@ -27,3 +27,13 @@ simulation:
   target_speed_ratio: 0.8
   time_step: 0.1
   total_time: 600
+  signal_mode: three_stage
+  atp:
+    safety_distance: 300
+    overspeed_margin: 0.05
+  ats:
+    dwell_adjust_mode: extend
+    min_dwell_time: 15
+    max_dwell_time: 300
+  following:
+    min_interval: 500

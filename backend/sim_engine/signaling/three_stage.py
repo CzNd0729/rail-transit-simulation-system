@@ -14,7 +14,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 from sim_engine.core.config import PidParams, SimulationParams
-from sim_engine.signaling.pid_controller import PIDController
+from sim_engine.signaling.ato import ATOController
+from sim_engine.signaling.ats import ATSController
 from sim_engine.track.models import Station
 from sim_engine.track.path_service import TrackPathService
 from sim_engine.vehicle.dynamics import effective_speed_limit_kmh
@@ -55,16 +56,18 @@ class ThreeStageController:
         track: TrackPathService,
         vehicle_params: VehicleParams,
         sim_params: SimulationParams,
+        ats: ATSController | None = None,
     ):
         self.track = track
         self.vehicle_params = vehicle_params
         self.sim_params = sim_params
+        self._ats = ats
         self._state = TrainSignalState()
         self._prev_traction_level = 0.0
         self._prev_brake_level = 0.0
 
-        # P-only 制动微调控制器
-        self._brake_pid = PIDController(kp=sim_params.pid.kp_brake)
+        pp = sim_params.pid
+        self._ato = ATOController(kp_brake=pp.kp_brake, comfort_decel=pp.comfort_decel)
 
         # 标记首站为已停靠，防止兜底检测误判刚离站的列车
         if self.track._stations:
@@ -83,7 +86,7 @@ class ThreeStageController:
         self._state = TrainSignalState()
         self._prev_traction_level = 0.0
         self._prev_brake_level = 0.0
-        self._brake_pid.reset()
+        self._ato.reset()
         if self.track._stations:
             self._state._dwell_station_id = self.track._stations[0].id
 
@@ -171,7 +174,16 @@ class ThreeStageController:
             st.target_station_id = ""
             st.distance_to_station = 0.0
 
-    def compute_commands(self, train: TrainState, dt: float) -> ControlCommands:
+    def _start_dwell(self, st: TrainSignalState, station: Station, elapsed: float) -> None:
+        """进入站停：有 ATS 时按策略 B 调整 dwell_remaining。"""
+        nominal = station.dwell_time
+        if self._ats is not None:
+            adjusted, _ = self._ats.adjust_dwell(station.id, nominal, elapsed)
+            st.dwell_remaining = adjusted
+        else:
+            st.dwell_remaining = nominal
+
+    def compute_commands(self, train: TrainState, dt: float, elapsed: float = 0.0) -> ControlCommands:
         st = self._state
         tol = self.sim_params.station_stop_tolerance
 
@@ -201,7 +213,7 @@ class ThreeStageController:
                 if old_station.id != st._dwell_station_id:
                     if train.speed < 0.1 and abs(train.position - old_station.chainage) <= 50.0:
                         st.phase = Phase.DWELL
-                        st.dwell_remaining = old_station.dwell_time
+                        self._start_dwell(st, old_station, elapsed)
                         st._dwell_station_id = old_station.id
                         self._update_distance(train, old_station)
                         return self._finalize_commands(
@@ -230,9 +242,9 @@ class ThreeStageController:
         # ── 到站停稳检测 ──
         if train.speed < 0.1 and abs(dist_to_station) <= tol:
             st.phase = Phase.DWELL
-            st.dwell_remaining = target.dwell_time
+            self._start_dwell(st, target, elapsed)
             st._dwell_station_id = target.id
-            self._brake_pid.reset()
+            self._ato.reset()
             self._update_distance(train, target)
             return self._finalize_commands(
                 ControlCommands(brake_level=0.20, phase="dwell"), train, dt
@@ -242,9 +254,9 @@ class ThreeStageController:
             current_station = self.track.station_at(train.position, half_length=50.0)
             if current_station is not None and current_station.id != st._dwell_station_id:
                 st.phase = Phase.DWELL
-                st.dwell_remaining = current_station.dwell_time
+                self._start_dwell(st, current_station, elapsed)
                 st._dwell_station_id = current_station.id
-                self._brake_pid.reset()
+                self._ato.reset()
                 self._update_distance(train, current_station)
                 return self._finalize_commands(
                     ControlCommands(brake_level=0.20, phase="dwell"), train, dt
@@ -276,9 +288,7 @@ class ThreeStageController:
                 st._brake_target_id = target.id
                 self._update_distance(train, target)
                 return self._braking_output(train, target, dt)
-            curve_speed = PIDController.braking_curve_speed(
-                max(dist_to_station, 1.0), self.sim_params.pid.comfort_decel
-            )
+            curve_speed = self._ato.target_speed_on_curve(max(dist_to_station, 1.0))
             dynamic_min = min(curve_speed * 0.4, self.sim_params.coasting_min_speed)
             dynamic_min = max(dynamic_min, 5.0)
             if train.speed < dynamic_min:
@@ -321,7 +331,6 @@ class ThreeStageController:
         全程工作到站台停稳，不使用蠕行模式。
         """
         remaining = target.chainage - train.position
-        pp = self.sim_params.pid
 
         # 已越过站台：低速时保持制动而非满制动，避免停稳瞬间冲击率尖峰
         if remaining <= 0:
@@ -349,12 +358,7 @@ class ThreeStageController:
         brake_ff = min(brake_ff, 1.0)
 
         # P 微调：以 ATO 制动曲线为目标
-        v_target_kmh = PIDController.braking_curve_speed(remaining, pp.comfort_decel)
-        if v_target_kmh > 1.0:
-            error = (train.speed - v_target_kmh) / v_target_kmh
-        else:
-            error = 0.0
-        trim = self._brake_pid.compute(error)
+        trim = self._ato.compute_trim(train.speed, remaining)
 
         brake = max(0.0, min(brake_ff + trim, 1.0))
         return ControlCommands(brake_level=brake)
