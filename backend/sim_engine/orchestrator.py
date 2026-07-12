@@ -20,7 +20,7 @@ from sim_engine.power.substation import Substation
 from sim_engine.signaling.atp import ATPController
 from sim_engine.signaling.ats import ATSController
 from sim_engine.signaling.manual_drive import ManualDriveController
-from sim_engine.signaling.models import MaProfile, SafetyStatus, Timetable
+from sim_engine.signaling.models import MaProfile, SafetyStatus, Timetable, TimetableEntry
 from sim_engine.signaling.three_stage import ThreeStageController
 from sim_engine.signaling.timetable_loader import load_timetable
 from sim_engine.signaling.train_following import is_interval_safe
@@ -46,6 +46,7 @@ class TrainRun:
     manual_driver: ManualDriveController
     spawn_time: float = 0.0
     active: bool = False
+    direction: str = "up"
     last_step: StepResult | None = None
 
 
@@ -153,7 +154,18 @@ class Orchestrator:
         self.trains = []
         for i in range(self.sim_params.train_count):
             train_id = f"TRAIN_{i + 1:02d}"
-            timetable = Timetable(train_id=train_id, entries=list(base_tt.entries))
+            spawn_time = i * interval
+            timetable = Timetable(
+                train_id=train_id,
+                entries=[
+                    TimetableEntry(
+                        station_id=e.station_id,
+                        planned_arrival=e.planned_arrival + spawn_time,
+                        planned_departure=e.planned_departure + spawn_time,
+                    )
+                    for e in base_tt.entries
+                ],
+            )
             ats = ATSController(self.sim_params.signal.ats, timetable)
             signaling = ThreeStageController(
                 self.track, self.vehicle.params, self.sim_params, ats=ats
@@ -167,8 +179,9 @@ class Orchestrator:
                     signaling=signaling,
                     ats=ats,
                     manual_driver=ManualDriveController(),
-                    spawn_time=i * interval,
+                    spawn_time=spawn_time,
                     active=(i == 0),
+                    direction="up",
                 )
             )
 
@@ -389,6 +402,7 @@ class Orchestrator:
                     forces=result.forces,
                     pantograph_voltage=pantograph_voltage,
                     power_demand=train_power,
+                    direction=run.direction,
                 )
             )
             control_commands.append({

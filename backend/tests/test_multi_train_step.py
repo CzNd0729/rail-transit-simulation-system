@@ -21,6 +21,34 @@ def test_delayed_spawn_adds_second_train_to_snapshot():
     assert len(train_ids) == 2
 
 
+def test_multi_train_timetable_offset_by_spawn():
+    orch = Orchestrator.from_config_dir()
+    orch.sim_params.train_count = 3
+    orch.sim_params.departure_interval = 120.0
+    orch.reset()
+    assert orch.trains[2].ats._timetable.planned_arrival("ST02") == 90.0 + 240.0
+
+
+def test_multi_train_third_train_progresses_past_st02():
+    """TRAIN_03 不应因 ATS 全局时刻表误判而在 ST02 长期停站。"""
+    orch = Orchestrator.from_config_dir()
+    orch.sim_params.train_count = 3
+    orch.sim_params.departure_interval = 120.0
+    orch.reset()
+    orch.start()
+    for _ in range(12000):
+        orch.step_once()
+    assert orch.trains[2].state.position > 2000.0
+
+
+def test_snapshot_includes_train_direction():
+    orch = Orchestrator.from_config_dir()
+    orch.reset()
+    orch.start()
+    snap = orch.step_once()
+    assert snap["data"]["trains"][0]["direction"] == "up"
+
+
 def test_single_train_count_one_unchanged_snapshot_shape(orchestrator):
     orch = orchestrator
     orch.sim_params.train_count = 1
