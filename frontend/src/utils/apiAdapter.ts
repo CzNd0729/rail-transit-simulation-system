@@ -4,6 +4,7 @@ import type {
   SimulationParams,
   SimulationSnapshot,
   SimulationStats,
+  Switch,
   TrackCircuit,
   TrainState,
 } from '../types/simulation';
@@ -97,7 +98,17 @@ export function parseServerSnapshot(raw: ApiSimulationSnapshot): SimulationSnaps
           occupied: Boolean(o.occupied),
         }),
       ),
-      switch_states: [],
+      switch_states: ((raw.track?.switchStates ?? []) as Record<string, unknown>[]).map(
+        (s): Switch => ({
+          id: String(s.switchId ?? ''),
+          chainage: Number(s.chainage ?? 0),
+          type: (s.type as Switch['type']) ?? 'single',
+          normal_direction: String(s.normalDirection ?? 'main'),
+          reverse_direction: String(s.reverseDirection ?? 'siding'),
+          lateral_speed_limit: Number(s.lateralSpeedLimit ?? 30),
+          state: (s.state as Switch['state']) ?? 'normal',
+        }),
+      ),
     },
     events: raw.events ?? [],
   };
