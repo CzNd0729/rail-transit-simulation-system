@@ -10,7 +10,7 @@ import { axisTooltip } from '../../../utils/format';
 import type { VoltagePoint } from '../../../types/simulation';
 
 export default function VoltageProfile() {
-  const { power, trains, lineLayout, runState, clock } = useSimulationState();
+  const { power, trains, lineLayout, runState } = useSimulationState();
   const trainPosition = trains[0]?.position;
   const trainVoltage = trains[0]?.pantograph_voltage;
   const totalLength = lineLayout?.total_length ?? 3200;
