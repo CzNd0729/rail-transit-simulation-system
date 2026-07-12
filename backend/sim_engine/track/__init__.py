@@ -4,6 +4,7 @@ from .config import load_track
 from .models import Segment, Station, Switch, Track, TrackCircuit, TrackLine
 from .occupancy import OccupancyDetector
 from .path_service import TrackPathService
+from .switch import SwitchManager
 
 __all__ = [
     "Segment",
@@ -14,5 +15,6 @@ __all__ = [
     "TrackLine",
     "TrackPathService",
     "OccupancyDetector",
+    "SwitchManager",
     "load_track",
 ]

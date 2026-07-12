@@ -19,6 +19,7 @@ def build_simulation_snapshot(
     substation_states: list | None = None,
     signaling_extra: dict | None = None,
     occupancy: list[dict] | None = None,
+    switch_states: list[dict] | None = None,
 ) -> dict:
     """构建单列车 MVP 快照（camelCase，与 API 文档对齐）。"""
     display_mode = state.mode
@@ -106,7 +107,7 @@ def build_simulation_snapshot(
                 "totalRegeneration": total_regeneration_kwh,
             },
             "signaling": signaling,
-            "track": {"occupancy": occupancy or [], "switchStates": []},
+            "track": {"occupancy": occupancy or [], "switchStates": switch_states or []},
             "events": [],
         },
     }

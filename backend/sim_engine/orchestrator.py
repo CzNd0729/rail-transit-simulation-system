@@ -25,6 +25,7 @@ from sim_engine.signaling.three_stage import ThreeStageController
 from sim_engine.signaling.timetable_loader import load_timetable
 from sim_engine.track.config import load_track
 from sim_engine.track.occupancy import OccupancyDetector
+from sim_engine.track.switch import SwitchManager
 from sim_engine.track.path_service import TrackPathService
 from sim_engine.vehicle.config import load_vehicle_params
 from sim_engine.vehicle.dynamics import VehicleSystem, effective_speed_limit_kmh
@@ -46,6 +47,7 @@ class Orchestrator:
     sim_params: SimulationParams
     power_network: PowerNetwork = field(default_factory=PowerNetwork)
     occupancy: OccupancyDetector = field(default_factory=lambda: OccupancyDetector([]))
+    switch_manager: SwitchManager = field(default_factory=lambda: SwitchManager([]))
     recorder: DataRecorder = field(default_factory=DataRecorder)
     train_id: str = "TRAIN_01"
     train_state: TrainState | None = None
@@ -62,6 +64,7 @@ class Orchestrator:
         vehicle = VehicleSystem(load_vehicle_params(config_dir / "vehicle.yaml"))
         track = TrackPathService(load_track(config_dir / "track.yaml"))
         occupancy = OccupancyDetector(track.track.circuits)
+        switch_manager = SwitchManager(track.track.switches)
         timetable = load_timetable(config_dir / "timetable.yaml")
         ats = ATSController(sim_params.signal.ats, timetable)
         atp = ATPController(sim_params.signal.atp)
@@ -97,6 +100,7 @@ class Orchestrator:
             sim_params=sim_params,
             power_network=power_network,
             occupancy=occupancy,
+            switch_manager=switch_manager,
         )
 
     def set_snapshot_callback(self, callback: Callable[[dict], None]) -> None:
@@ -112,6 +116,11 @@ class Orchestrator:
         self.recorder.clear()
         self.signaling.reset()
         self.occupancy.update({})  # 清空所有区段占用
+        # Reset all switches to normal
+        for sw in self.switch_manager._switches.values():
+            sw.state = "normal"
+            sw.transition_elapsed = 0.0
+            sw._target_state = "normal"
         self.train_state = self.vehicle.create_initial_state(
             position=0.0, passenger_load=passenger_load
         )
@@ -185,6 +194,9 @@ class Orchestrator:
         # ── 轨道区段占用检测 ──
         self.occupancy.update({self.train_id: result.state.position})
 
+        # ── 道岔转换时延推进 ──
+        self.switch_manager.update(dt)
+
         # ── 供电计算 ──
         v_ms = result.state.speed / 3.6 if result.state.speed > 0 else 0.0
         power_mode = self.sim_params.power.mode
@@ -253,6 +265,7 @@ class Orchestrator:
             voltage_profile=voltage_profile,
             substation_states=substation_states,
             occupancy=self.occupancy.occupancy_list(),
+            switch_states=self.switch_manager.switch_list(),
             signaling_extra={
                 "runningPhase": running_phase,
                 "speedLimits": [{
