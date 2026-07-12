@@ -1,0 +1,15 @@
+power:
+  contact_line_resistance: 0.02     # Ω/km
+  mode: simple_ohm                  # "fixed" = 迭代一固定网压 / "simple_ohm" = 迭代二欧姆压降
+  rail_resistance: 0.01             # Ω/km
+  substations:
+    - chainage: 0
+      id: SUB01
+      name: A站变电所
+      rated_power: 5000
+      rated_voltage: 1500
+    - chainage: 3200
+      id: SUB02
+      name: C站变电所
+      rated_power: 5000
+      rated_voltage: 1500

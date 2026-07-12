@@ -1,0 +1,11 @@
+signal:
+  mode: three_stage                 # ATP 控车模式
+  atp:
+    safety_distance: 300            # 安全距离 (m)
+    overspeed_margin: 0.05          # 超速裕度
+  ats:
+    dwell_adjust_mode: extend       # 停站调节模式
+    min_dwell_time: 15              # 最小停站时间 (s)
+    max_dwell_time: 300             # 最大停站时间 (s)
+  following:
+    min_interval: 500               # 最小追踪间隔 (m)

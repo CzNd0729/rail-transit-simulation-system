@@ -1,39 +1,7 @@
 simulation:
   coasting_min_speed: 30.0
-  pid:
-    brake_safety_factor: 1.02
-    comfort_decel: 0.8
-    creep_gain: 0.25
-    deadband_d: 1.0
-    kp_brake: 0.02
-    max_jerk: 0.75
-  power:
-    contact_line_resistance: 0.02
-    mode: simple_ohm
-    rail_resistance: 0.01
-    substations:
-    - chainage: 0
-      id: SUB01
-      name: A站变电所
-      rated_power: 5000
-      rated_voltage: 1500
-    - chainage: 3200
-      id: SUB02
-      name: C站变电所
-      rated_power: 5000
-      rated_voltage: 1500
   speed_multiplier: 1
   station_stop_tolerance: 1.0
   target_speed_ratio: 0.8
   time_step: 0.1
-  total_time: 6000
-  signal_mode: three_stage
-  atp:
-    safety_distance: 300
-    overspeed_margin: 0.05
-  ats:
-    dwell_adjust_mode: extend
-    min_dwell_time: 15
-    max_dwell_time: 300
-  following:
-    min_interval: 500
+  total_time: 600

@@ -1,4 +1,10 @@
-"""仿真全局参数加载。"""
+"""仿真全局参数加载。
+
+simulation.yaml 只包含仿真器自身参数，子模块配置从同目录独立的 YAML 文件加载：
+- pid.yaml     → 制动/控车参数
+- power.yaml   → 供电系统配置
+- signal.yaml  → 信号系统配置
+"""
 
 from __future__ import annotations
 
@@ -93,8 +99,29 @@ class SimulationParams:
     signal: SignalConfig = field(default_factory=SignalConfig)
 
 
-def _load_pid_params(data: dict) -> PidParams:
-    pid_data = data.get("pid", {}) or {}
+# ── 子模块配置文件加载器 ────────────────────────────────────────────
+
+
+def _try_load_yaml(path: Path) -> dict:
+    """尝试加载 YAML 文件，文件不存在时返回空 dict。"""
+    if path.exists():
+        with path.open("r", encoding="utf-8") as fp:
+            return yaml.safe_load(fp) or {}
+    return {}
+
+
+def load_pid_params(config_dir: str | Path) -> PidParams:
+    """从 pid.yaml 加载制动控车参数。
+
+    Args:
+        config_dir: 配置文件所在目录。
+
+    Returns:
+        PidParams，文件缺失时返回默认值。
+    """
+    config_dir = Path(config_dir)
+    data = _try_load_yaml(config_dir / "pid.yaml")
+    pid_data = data.get("pid", data) or {}
     return PidParams(
         comfort_decel=float(pid_data.get("comfort_decel", 0.8)),
         kp_brake=float(pid_data.get("kp_brake", 0.02)),
@@ -105,8 +132,18 @@ def _load_pid_params(data: dict) -> PidParams:
     )
 
 
-def _load_power_params(data: dict) -> PowerConfig:
-    power_data = data.get("power", {}) or {}
+def load_power_params(config_dir: str | Path) -> PowerConfig:
+    """从 power.yaml 加载供电系统配置。
+
+    Args:
+        config_dir: 配置文件所在目录。
+
+    Returns:
+        PowerConfig，文件缺失时返回默认值。
+    """
+    config_dir = Path(config_dir)
+    data = _try_load_yaml(config_dir / "power.yaml")
+    power_data = data.get("power", data) or {}
     substations = []
     for s in power_data.get("substations", []) or []:
         substations.append(
@@ -126,12 +163,23 @@ def _load_power_params(data: dict) -> PowerConfig:
     )
 
 
-def _load_signal_params(data: dict) -> SignalConfig:
-    atp_data = data.get("atp", {}) or {}
-    ats_data = data.get("ats", {}) or {}
-    following_data = data.get("following", {}) or {}
+def load_signal_params(config_dir: str | Path) -> SignalConfig:
+    """从 signal.yaml 加载信号系统配置。
+
+    Args:
+        config_dir: 配置文件所在目录。
+
+    Returns:
+        SignalConfig，文件缺失时返回默认值。
+    """
+    config_dir = Path(config_dir)
+    data = _try_load_yaml(config_dir / "signal.yaml")
+    sig_data = data.get("signal", data) or {}
+    atp_data = sig_data.get("atp", {}) or {}
+    ats_data = sig_data.get("ats", {}) or {}
+    following_data = sig_data.get("following", {}) or {}
     return SignalConfig(
-        mode=str(data.get("signal_mode", "three_stage")),
+        mode=str(sig_data.get("mode", "three_stage")),
         atp=AtpConfig(
             safety_distance=float(atp_data.get("safety_distance", 300.0)),
             overspeed_margin=float(atp_data.get("overspeed_margin", 0.05)),
@@ -145,12 +193,31 @@ def _load_signal_params(data: dict) -> SignalConfig:
     )
 
 
+# ── 主入口 ───────────────────────────────────────────────────────────
+
+
 def load_simulation_params(path: str | Path) -> SimulationParams:
+    """从 simulation.yaml 加载仿真全局参数，同时自动加载同目录的子模块配置。
+
+    Args:
+        path: simulation.yaml 文件路径。
+
+    Returns:
+        SimulationParams，包含 pid/power/signal 子配置。
+    """
     path = Path(path)
+    config_dir = path.parent
+
     with path.open("r", encoding="utf-8") as fp:
         data = yaml.safe_load(fp) or {}
     if "simulation" in data:
         data = data["simulation"]
+
+    # 从同目录独立文件加载子模块配置
+    pid = load_pid_params(config_dir)
+    power = load_power_params(config_dir)
+    signal = load_signal_params(config_dir)
+
     return SimulationParams(
         time_step=float(data.get("time_step", 0.1)),
         total_time=float(data.get("total_time", 600.0)),
@@ -158,7 +225,7 @@ def load_simulation_params(path: str | Path) -> SimulationParams:
         target_speed_ratio=float(data.get("target_speed_ratio", 0.8)),
         station_stop_tolerance=float(data.get("station_stop_tolerance", 1.0)),
         coasting_min_speed=float(data.get("coasting_min_speed", 30.0)),
-        pid=_load_pid_params(data),
-        power=_load_power_params(data),
-        signal=_load_signal_params(data),
+        pid=pid,
+        power=power,
+        signal=signal,
     )

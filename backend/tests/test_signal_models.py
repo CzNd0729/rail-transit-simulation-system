@@ -20,9 +20,10 @@ def test_timetable_entry_fields():
 
 
 def test_load_signal_config_from_yaml(tmp_path):
-    yaml_text = """
-simulation:
-  signal_mode: atp_ato
+    # 写入 signal.yaml（独立信号配置文件）
+    signal_yaml = """
+signal:
+  mode: atp_ato
   atp:
     safety_distance: 300
     overspeed_margin: 0.05
@@ -33,8 +34,18 @@ simulation:
   following:
     min_interval: 500
 """
+    sp = tmp_path / "signal.yaml"
+    sp.write_text(signal_yaml, encoding="utf-8")
+
+    # 写入最小 simulation.yaml（只含仿真器自身参数）
+    sim_yaml = """
+simulation:
+  time_step: 0.1
+  total_time: 600.0
+"""
     p = tmp_path / "simulation.yaml"
-    p.write_text(yaml_text, encoding="utf-8")
+    p.write_text(sim_yaml, encoding="utf-8")
+
     params = load_simulation_params(p)
     assert params.signal.mode == "atp_ato"
     assert params.signal.atp.safety_distance == 300.0
