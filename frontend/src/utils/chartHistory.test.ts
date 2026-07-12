@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { EMPTY_CHART_HISTORY, appendChartHistory, clearChartHistory } from './chartHistory';
 import type { SimulationSnapshot } from '../types/simulation';
+import { EMPTY_SIGNAL_STATE } from '../types/simulation';
 
 const makeSnapshot = (t: number, speed: number, accel: number, pos: number, jerk = 0): SimulationSnapshot => ({
   clock: { elapsed: t, speed_multiplier: 1 },
@@ -12,7 +13,7 @@ const makeSnapshot = (t: number, speed: number, accel: number, pos: number, jerk
     fault_alarm: null,
   }],
   power: { substations: [], voltage_profile: [], total_consumption: 0, total_regeneration: 0, regeneration_rate: 0 },
-  signaling: { commands: [], emergency_brake: [], train_intervals: [] },
+  signaling: { ...EMPTY_SIGNAL_STATE },
   track: { occupancy: [], switch_states: [] },
   events: [],
 });

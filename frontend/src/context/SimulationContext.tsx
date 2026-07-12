@@ -15,6 +15,7 @@ import type {
 } from '../types/simulation';
 import type { ProfileSegment } from '../data/mvpLineLayout';
 import { DEFAULT_VEHICLE_PARAMS } from '../data/mockVehicleParams';
+import { EMPTY_SIGNAL_STATE } from '../types/simulation';
 import { EMPTY_CHART_HISTORY, appendChartHistory, clearChartHistory } from '../utils/chartHistory';
 import {
   extractVehicleParamBaselines,
@@ -40,11 +41,7 @@ export const initialState: AppState = {
     total_regeneration: 0,
     regeneration_rate: 0,
   },
-  signaling: {
-    commands: [],
-    emergency_brake: [],
-    train_intervals: [],
-  },
+  signaling: { ...EMPTY_SIGNAL_STATE },
   track: {
     occupancy: [],
     switch_states: [],

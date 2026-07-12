@@ -7,6 +7,7 @@ import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { mockLineData } from '../../../data/mockLineData';
 import { axisTooltip } from '../../../utils/format';
+import { resolveLatestDeviation } from '../../../utils/signalSelectors';
 
 /** X 轴上限按 50s 阶梯取整，避免每帧 float 抖动 */
 function stableTimeMax(points: [number, number][]): number {
@@ -76,9 +77,13 @@ function buildStationLabel(
 }
 
 export default function TimetableChart() {
-  const { chartHistory, lineLayout } = useSimulationState();
+  const { chartHistory, lineLayout, trains, signaling } = useSimulationState();
   const stations = lineLayout?.stations ?? mockLineData.stations;
   const maxPos = lineLayout?.total_length ?? mockLineData.total_length;
+  const deviation = resolveLatestDeviation(
+    signaling.timetable_deviations,
+    trains[0]?.id ?? 'TRAIN_01',
+  );
 
   const xMax = useMemo(
     () => stableTimeMax(chartHistory.positionTime),
@@ -164,6 +169,12 @@ export default function TimetableChart() {
   return (
     <div className="panel" style={{ height: '100%' }}>
       <div className="panel-title">📅 运行图</div>
+      {deviation && (
+        <div style={{ fontSize: 11, color: '#fa8c16', padding: '0 8px 4px' }}>
+          最近到站偏差 {deviation.delay_arrival >= 0 ? '+' : ''}
+          {deviation.delay_arrival.toFixed(1)} s（{deviation.station_id}）
+        </div>
+      )}
       <ReactECharts
         option={option}
         style={{ height: 'calc(100% - 30px)' }}

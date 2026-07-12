@@ -6,9 +6,9 @@
  * - UI-PARAM-01: 车辆参数编辑
  * - UI-PARAM-02: 线路参数编辑
  * - UI-PARAM-05: 参数重置为默认值
- * - UI-PARAM-03: 供电参数编辑（迭代三）
- * - UI-PARAM-04: 信号参数编辑（迭代三）
- * - UI-PARAM-06: 参数预设方案保存/加载（迭代三）
+ * - UI-PARAM-03: 供电参数编辑（迭代二，部分）
+ * - UI-PARAM-04: 信号参数编辑（迭代二）
+ * - UI-PARAM-06: 参数预设方案保存/加载（迭代二，待实现）
  */
 import { useSimulationState } from '../../context/SimulationContext';
 import VehicleParamsForm from './VehicleParams';

@@ -22,8 +22,10 @@ const PARAM_LABELS: Record<SignalParamStepKey, string> = {
 };
 
 export default function SignalParamsForm({ send, disabled = false }: Props) {
-  const { params, signalParamBaselines } = useSimulationState();
+  const { params, signalParamBaselines, connection } = useSimulationState();
   const { updateParams } = useSimulation(send);
+  const isLive = import.meta.env.VITE_USE_MOCK !== 'true';
+  const liveLocked = isLive && connection === 'connected';
 
   const handleChange = (key: SignalParamStepKey, value: number) => {
     if (disabled) return;
@@ -42,10 +44,15 @@ export default function SignalParamsForm({ send, disabled = false }: Props) {
             value={params.signal[key]}
             step={computeFixedParamStep(baseline)}
             onChange={(v) => handleChange(key, v)}
-            disabled={disabled}
+            disabled={disabled || (liveLocked && key !== 'target_speed_ratio')}
           />
         );
       })}
+      {liveLocked && (
+        <p style={styles.hint}>
+          Live 模式仅「目标速度比」可实时修改；站停时间与发车间隔需重启仿真后生效（待后端支持）。
+        </p>
+      )}
     </fieldset>
   );
 }
@@ -60,5 +67,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: 'var(--text-highlight)',
     padding: '0 4px',
+  },
+  hint: {
+    fontSize: 11,
+    color: 'var(--text-secondary)',
+    margin: '6px 0 0',
   },
 };

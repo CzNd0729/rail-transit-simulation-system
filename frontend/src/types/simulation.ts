@@ -179,12 +179,47 @@ export interface EmergencyBrakeCommand {
   reason: string;
 }
 
+/** ATP 移动授权包络（后端 maProfile） */
+export interface MaProfileEntry {
+  train_id: string;
+  ma_end_chainage: number;
+  safety_distance: number;
+}
+
+/** 区段限速与 ATP 限速（后端 speedLimits） */
+export interface SpeedLimitEntry {
+  train_id: string;
+  permanent_limit: number;
+  atp_limit: number;
+}
+
+/** ATS 时刻表偏差（后端 timetableDeviation） */
+export interface TimetableDeviationEntry {
+  train_id: string;
+  station_id: string;
+  delay_arrival: number;
+  nominal_dwell: number;
+  adjusted_dwell: number;
+}
+
 /** 信号状态 */
 export interface SignalState {
   commands: SignalCommand[];
   emergency_brake: EmergencyBrakeCommand[];
   train_intervals: number[];   // 各列车发车间隔 (s)
+  ma_profiles: MaProfileEntry[];
+  speed_limits: SpeedLimitEntry[];
+  timetable_deviations: TimetableDeviationEntry[];
 }
+
+export const EMPTY_SIGNAL_STATE: SignalState = {
+  commands: [],
+  emergency_brake: [],
+  train_intervals: [],
+  ma_profiles: [],
+  speed_limits: [],
+  timetable_deviations: [],
+};
 
 // ==================== 仿真数据快照 ====================
 
@@ -294,6 +329,11 @@ export interface MockReplayFrame {
   passenger_count: number;
   pantograph_voltage: number;
   power_demand: number;
+  running_phase?: string;
+  distance_to_station?: number;
+  target_station_id?: string;
+  traction_level?: number;
+  brake_level?: number;
 }
 
 /** 预录回放场景 */
@@ -395,12 +435,27 @@ export interface ApiControlCommand {
   runningPhase?: string;
 }
 
+export interface ApiSubstation {
+  id: string;
+  name: string;
+  chainage: number;
+  ratedVoltage: number;
+  ratedPower: number;
+  outputCurrent: number;
+  outputPower: number;
+}
+
+export interface ApiVoltagePoint {
+  chainage: number;
+  voltage: number;
+}
+
 export interface ApiSimulationSnapshot {
   clock: { elapsed: number; speedMultiplier: SpeedMultiplier };
   trains: ApiTrainState[];
   power: {
-    substations: unknown[];
-    voltageProfile: unknown[];
+    substations: ApiSubstation[];
+    voltageProfile: ApiVoltagePoint[];
     totalConsumption: number;
     totalRegeneration: number;
   };
@@ -408,6 +463,23 @@ export interface ApiSimulationSnapshot {
     controlCommands?: ApiControlCommand[];
     commands?: unknown[];
     emergencyBrakes: unknown[];
+    maProfile?: Array<{
+      trainId: string;
+      maEndChainage: number;
+      safetyDistance: number;
+    }>;
+    speedLimits?: Array<{
+      trainId: string;
+      permanentLimit: number;
+      atpLimit: number;
+    }>;
+    timetableDeviation?: Array<{
+      trainId: string;
+      stationId: string;
+      delayArrival: number;
+      nominalDwell: number;
+      adjustedDwell: number;
+    }>;
   };
   track: { occupancy: unknown[]; switchStates: unknown[] };
   events: SimulationEvent[];

@@ -1,10 +1,32 @@
 import { MOCK_STATIONS, getSegmentAt } from './mockTrackBlueprint';
 import { computeMass, computeAcceleration, msToKmh, kmhToMs } from './mockDynamics';
 import { decideMode, PLATFORM_HALF_LENGTH } from './mockThreeStage';
-import type { MockReplayFrame, MockSimInput } from '../types/simulation';
+import type { MockReplayFrame, MockSimInput, TrainMode } from '../types/simulation';
 
 const DT = 0.1;
 const MAX_STEPS = 60_000;
+
+function signalFrameFields(
+  mode: TrainMode,
+  speedKmh: number,
+  position: number,
+  targetStation: { id: string; chainage: number },
+): Pick<MockReplayFrame, 'running_phase' | 'distance_to_station' | 'target_station_id' | 'traction_level' | 'brake_level'> {
+  const distance = Math.max(0, targetStation.chainage - position);
+  let running_phase: string;
+  if (speedKmh < 0.5 && distance < 20) running_phase = 'dwell';
+  else if (mode === 'braking') running_phase = 'braking';
+  else if (mode === 'traction') running_phase = 'traction';
+  else running_phase = 'coasting';
+
+  return {
+    running_phase,
+    distance_to_station: Math.round(distance),
+    target_station_id: targetStation.id,
+    traction_level: mode === 'traction' ? 0.8 : 0,
+    brake_level: mode === 'braking' ? 0.5 : 0,
+  };
+}
 
 function shouldArriveAtStation(speedKmh: number, position: number, stationChainage: number): boolean {
   return speedKmh < 0.5 && Math.abs(position - stationChainage) <= PLATFORM_HALF_LENGTH;
@@ -14,6 +36,7 @@ function appendDwellFrames(
   frames: MockReplayFrame[],
   t: number,
   stationChainage: number,
+  targetStation: { id: string; chainage: number },
   dwellTime: number,
   mass: number,
   passengerCount: number,
@@ -34,6 +57,11 @@ function appendDwellFrames(
       passenger_count: passengerCount,
       pantograph_voltage: 1500,
       power_demand: 0,
+      running_phase: 'dwell',
+      distance_to_station: Math.max(0, Math.round(targetStation.chainage - stationChainage)),
+      target_station_id: targetStation.id,
+      traction_level: 0,
+      brake_level: 0,
     });
     accel = 0;
     t += DT;
@@ -102,6 +130,7 @@ export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
       passenger_count: passengerCount,
       pantograph_voltage: 1500,
       power_demand: mode === 'traction' ? 3200 : 0,
+      ...signalFrameFields(mode, speedKmh, position, nextStation),
     });
     prevAccel = acceleration;
 
@@ -115,8 +144,9 @@ export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
       position = nextStation.chainage;
       speedKmh = 0;
 
+      const targetAfterDwell = MOCK_STATIONS[stationIdx + 2] ?? nextStation;
       const dwell = appendDwellFrames(
-        frames, t, nextStation.chainage, input.signal.dwell_time, mass, passengerCount, prevAccel,
+        frames, t, nextStation.chainage, targetAfterDwell, input.signal.dwell_time, mass, passengerCount, prevAccel,
       );
       t = dwell.t;
       prevAccel = dwell.prevAccel;

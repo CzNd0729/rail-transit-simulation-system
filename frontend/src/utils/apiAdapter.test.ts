@@ -21,6 +21,7 @@ describe('parseServerSnapshot', () => {
         faultAlarm: null,
       }],
       power: { substations: [], voltageProfile: [], totalConsumption: 0, totalRegeneration: 0 },
+      signaling: { controlCommands: [], emergencyBrakes: [] },
       track: { occupancy: [], switchStates: [] },
       events: [],
     };
@@ -92,6 +93,46 @@ describe('parseServerSnapshot', () => {
     };
     const snap = parseServerSnapshot(raw);
     expect(snap.signaling.commands[0]?.running_phase).toBe('dwell');
+  });
+
+  it('maps maProfile, speedLimits, timetableDeviation from backend', () => {
+    const raw = {
+      clock: { elapsed: 45, speedMultiplier: 1 as const },
+      trains: [{
+        id: 'TRAIN_01', position: 800, speed: 60, acceleration: 0,
+        mode: 'traction' as const, mass: 254000, passengerCount: 900,
+        pantographVoltage: 1480, powerDemand: 1200, doorStatus: 'closed' as const,
+        distanceToStation: 700, targetStationId: 'ST_B', faultAlarm: null,
+      }],
+      power: { substations: [], voltageProfile: [], totalConsumption: 1.2, totalRegeneration: 0.3 },
+      signaling: {
+        controlCommands: [{
+          trainId: 'TRAIN_01', tractionLevel: 0.5, brakeLevel: 0,
+          emergencyBrake: false, runningPhase: 'traction',
+        }],
+        emergencyBrakes: [],
+        maProfile: [{
+          trainId: 'TRAIN_01', maEndChainage: 1500, safetyDistance: 300,
+        }],
+        speedLimits: [{
+          trainId: 'TRAIN_01', permanentLimit: 80, atpLimit: 76,
+        }],
+        timetableDeviation: [{
+          trainId: 'TRAIN_01', stationId: 'ST_A',
+          delayArrival: 2.5, nominalDwell: 30, adjustedDwell: 32.5,
+        }],
+      },
+      track: { occupancy: [], switchStates: [] },
+      events: [],
+    };
+    const snap = parseServerSnapshot(raw);
+    expect(snap.signaling.ma_profiles[0]).toEqual({
+      train_id: 'TRAIN_01',
+      ma_end_chainage: 1500,
+      safety_distance: 300,
+    });
+    expect(snap.signaling.speed_limits[0]?.atp_limit).toBe(76);
+    expect(snap.signaling.timetable_deviations[0]?.delay_arrival).toBe(2.5);
   });
 });
 
