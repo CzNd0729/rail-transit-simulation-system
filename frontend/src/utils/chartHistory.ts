@@ -1,6 +1,6 @@
-import type { ChartHistory, SimulationSnapshot } from '../types/simulation';
+import type { ChartHistory, SimulationSnapshot, TrainChartHistory } from '../types/simulation';
 
-export const EMPTY_CHART_HISTORY: ChartHistory = {
+export const EMPTY_TRAIN_CHART_HISTORY: TrainChartHistory = {
   speedTime: [],
   accelTime: [],
   jerkTime: [],
@@ -8,34 +8,55 @@ export const EMPTY_CHART_HISTORY: ChartHistory = {
   positionTime: [],
 };
 
+export const EMPTY_CHART_HISTORY: ChartHistory = {
+  byTrain: {},
+};
+
 const MAX_POINTS = 10_000;
+
+function trimHistory(history: TrainChartHistory): TrainChartHistory {
+  if (history.speedTime.length <= MAX_POINTS) {
+    return history;
+  }
+  return {
+    speedTime: history.speedTime.slice(-MAX_POINTS),
+    accelTime: history.accelTime.slice(-MAX_POINTS),
+    jerkTime: history.jerkTime.slice(-MAX_POINTS),
+    speedPosition: history.speedPosition.slice(-MAX_POINTS),
+    positionTime: history.positionTime.slice(-MAX_POINTS),
+  };
+}
+
+export function getTrainChartHistory(
+  history: ChartHistory,
+  trainId: string,
+): TrainChartHistory {
+  return history.byTrain[trainId] ?? EMPTY_TRAIN_CHART_HISTORY;
+}
 
 export function appendChartHistory(
   history: ChartHistory,
   snapshot: SimulationSnapshot,
 ): ChartHistory {
-  const train = snapshot.trains[0];
-  if (!train) return history;
-
-  const t = snapshot.clock.elapsed;
-  const next: ChartHistory = {
-    speedTime: [...history.speedTime, [t, train.speed]],
-    accelTime: [...history.accelTime, [t, train.acceleration]],
-    jerkTime: [...history.jerkTime, [t, train.jerk]],
-    speedPosition: [...history.speedPosition, [train.position, train.speed]],
-    positionTime: [...history.positionTime, [t, train.position]],
-  };
-
-  if (next.speedTime.length > MAX_POINTS) {
-    return {
-      speedTime: next.speedTime.slice(-MAX_POINTS),
-      accelTime: next.accelTime.slice(-MAX_POINTS),
-      jerkTime: next.jerkTime.slice(-MAX_POINTS),
-      speedPosition: next.speedPosition.slice(-MAX_POINTS),
-      positionTime: next.positionTime.slice(-MAX_POINTS),
-    };
+  if (snapshot.trains.length === 0) {
+    return history;
   }
-  return next;
+
+  const byTrain = { ...history.byTrain };
+  const t = snapshot.clock.elapsed;
+
+  for (const train of snapshot.trains) {
+    const prev = byTrain[train.id] ?? EMPTY_TRAIN_CHART_HISTORY;
+    byTrain[train.id] = trimHistory({
+      speedTime: [...prev.speedTime, [t, train.speed]],
+      accelTime: [...prev.accelTime, [t, train.acceleration]],
+      jerkTime: [...prev.jerkTime, [t, train.jerk]],
+      speedPosition: [...prev.speedPosition, [train.position, train.speed]],
+      positionTime: [...prev.positionTime, [t, train.position]],
+    });
+  }
+
+  return { byTrain };
 }
 
 export function clearChartHistory(): ChartHistory {

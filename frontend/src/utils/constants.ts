@@ -35,5 +35,19 @@ export const VIEW_CONFIG = {
   track: { label: '轨道视图', icon: '🛤️' },
 } as const;
 
+/** 多车标识配色：红 / 黄 / 蓝（高对比，按 TRAIN_01 起顺序） */
+export const TRAIN_CHART_COLORS = [
+  '#ff4d4f',
+  '#fadb14',
+  '#1890ff',
+  '#eb2f96',
+  '#722ed1',
+  '#13c2c2',
+] as const;
+
+export function trainColorByIndex(index: number): string {
+  return TRAIN_CHART_COLORS[index % TRAIN_CHART_COLORS.length];
+}
+
 /** 迭代二 MA 示意图固定安全包络长度 (m)，迭代三改为动态 ATP 包络 */
 export const MA_ENVELOPE_LENGTH = 300;

@@ -36,6 +36,7 @@ export const initialState: AppState = {
   activeView: 'overview',
   clock: { elapsed: 0, speed_multiplier: 1 },
   trains: [],
+  selectedTrainId: null,
   power: {
     substations: [],
     voltage_profile: [],
@@ -82,6 +83,7 @@ export type SimulationAction =
   | { type: 'WS_DISCONNECTED' }
   | { type: 'WS_CONNECTING' }
   | { type: 'RUNTIME_UPDATE'; payload: SimulationSnapshot }
+  | { type: 'SET_SELECTED_TRAIN'; payload: string }
   | { type: 'SET_VIEW'; payload: ViewType }
   | { type: 'SET_RUN_STATE'; payload: RunState }
   | { type: 'UPDATE_PARAMS'; payload: Partial<SimulationParams> }
@@ -110,10 +112,17 @@ export function simulationReducer(state: AppState, action: SimulationAction): Ap
 
     case 'RUNTIME_UPDATE': {
       const snapshot = action.payload;
+      const selectedStillValid =
+        state.selectedTrainId != null &&
+        snapshot.trains.some((t) => t.id === state.selectedTrainId);
+      const selectedTrainId = selectedStillValid
+        ? state.selectedTrainId
+        : snapshot.trains[0]?.id ?? null;
       return {
         ...state,
         clock: snapshot.clock,
         trains: snapshot.trains,
+        selectedTrainId,
         power: snapshot.power,
         signaling: snapshot.signaling,
         track: snapshot.track,
@@ -121,6 +130,9 @@ export function simulationReducer(state: AppState, action: SimulationAction): Ap
         chartHistory: appendChartHistory(state.chartHistory, snapshot),
       };
     }
+
+    case 'SET_SELECTED_TRAIN':
+      return { ...state, selectedTrainId: action.payload };
 
     case 'SET_VIEW':
       return { ...state, activeView: action.payload };
