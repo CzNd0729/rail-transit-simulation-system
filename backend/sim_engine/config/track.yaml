@@ -265,6 +265,29 @@ line:
     - { id: TC21, start_chainage: 15900, end_chainage: 16900, direction: "down" }
     - { id: TC22, start_chainage: 16900, end_chainage: 17700, direction: "down" }
     - { id: TC23, start_chainage: 17700, end_chainage: 18600, direction: "down" }
+    - { id: TC01U, start_chainage: 0,     end_chainage: 1100,  direction: "up" }
+    - { id: TC02U, start_chainage: 1100,  end_chainage: 2000,  direction: "up" }
+    - { id: TC03U, start_chainage: 2000,  end_chainage: 2800,  direction: "up" }
+    - { id: TC04U, start_chainage: 2800,  end_chainage: 3600,  direction: "up" }
+    - { id: TC05U, start_chainage: 3600,  end_chainage: 4300,  direction: "up" }
+    - { id: TC06U, start_chainage: 4300,  end_chainage: 5100,  direction: "up" }
+    - { id: TC07U, start_chainage: 5100,  end_chainage: 5800,  direction: "up" }
+    - { id: TC08U, start_chainage: 5800,  end_chainage: 6600,  direction: "up" }
+    - { id: TC09U, start_chainage: 6600,  end_chainage: 7300,  direction: "up" }
+    - { id: TC10U, start_chainage: 7300,  end_chainage: 8300,  direction: "up" }
+    - { id: TC11U, start_chainage: 8300,  end_chainage: 9200,  direction: "up" }
+    - { id: TC12U, start_chainage: 9200,  end_chainage: 10000, direction: "up" }
+    - { id: TC13U, start_chainage: 10000, end_chainage: 10700, direction: "up" }
+    - { id: TC14U, start_chainage: 10700, end_chainage: 11400, direction: "up" }
+    - { id: TC15U, start_chainage: 11400, end_chainage: 12000, direction: "up" }
+    - { id: TC16U, start_chainage: 12000, end_chainage: 12700, direction: "up" }
+    - { id: TC17U, start_chainage: 12700, end_chainage: 13500, direction: "up" }
+    - { id: TC18U, start_chainage: 13500, end_chainage: 14300, direction: "up" }
+    - { id: TC19U, start_chainage: 14300, end_chainage: 15200, direction: "up" }
+    - { id: TC20U, start_chainage: 15200, end_chainage: 15900, direction: "up" }
+    - { id: TC21U, start_chainage: 15900, end_chainage: 16900, direction: "up" }
+    - { id: TC22U, start_chainage: 16900, end_chainage: 17700, direction: "up" }
+    - { id: TC23U, start_chainage: 17700, end_chainage: 18600, direction: "up" }
 
   # ── 道岔配置（TRK-06）────────────────────────────────
   # 4 组道岔：两端折返 + 中间关键站侧线
