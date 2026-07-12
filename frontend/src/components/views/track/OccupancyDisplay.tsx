@@ -92,21 +92,15 @@ export default function OccupancyDisplay() {
           {/* 上行轨道电路色块 */}
           {renderBar(upCircuits, upY, trackH)}
 
-          {/* 车站标签 */}
+          {/* 站台分隔线（纵贯双条） */}
           {stations.map((s) => (
-            <g key={s.id}>
-              <line
-                x1={s.chainage} y1={upY + trackH + 2}
-                x2={s.chainage} y2={upY + trackH + 12}
-                stroke="#555" strokeWidth={1}
-              />
-              <text
-                x={s.chainage} y={upY + trackH + 24}
-                textAnchor="middle" fontSize={8} fill="#ccc"
-              >
-                {s.name}
-              </text>
-            </g>
+            <line
+              key={`div-${s.id}`}
+              x1={s.chainage} y1={trackY}
+              x2={s.chainage} y2={upY + trackH}
+              stroke="#666" strokeWidth={2}
+              opacity={0.7}
+            />
           ))}
 
           {/* 列车标记 */}
