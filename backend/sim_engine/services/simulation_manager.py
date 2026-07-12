@@ -138,7 +138,7 @@ class SimulationManager:
             "simulationTime": orch.clock.elapsed,
             "totalTime": orch.sim_params.total_time,
             "speedMultiplier": orch.clock.speed_multiplier,
-            "trainCount": 1,
+            "trainCount": orch.sim_params.train_count,
         }
 
     # ==================== 配置读取 ====================
@@ -204,6 +204,8 @@ class SimulationManager:
                 "speedMultiplier": "speed_multiplier",
                 "targetSpeedRatio": "target_speed_ratio",
                 "stationStopTolerance": "station_stop_tolerance",
+                "trainCount": "train_count",
+                "departureInterval": "departure_interval",
             }
             for camel_key, snake_key in field_map.items():
                 if camel_key in sim_updates:
@@ -269,7 +271,7 @@ class SimulationManager:
             },
             "signal": {
                 "dwellTime": 30,
-                "departureInterval": 120,
+                "departureInterval": orch.sim_params.departure_interval,
                 "targetSpeedRatio": orch.sim_params.target_speed_ratio,
             },
         }
@@ -374,6 +376,17 @@ class SimulationManager:
 
     # ==================== 后台循环 ====================
 
+    @staticmethod
+    def _all_trains_finished(orch: Orchestrator) -> bool:
+        """全部列车已 spawn 且均到终点停稳。"""
+        active = [t for t in orch.trains if t.active]
+        if len(active) < orch.sim_params.train_count:
+            return False
+        terminal = orch.track.track.total_length - 1.0
+        return all(
+            t.state.position >= terminal and t.state.speed < 0.1 for t in active
+        )
+
     async def _run_loop(self) -> None:
         """后台仿真主循环：每步 step_once → broadcast → sleep(dt/multiplier)。"""
         orch = self.orchestrator
@@ -394,11 +407,7 @@ class SimulationManager:
             # 终点停稳判断
             if (
                 orch.clock.elapsed >= orch.sim_params.total_time
-                or (
-                    orch.train_state is not None
-                    and orch.train_state.position >= orch.track.track.total_length - 1.0
-                    and orch.train_state.speed < 0.1
-                )
+                or self._all_trains_finished(orch)
             ):
                 # 先记录结束时刻的摘要
                 summary = orch.recorder.summary()
