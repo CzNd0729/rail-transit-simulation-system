@@ -3,9 +3,10 @@
  * 基于《需求文档》UI-PWR-01
  * 全线电压曲线，标示变电所位置和列车当前位置
  */
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
+import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import { axisTooltip } from '../../../utils/format';
 import type { VoltagePoint } from '../../../types/simulation';
 
@@ -14,9 +15,10 @@ let accumulatedCache: VoltagePoint[] = [];
 let prevRunState: string = 'idle';
 
 export default function VoltageProfile() {
-  const { power, trains, lineLayout, runState } = useSimulationState();
-  const trainPosition = trains[0]?.position;
-  const trainVoltage = trains[0]?.pantograph_voltage;
+  const { power, lineLayout, runState } = useSimulationState();
+  const train = useSelectedTrain();
+  const trainPosition = train?.position;
+  const trainVoltage = train?.pantograph_voltage;
   const totalLength = lineLayout?.total_length ?? 3200;
 
   // 新仿真启动时清空上一次的曲线（仅 idle/stopped → running，不含 resumed）

@@ -4,12 +4,14 @@
  */
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
+import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
 import { axisTooltip } from '../../../utils/format';
 
 const COMFORT_JERK_LIMIT = 0.75;
 
 export default function JerkTimeCurve() {
-  const { chartHistory, clock } = useSimulationState();
+  const { clock } = useSimulationState();
+  const chartHistory = useActiveChartHistory();
 
   const xMax = chartHistory.jerkTime.length > 0
     ? Math.max(clock.elapsed + 10, chartHistory.jerkTime[chartHistory.jerkTime.length - 1][0] + 10)

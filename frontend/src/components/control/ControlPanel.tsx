@@ -10,14 +10,16 @@ import RunControlButtons from './RunControlButtons';
 import SpeedSelector from './SpeedSelector';
 import EmergencyBrakeButton from './EmergencyBrakeButton';
 import { useSimulationState } from '../../context/SimulationContext';
+import { useSelectedTrain } from '../../hooks/useSelectedTrain';
 
 interface Props {
   send: (data: object) => void;
 }
 
 export default function ControlPanel({ send }: Props) {
-  const { runState, trains } = useSimulationState();
-  const speed = trains[0]?.speed ?? 0;
+  const { runState } = useSimulationState();
+  const train = useSelectedTrain();
+  const speed = train?.speed ?? 0;
 
   return (
     <div className="panel">

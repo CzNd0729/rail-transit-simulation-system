@@ -9,12 +9,14 @@ import { getStatusColor } from '../../../utils/format';
 type SystemStatus = 'normal' | 'warning' | 'error';
 
 export default function SubsystemIndicators() {
-  const { trains } = useSimulationState();
+  const { trains, signaling } = useSimulationState();
 
-  // 简单的状态判断逻辑（后续迭代可细化）
   const vehicleStatus: SystemStatus = trains.length > 0 ? 'normal' : 'warning';
   const powerStatus: SystemStatus = trains.some((t) => t.pantograph_voltage < 1400) ? 'warning' : 'normal';
-  const signalStatus: SystemStatus = 'normal';
+  const hasEb = signaling.commands.some((c) => c.emergency_brake);
+  const hasUnsafeInterval = signaling.train_intervals.some((iv) => !iv.safe);
+  const signalStatus: SystemStatus =
+    hasEb || hasUnsafeInterval ? 'warning' : 'normal';
   const trackStatus: SystemStatus = 'normal';
 
   const systems = [
