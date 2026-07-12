@@ -36,7 +36,7 @@ class PlcSimulator:
         self.client_addr: Optional[tuple] = None
         self.running = False
 
-        # 模拟状态
+        # 模拟状态（按文档 7.1 节 46字节协议）
         self.train_id = 1
         self.speed_cm_s = 0
         self.accel = 0
@@ -46,7 +46,66 @@ class PlcSimulator:
         self.cab_active = 0
         self.key_status = 0
         self.eb_status = 0
-        self.mode = DRIVE_MODE["INIT"]
+        self.mode = DRIVE_MODE["INIT"]  # 现在用做兼容旧引用的默认值
+
+        # ---- 文档 7.1 节 46字节协议字段 ----
+        self.year = 2025
+        self.month = 7
+        self.day = 16
+        self.hour = 15
+        self.minute = 11
+        self.second = 3
+        self.verify_type = 0
+        self.verify_code = 0
+        # 指示灯 (字节24)
+        self.hscb = 0
+        self.brake_fault_indicator = 0
+        self.door_closed_indicator = 0
+        self.net_fault_indicator = 0
+        self.ar_available = 0
+        # 模式标志 (字节25)
+        self.ato_available = 0
+        self.wash_mode = 0
+        self.ato_active = 0
+        self.ar_active = 0
+        # 车辆速度 (字节26-27)
+        self.vehicle_speed = 0
+        # 按钮 (字节28)
+        self.eb_button = 0
+        self.bus_ctrl = 0
+        self.forced_release = 0
+        self.forced_pump = 0
+        self.emergency_cmd = 0
+        self.parking_apply = 0
+        self.parking_release = 0
+        self.horn = 0
+        # 门控 (字节29)
+        self.open_left_door = 0
+        self.open_right_door = 0
+        self.close_left_door = 0
+        self.close_right_door = 0
+        # 外部照明 / 门模式
+        self.light_switch = 0
+        self.door_mode_switch = 0
+        # 按钮 (字节34)
+        self.high_accel = 0
+        self.cab_light = 0
+        self.mode_up_confirm = 0
+        self.mode_down_confirm = 0
+        self.confirm_flag = 0
+        self.ar_flag = 0
+        self.traction_reset = 0
+        self.ato_start = 0
+        # 开关 (字节35)
+        self.wash_switch = 0
+        self.key_switch = 0
+        self.alert_flag = 0
+        self.alert_release = 0
+        # 手柄
+        self.dir_handle = 0
+        self.main_handle = 0
+        self.traction_level = 0
+        self.brake_level = 0
 
         # 接收到的上位机命令
         self.last_upper_cmd: Optional[dict] = None
@@ -147,18 +206,60 @@ class PlcSimulator:
             time.sleep(SIM_CYCLE_INTERVAL)
 
     def _build_packet(self) -> bytes:
-        """构建当前状态报文"""
+        """构建当前状态报文（文档 7.1 节 46字节大端序）"""
         return pack_plc_to_upper(
-            train_id=self.train_id,
-            speed_cm_s=self.speed_cm_s,
-            accel=self.accel,
-            master_controller=self.master_controller,
-            brake_pressure=self.brake_pressure,
-            door_status=self.door_status,
-            cab_active=self.cab_active,
-            key_status=self.key_status,
-            eb_status=self.eb_status,
-            mode=self.mode,
+            year=self.year, month=self.month, day=self.day,
+            hour=self.hour, minute=self.minute, second=self.second,
+            verify_type=self.verify_type, verify_code=self.verify_code,
+            # 指示灯
+            hscb=self.hscb,
+            brake_fault=self.brake_fault_indicator,
+            door_closed=self.door_closed_indicator,
+            net_fault=self.net_fault_indicator,
+            ar_available=self.ar_available,
+            # 模式标志
+            ato_available=self.ato_available,
+            wash_mode=self.wash_mode,
+            ato_active=self.ato_active,
+            ar_active=self.ar_active,
+            # 车辆速度
+            vehicle_speed=self.vehicle_speed,
+            # 按钮 (字节28)
+            eb_button=self.eb_button,
+            bus_ctrl=self.bus_ctrl,
+            forced_release=self.forced_release,
+            forced_pump=self.forced_pump,
+            emergency_cmd=self.emergency_cmd,
+            parking_apply=self.parking_apply,
+            parking_release=self.parking_release,
+            horn=self.horn,
+            # 门控 (字节29)
+            open_left_door=self.open_left_door,
+            open_right_door=self.open_right_door,
+            close_left_door=self.close_left_door,
+            close_right_door=self.close_right_door,
+            # 照明/门模式
+            light_switch=self.light_switch,
+            door_mode_switch=self.door_mode_switch,
+            # 按钮 (字节34)
+            high_accel=self.high_accel,
+            cab_light=self.cab_light,
+            mode_up_confirm=self.mode_up_confirm,
+            mode_down_confirm=self.mode_down_confirm,
+            confirm_flag=self.confirm_flag,
+            ar_flag=self.ar_flag,
+            traction_reset=self.traction_reset,
+            ato_start=self.ato_start,
+            # 开关 (字节35)
+            wash_switch=self.wash_switch,
+            key_switch=self.key_switch,
+            alert_flag=self.alert_flag,
+            alert_release=self.alert_release,
+            # 手柄
+            dir_handle=self.dir_handle,
+            main_handle=self.main_handle,
+            traction_level=self.traction_level,
+            brake_level=self.brake_level,
         )
 
     def set_speed(self, speed_cm_s: int):

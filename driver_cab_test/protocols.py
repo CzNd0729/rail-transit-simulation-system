@@ -1,5 +1,5 @@
 """
-司机台联动测试 — 协议编解码核心库
+司机台联动测试 -- 协议编解码核心库
 =====================================
 实现 PLC 协议、网络屏协议、信号屏协议、信号系统 UDP 协议的
 报文打包（编码）与解析（解码）功能。
@@ -22,63 +22,413 @@ logger = logging.getLogger(__name__)
 
 
 # ====================================================================
-# PLC 协议编解码
+# PLC 协议编解码（文档 7.1 / 7.2 节，大端序）
 # ====================================================================
 
+# ---- PLC -> 上位机 (46字节, 大端序) ----
+
+# 字节 24 位定义 (指示灯/标志)
+PLC_BIT_24 = {
+    "reserved_24_0":   0x01,  # 预留
+    "hscb":           0x02,  # 高断合指示灯状态 1=亮 0=灭
+    "brake_fault":    0x04,  # 制动缓解不良指示灯状态 1=亮 0=灭
+    "reserved_24_3":  0x08,  # 预留
+    "reserved_24_4":  0x10,  # 预留
+    "door_closed":    0x20,  # 门关好指示灯状态 1=亮 0=灭
+    "net_fault":      0x40,  # 网络故障指示灯状态 1=亮 0=灭
+    "ar_available":   0x80,  # 具备自动折返模式标志 1=具备
+}
+
+# 字节 25 位定义 (模式标志)
+PLC_BIT_25 = {
+    "ato_available":   0x01,  # 具备ATO模式标志 1=具备
+    "wash_mode":       0x02,  # 进入洗车模式标志 1=进入
+    "ato_active":      0x04,  # 激活ATO模式标志 1=激活
+    "ar_active":       0x08,  # 激活自动折返模式标志 1=激活
+    "reserved_25_4":   0x10,  # 预留
+    "reserved_25_5":   0x20,  # 预留
+    "reserved_25_6":   0x40,  # 预留
+    "reserved_25_7":   0x80,  # 预留
+}
+
+# 字节 28 位定义 (按钮/标志)
+PLC_BIT_28 = {
+    "eb_button":         0x01,  # 紧急制动按钮状态 1=锁定 0=解除
+    "bus_ctrl":          0x02,  # 母线控制按钮状态 1=锁定 0=解除
+    "forced_release":    0x04,  # 强迫缓解标志 1=触发 0=复位
+    "forced_pump":       0x08,  # 强迫泵风标志 1=触发 0=复位
+    "emergency_cmd":     0x10,  # 应急指挥按钮状态 1=锁定 0=解除
+    "parking_apply":     0x20,  # 停放制动施加标志 1=触发 0=复位
+    "parking_release":   0x40,  # 停放制动缓解标志 1=触发 0=复位
+    "horn":              0x80,  # 电笛标志 1=触发 0=复位
+}
+
+# 字节 29 位定义 (门控标志)
+PLC_BIT_29 = {
+    "open_left_door":   0x01,  # 开左门标志 1=触发 0=复位
+    "open_right_door":  0x02,  # 开右门标志 1=触发 0=复位
+    "close_left_door":  0x04,  # 关左门标志 1=触发 0=复位
+    "close_right_door": 0x08,  # 关右门标志 1=触发 0=复位
+    "reserved_29_4":    0x10,  # 预留
+    "reserved_29_5":    0x20,  # 预留
+    "reserved_29_6":    0x40,  # 预留
+    "reserved_29_7":    0x80,  # 预留
+}
+
+# 字节 34 位定义 (按钮/开关)
+PLC_BIT_34 = {
+    "high_accel":       0x01,  # 高加速按钮状态 1=锁定 0=解除
+    "cab_light":        0x02,  # 司机室照明开关状态 1=锁定 0=解除
+    "mode_up_confirm":  0x04,  # 模式升级确认标志 1=触发 0=复位
+    "mode_down_confirm":0x08,  # 模式降级确认标志 1=触发 0=复位
+    "confirm_flag":     0x10,  # 确认标志 1=触发 0=复位
+    "ar_flag":          0x20,  # 自动折返标志 1=触发 0=复位
+    "traction_reset":   0x40,  # 牵引辅助复位标志 1=触发 0=复位
+    "ato_start":        0x80,  # ATO启动标志 1=触发 0=复位
+}
+
+# 字节 35 位定义 (开关/标志)
+PLC_BIT_35 = {
+    "wash_switch":      0x01,  # 洗车模式开关状态 1=锁定 0=解除
+    "key_switch":       0x02,  # 钥匙开关状态 1=锁定 0=解除
+    "alert_flag":       0x04,  # 警惕标志 1=触发 0=复位
+    "alert_release":    0x08,  # 警惕允许解除标志 1=允许 0=不允许
+    "reserved_35_4":    0x10,  # 预留
+    "reserved_35_5":    0x20,  # 预留
+    "reserved_35_6":    0x40,  # 预留
+    "reserved_35_7":    0x80,  # 预留
+}
+
+# 所有位定义按字节分组
+PLC_BIT_GROUPS = {
+    24: PLC_BIT_24,
+    25: PLC_BIT_25,
+    28: PLC_BIT_28,
+    29: PLC_BIT_29,
+    34: PLC_BIT_34,
+    35: PLC_BIT_35,
+}
+
+# 外部照明开关状态枚举
+LIGHT_SWITCH_MAP = {
+    0: "停止",
+    1: "自动",
+    2: "近光",
+    4: "远光",
+}
+
+# 门模式开关状态枚举
+DOOR_MODE_MAP = {
+    0: "半自动",
+    1: "手动",
+    2: "自动",
+}
+
+# 方向手柄状态枚举
+DIR_HANDLE_MAP = {
+    0: "0位",
+    1: "向前",
+    2: "向后",
+}
+
+# 主手柄状态枚举
+MAIN_HANDLE_MAP = {
+    0: "0位",
+    1: "牵引",
+    2: "制动",
+    4: "快制",
+}
+
+
+def _decode_bits_byte(byte_val: int, bit_map: dict) -> dict:
+    """将单字节按位图解码为布尔值字典"""
+    return {name: (byte_val & mask) != 0 for name, mask in bit_map.items()}
+
+
+def _encode_bits_byte(bits: dict, bit_map: dict) -> int:
+    """将布尔值字典按位图编码为单字节"""
+    val = 0
+    for name, mask in bit_map.items():
+        if bits.get(name, False):
+            val |= mask
+    return val
+
+
 def pack_plc_to_upper(
-    train_id: int = 1,
-    speed_cm_s: int = 0,
-    accel: int = 0,
-    master_controller: int = 0,
-    brake_pressure: int = 0,
-    door_status: int = 0,
-    cab_active: int = 0,
-    key_status: int = 0,
-    eb_status: int = 0,
-    mode: int = 0,
+    # 时间
+    year: int = 2025,
+    month: int = 7,
+    day: int = 16,
+    hour: int = 15,
+    minute: int = 11,
+    second: int = 3,
+    # 校验
+    verify_type: int = 0,
+    verify_code: int = 0,
+    # 字节 24 标志 (指示灯)
+    hscb: int = 0,
+    brake_fault: int = 0,
+    door_closed: int = 0,
+    net_fault: int = 0,
+    ar_available: int = 0,
+    # 字节 25 标志 (模式)
+    ato_available: int = 0,
+    wash_mode: int = 0,
+    ato_active: int = 0,
+    ar_active: int = 0,
+    # 车辆速度
+    vehicle_speed: int = 0,
+    # 字节 28 标志 (按钮)
+    eb_button: int = 0,
+    bus_ctrl: int = 0,
+    forced_release: int = 0,
+    forced_pump: int = 0,
+    emergency_cmd: int = 0,
+    parking_apply: int = 0,
+    parking_release: int = 0,
+    horn: int = 0,
+    # 字节 29 标志 (门控)
+    open_left_door: int = 0,
+    open_right_door: int = 0,
+    close_left_door: int = 0,
+    close_right_door: int = 0,
+    # 外部照明开关
+    light_switch: int = 0,
+    # 门模式开关
+    door_mode_switch: int = 0,
+    # 字节 34 标志
+    high_accel: int = 0,
+    cab_light: int = 0,
+    mode_up_confirm: int = 0,
+    mode_down_confirm: int = 0,
+    confirm_flag: int = 0,
+    ar_flag: int = 0,
+    traction_reset: int = 0,
+    ato_start: int = 0,
+    # 字节 35 标志
+    wash_switch: int = 0,
+    key_switch: int = 0,
+    alert_flag: int = 0,
+    alert_release: int = 0,
+    # 方向手柄 / 主手柄 / 极位
+    dir_handle: int = 0,
+    main_handle: int = 0,
+    traction_level: int = 0,
+    brake_level: int = 0,
 ) -> bytes:
     """
-    打包 PLC → 上位机 报文（46字节）
+    打包 PLC -> 上位机 报文（46字节，大端序）
 
-    格式：小端序 WORD(16bit) 为单位
+    协议定义见文档 7.1 节
     """
     data = bytearray(PLC_TO_UPPER_LEN)
-    struct.pack_into("<H", data, 0, 0xABCD)       # header
-    struct.pack_into("<H", data, 2, train_id & 0xFFFF)
-    struct.pack_into("<H", data, 4, speed_cm_s & 0xFFFF)
-    struct.pack_into("<H", data, 6, (speed_cm_s >> 16) & 0xFFFF)
-    struct.pack_into("<H", data, 8, accel & 0xFFFF)
-    struct.pack_into("<H", data, 10, (accel >> 16) & 0xFFFF)
-    struct.pack_into("<H", data, 12, master_controller & 0xFFFF)
-    struct.pack_into("<H", data, 14, brake_pressure & 0xFFFF)
-    struct.pack_into("<H", data, 16, door_status & 0xFFFF)
-    struct.pack_into("<H", data, 18, cab_active & 0xFFFF)
-    struct.pack_into("<H", data, 20, key_status & 0xFFFF)
-    struct.pack_into("<H", data, 22, eb_status & 0xFFFF)
-    struct.pack_into("<H", data, 24, mode & 0xFFFF)
-    # 预留 20 字节 (偏移 26-45)，保持为 0
+
+    # 固定头
+    struct.pack_into(">I", data, 0, 0xAA55AA55)  # identify
+    struct.pack_into(">H", data, 4, PLC_TO_UPPER_LEN)  # total_len
+    struct.pack_into(">H", data, 6, 22)  # data_len
+
+    # 时间
+    struct.pack_into(">H", data, 8, year & 0xFFFF)
+    struct.pack_into(">H", data, 10, month & 0xFFFF)
+    struct.pack_into(">H", data, 12, day & 0xFFFF)
+    struct.pack_into(">H", data, 14, hour & 0xFFFF)
+    struct.pack_into(">H", data, 16, minute & 0xFFFF)
+    struct.pack_into(">H", data, 18, second & 0xFFFF)
+
+    # 校验
+    struct.pack_into(">H", data, 20, verify_type & 0xFFFF)
+    struct.pack_into(">H", data, 22, verify_code & 0xFFFF)
+
+    # 字节 24-25 BOOL 标志
+    data[24] = _encode_bits_byte(
+        {"hscb": hscb, "brake_fault": brake_fault, "door_closed": door_closed,
+         "net_fault": net_fault, "ar_available": ar_available},
+        PLC_BIT_24,
+    )
+    data[25] = _encode_bits_byte(
+        {"ato_available": ato_available, "wash_mode": wash_mode,
+         "ato_active": ato_active, "ar_active": ar_active},
+        PLC_BIT_25,
+    )
+
+    # 车辆速度
+    struct.pack_into(">H", data, 26, vehicle_speed & 0xFFFF)
+
+    # 字节 28-29 BOOL 标志
+    data[28] = _encode_bits_byte(
+        {"eb_button": eb_button, "bus_ctrl": bus_ctrl,
+         "forced_release": forced_release, "forced_pump": forced_pump,
+         "emergency_cmd": emergency_cmd, "parking_apply": parking_apply,
+         "parking_release": parking_release, "horn": horn},
+        PLC_BIT_28,
+    )
+    data[29] = _encode_bits_byte(
+        {"open_left_door": open_left_door, "open_right_door": open_right_door,
+         "close_left_door": close_left_door, "close_right_door": close_right_door},
+        PLC_BIT_29,
+    )
+
+    # 外部照明开关 / 门模式开关
+    struct.pack_into(">H", data, 30, light_switch & 0xFFFF)
+    struct.pack_into(">H", data, 32, door_mode_switch & 0xFFFF)
+
+    # 字节 34-35 BOOL 标志
+    data[34] = _encode_bits_byte(
+        {"high_accel": high_accel, "cab_light": cab_light,
+         "mode_up_confirm": mode_up_confirm, "mode_down_confirm": mode_down_confirm,
+         "confirm_flag": confirm_flag, "ar_flag": ar_flag,
+         "traction_reset": traction_reset, "ato_start": ato_start},
+        PLC_BIT_34,
+    )
+    data[35] = _encode_bits_byte(
+        {"wash_switch": wash_switch, "key_switch": key_switch,
+         "alert_flag": alert_flag, "alert_release": alert_release},
+        PLC_BIT_35,
+    )
+
+    # 方向手柄 / 主手柄 / 极位
+    struct.pack_into(">H", data, 36, dir_handle & 0xFFFF)
+    struct.pack_into(">H", data, 38, main_handle & 0xFFFF)
+    struct.pack_into(">H", data, 40, traction_level & 0xFFFF)
+    struct.pack_into(">H", data, 42, brake_level & 0xFFFF)
+
+    # 字节 44-45: 预留
     return bytes(data)
 
 
 def parse_plc_to_upper(data: bytes) -> dict:
     """
-    解析 PLC → 上位机 报文（46字节）
+    解析 PLC -> 上位机 报文（46字节，大端序）
+
+    协议定义见文档 7.1 节
     """
     if len(data) < PLC_TO_UPPER_LEN:
         raise ValueError(f"PLC报文长度不足: {len(data)} < {PLC_TO_UPPER_LEN}")
 
+    identify = struct.unpack_from(">I", data, 0)[0]
+    total_len = struct.unpack_from(">H", data, 4)[0]
+    data_len = struct.unpack_from(">H", data, 6)[0]
+
+    # 时间
+    year = struct.unpack_from(">H", data, 8)[0]
+    month = struct.unpack_from(">H", data, 10)[0]
+    day = struct.unpack_from(">H", data, 12)[0]
+    hour = struct.unpack_from(">H", data, 14)[0]
+    minute = struct.unpack_from(">H", data, 16)[0]
+    second = struct.unpack_from(">H", data, 18)[0]
+
+    # 校验
+    verify_type = struct.unpack_from(">H", data, 20)[0]
+    verify_code = struct.unpack_from(">H", data, 22)[0]
+
+    # BOOL 标志字节
+    flags_24 = _decode_bits_byte(data[24], PLC_BIT_24)
+    flags_25 = _decode_bits_byte(data[25], PLC_BIT_25)
+
+    # 车辆速度 (WORD, 大端)
+    vehicle_speed = struct.unpack_from(">H", data, 26)[0]
+
+    flags_28 = _decode_bits_byte(data[28], PLC_BIT_28)
+    flags_29 = _decode_bits_byte(data[29], PLC_BIT_29)
+
+    # 外部照明开关 / 门模式开关
+    light_switch = struct.unpack_from(">H", data, 30)[0]
+    door_mode_switch = struct.unpack_from(">H", data, 32)[0]
+
+    flags_34 = _decode_bits_byte(data[34], PLC_BIT_34)
+    flags_35 = _decode_bits_byte(data[35], PLC_BIT_35)
+
+    # 方向手柄 / 主手柄 / 极位
+    dir_handle = struct.unpack_from(">H", data, 36)[0]
+    main_handle = struct.unpack_from(">H", data, 38)[0]
+    traction_level = struct.unpack_from(">H", data, 40)[0]
+    brake_level = struct.unpack_from(">H", data, 42)[0]
+
+    # 预留字节 44-45
+    reserved = struct.unpack_from(">H", data, 44)[0]
+
+    # 枚举映射
+    light_str = LIGHT_SWITCH_MAP.get(light_switch, f"未知({light_switch})")
+    door_mode_str = DOOR_MODE_MAP.get(door_mode_switch, f"未知({door_mode_switch})")
+    dir_str = DIR_HANDLE_MAP.get(dir_handle, f"未知({dir_handle})")
+    main_handle_str = MAIN_HANDLE_MAP.get(main_handle, f"未知({main_handle})")
+
     result = {
-        "header": struct.unpack_from("<H", data, 0)[0],
-        "train_id": struct.unpack_from("<H", data, 2)[0],
-        "speed_cm_s": struct.unpack_from("<H", data, 4)[0] | (struct.unpack_from("<H", data, 6)[0] << 16),
-        "accel": struct.unpack_from("<H", data, 8)[0] | (struct.unpack_from("<H", data, 10)[0] << 16),
-        "master_controller": struct.unpack_from("<H", data, 12)[0],
-        "brake_pressure": struct.unpack_from("<H", data, 14)[0],
-        "door_status": struct.unpack_from("<H", data, 16)[0],
-        "cab_active": struct.unpack_from("<H", data, 18)[0],
-        "key_status": struct.unpack_from("<H", data, 20)[0],
-        "eb_status": struct.unpack_from("<H", data, 22)[0],
-        "mode": struct.unpack_from("<H", data, 24)[0],
+        # 固定头
+        "identify": hex(identify),
+        "identify_ok": identify == 0xAA55AA55,
+        "total_len": total_len,
+        "data_len": data_len,
+        # 时间
+        "year": year,
+        "month": month,
+        "day": day,
+        "hour": hour,
+        "minute": minute,
+        "second": second,
+        "timestamp_str": f"{year:04d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}",
+        # 校验
+        "verify_type": verify_type,
+        "verify_code": verify_code,
+        # 指示灯标志 (字节24)
+        "hscb": flags_24.get("hscb", False),           # 高断合指示灯
+        "brake_fault_indicator": flags_24.get("brake_fault", False),
+        "door_closed_indicator": flags_24.get("door_closed", False),
+        "net_fault_indicator": flags_24.get("net_fault", False),
+        "ar_available": flags_24.get("ar_available", False),
+        # 模式标志 (字节25)
+        "ato_available": flags_25.get("ato_available", False),
+        "wash_mode": flags_25.get("wash_mode", False),
+        "ato_active": flags_25.get("ato_active", False),
+        "ar_active": flags_25.get("ar_active", False),
+        # 车辆速度
+        "vehicle_speed": vehicle_speed,
+        # 按钮标志 (字节28)
+        "eb_button_locked": flags_28.get("eb_button", False),
+        "bus_ctrl_locked": flags_28.get("bus_ctrl", False),
+        "forced_release": flags_28.get("forced_release", False),
+        "forced_pump": flags_28.get("forced_pump", False),
+        "emergency_cmd_locked": flags_28.get("emergency_cmd", False),
+        "parking_apply": flags_28.get("parking_apply", False),
+        "parking_release": flags_28.get("parking_release", False),
+        "horn": flags_28.get("horn", False),
+        # 门控标志 (字节29)
+        "open_left_door": flags_29.get("open_left_door", False),
+        "open_right_door": flags_29.get("open_right_door", False),
+        "close_left_door": flags_29.get("close_left_door", False),
+        "close_right_door": flags_29.get("close_right_door", False),
+        # 照明 / 门模式
+        "light_switch": light_switch,
+        "light_switch_str": light_str,
+        "door_mode_switch": door_mode_switch,
+        "door_mode_switch_str": door_mode_str,
+        # 按钮标志 (字节34)
+        "high_accel": flags_34.get("high_accel", False),
+        "cab_light": flags_34.get("cab_light", False),
+        "mode_up_confirm": flags_34.get("mode_up_confirm", False),
+        "mode_down_confirm": flags_34.get("mode_down_confirm", False),
+        "confirm_flag": flags_34.get("confirm_flag", False),
+        "ar_flag": flags_34.get("ar_flag", False),
+        "traction_reset": flags_34.get("traction_reset", False),
+        "ato_start_flag": flags_34.get("ato_start", False),
+        # 开关标志 (字节35)
+        "wash_switch": flags_35.get("wash_switch", False),
+        "key_switch": flags_35.get("key_switch", False),
+        "alert_flag": flags_35.get("alert_flag", False),
+        "alert_release": flags_35.get("alert_release", False),
+        # 手柄
+        "dir_handle": dir_handle,
+        "dir_handle_str": dir_str,
+        "main_handle": main_handle,
+        "main_handle_str": main_handle_str,
+        # 极位
+        "traction_level": traction_level,
+        "brake_level": brake_level,
+        # 预留
+        "reserved": reserved,
+        # 原始字节
+        "raw": data[:PLC_TO_UPPER_LEN],
     }
     return result
 
@@ -94,7 +444,7 @@ def pack_upper_to_plc(
     eb_reset: int = 0,
 ) -> bytes:
     """
-    打包 上位机 → PLC 报文（26字节）
+    打包 上位机 -> PLC 报文（26字节）
     """
     data = bytearray(UPPER_TO_PLC_LEN)
     struct.pack_into("<H", data, 0, header & 0xFFFF)
@@ -112,7 +462,7 @@ def pack_upper_to_plc(
 
 def parse_upper_to_plc(data: bytes) -> dict:
     """
-    解析 上位机 → PLC 报文（26字节）
+    解析 上位机 -> PLC 报文（26字节）
     """
     if len(data) < UPPER_TO_PLC_LEN:
         raise ValueError(f"上位机报文长度不足: {len(data)} < {UPPER_TO_PLC_LEN}")
@@ -261,7 +611,7 @@ def pack_signal_screen(
     """
     打包信号屏（DMI）显示数据（66字节）
 
-    参考 ATP → DMI 应用数据包格式
+    参考 ATP -> DMI 应用数据包格式
     """
     data = bytearray(SIGNAL_SCREEN_LEN)
 
@@ -373,7 +723,7 @@ def parse_signal_screen(data: bytes) -> dict:
 
 def pack_signal_to_db_train_data(trains: list) -> bytes:
     """
-    打包 信号系统 → 总控数据库节点 列车数据报文
+    打包 信号系统 -> 总控数据库节点 列车数据报文
 
     Args:
         trains: 列车信息列表，每项为 dict:
@@ -431,7 +781,7 @@ def pack_signal_to_db_cab_binary(
     vehicle_output: int = 0,
 ) -> bytes:
     """
-    打包 信号系统 → 总控数据库节点 驾驶台开关量信息
+    打包 信号系统 -> 总控数据库节点 驾驶台开关量信息
 
     报文头：0xff 0xf1
     """
@@ -460,7 +810,7 @@ def pack_signal_to_db_cab_binary(
 
 def parse_signal_to_db_cab_binary(data: bytes) -> dict:
     """
-    解析 信号系统 → 总控数据库节点 驾驶台开关量信息
+    解析 信号系统 -> 总控数据库节点 驾驶台开关量信息
     """
     if len(data) < 33:
         raise ValueError(f"驾驶台开关量报文长度不足: {len(data)}")
@@ -484,7 +834,7 @@ def parse_signal_to_db_cab_binary(data: bytes) -> dict:
 
 def pack_db_to_signal_train_data(trains: list) -> bytes:
     """
-    打包 总控数据库节点 → 信号系统 列车数据报文
+    打包 总控数据库节点 -> 信号系统 列车数据报文
 
     报文头：0xff 0xf0
     单列车18字节，单包最多40列车
@@ -525,10 +875,10 @@ def pack_db_to_signal_train_data(trains: list) -> bytes:
 
 def parse_db_to_signal_train_data(data: bytes) -> dict:
     """
-    解析 总控数据库节点 → 信号系统 列车数据报文
+    解析 总控数据库节点 -> 信号系统 列车数据报文
     """
     if len(data) < 16:
-        raise ValueError(f"总控→信号报文长度不足: {len(data)}")
+        raise ValueError(f"总控->信号报文长度不足: {len(data)}")
 
     content_len = struct.unpack_from("<H", data, 14)[0]
     n = content_len // 18
@@ -567,7 +917,7 @@ def pack_db_to_signal_cab_binary(
     ato_nonsafe_input: int = 0,
 ) -> bytes:
     """
-    打包 总控数据库节点 → 信号系统 驾驶台开关量信息（仅1车）
+    打包 总控数据库节点 -> 信号系统 驾驶台开关量信息（仅1车）
 
     报文头：0xff 0xf1
     """
@@ -592,7 +942,7 @@ def pack_db_to_signal_cab_binary(
 
 def parse_db_to_signal_cab_binary(data: bytes) -> dict:
     """
-    解析 总控数据库节点 → 信号系统 驾驶台开关量信息
+    解析 总控数据库节点 -> 信号系统 驾驶台开关量信息
     """
     if len(data) < 29:
         raise ValueError(f"驾驶台开关量报文长度不足: {len(data)}")
@@ -670,24 +1020,46 @@ def self_test():
     print("协议编解码自检")
     print("=" * 60)
 
-    # 1. PLC → 上位机
-    print("\n[1] PLC → 上位机 编解码")
-    raw = pack_plc_to_upper(train_id=1, speed_cm_s=5000, cab_active=1, key_status=1, mode=3)
+    # 1. PLC -> 上位机 (文档 7.1 节 46字节大端序)
+    print("\n[1] PLC -> 上位机 编解码 (文档7.1节 46字节大端序)")
+    raw = pack_plc_to_upper(
+        year=2025, month=7, day=16, hour=15, minute=11, second=3,
+        vehicle_speed=5000,
+        hscb=1, door_closed=1, ato_available=1, ato_active=1,
+        eb_button=1, horn=0,
+        door_mode_switch=2,
+        key_switch=1, alert_flag=1,
+        dir_handle=1, main_handle=1, traction_level=50, brake_level=0,
+    )
     parsed = parse_plc_to_upper(raw)
-    assert parsed["train_id"] == 1
-    assert parsed["speed_cm_s"] == 5000
-    assert parsed["cab_active"] == 1
-    assert parsed["mode"] == 3
-    print(f"    ✓ 打包 {len(raw)}B → 解析: speed={parsed['speed_cm_s']}cm/s, mode={parsed['mode']}")
+    assert parsed["identify_ok"] == True
+    assert parsed["year"] == 2025
+    assert parsed["month"] == 7
+    assert parsed["vehicle_speed"] == 5000
+    assert parsed["hscb"] == True
+    assert parsed["door_closed_indicator"] == True
+    assert parsed["ato_available"] == True
+    assert parsed["ato_active"] == True
+    assert parsed["eb_button_locked"] == True
+    assert parsed["door_mode_switch_str"] == "自动"
+    assert parsed["key_switch"] == True
+    assert parsed["alert_flag"] == True
+    assert parsed["dir_handle_str"] == "向前"
+    assert parsed["main_handle_str"] == "牵引"
+    assert parsed["traction_level"] == 50
+    assert parsed["brake_level"] == 0
+    print(f"    [OK] 打包 {len(raw)}B -> 解析: time={parsed['timestamp_str']}, "
+          f"speed={parsed['vehicle_speed']}, hscb={parsed['hscb']}, "
+          f"门模式={parsed['door_mode_switch_str']}, 方向={parsed['dir_handle_str']}")
 
-    # 2. 上位机 → PLC
-    print("\n[2] 上位机 → PLC 编解码")
+    # 2. 上位机 -> PLC
+    print("\n[2] 上位机 -> PLC 编解码")
     raw = pack_upper_to_plc(traction_cmd=0x55, traction_pct=80, target_speed_cm_s=5000)
     parsed = parse_upper_to_plc(raw)
     assert parsed["traction_cmd"] == 0x55
     assert parsed["traction_pct"] == 80
     assert parsed["target_speed_cm_s"] == 5000
-    print(f"    ✓ 打包 {len(raw)}B → 解析: cmd=0x{parsed['traction_cmd']:02x}, pct={parsed['traction_pct']}%")
+    print(f"    [OK] 打包 {len(raw)}B -> 解析: cmd=0x{parsed['traction_cmd']:02x}, pct={parsed['traction_pct']}%")
 
     # 3. 网络屏
     print("\n[3] 网络屏 编解码")
@@ -695,7 +1067,7 @@ def self_test():
     parsed = parse_network_screen(raw)
     assert abs(parsed["speed_km_h"] - 60.0) < 0.01
     assert parsed["next_station"] == "人民广场"
-    print(f"    ✓ 打包 {len(raw)}B → 解析: speed={parsed['speed_km_h']}km/h, station={parsed['next_station']}")
+    print(f"    [OK] 打包 {len(raw)}B -> 解析: speed={parsed['speed_km_h']}km/h, station={parsed['next_station']}")
 
     # 4. 信号屏
     print("\n[4] 信号屏(DMI) 编解码")
@@ -706,7 +1078,7 @@ def self_test():
     assert parsed["permit_speed_cm_s"] == 8000
     assert parsed["target_distance_m"] == 1000.0
     assert parsed["current_mode"] == "RM"
-    print(f"    ✓ 打包 {len(raw)}B → 解析: speed={parsed['current_speed_km_h']}km/h, "
+    print(f"    [OK] 打包 {len(raw)}B -> 解析: speed={parsed['current_speed_km_h']}km/h, "
           f"dist={parsed['target_distance_m']}m, mode={parsed['current_mode']}")
 
     # 5. 驾驶台开关量 ATP位编解码
@@ -728,11 +1100,11 @@ def self_test():
     assert decoded["door_closed"] == True
     assert decoded["traction_cut"] == False
     assert decoded["handle_zero_forward"] == True
-    print(f"    ✓ 编码 0x{atp_safe:08x} → 解码: cab_active={decoded['cab_active']}, "
+    print(f"    [OK] 编码 0x{atp_safe:08x} -> 解码: cab_active={decoded['cab_active']}, "
           f"key={decoded['key_active']}, door={decoded['door_closed']}")
 
-    # 6. 信号系统 ⇄ 总控 驾驶台开关量
-    print("\n[6] 信号系统 ⇄ 总控 驾驶台开关量")
+    # 6. 信号系统 <-> 总控 驾驶台开关量
+    print("\n[6] 信号系统 <-> 总控 驾驶台开关量")
     raw = pack_signal_to_db_cab_binary(
         train_id=1,
         atp_safe_output=encode_atp_safe_output({"eb_output": True, "zero_speed": True}),
@@ -745,10 +1117,10 @@ def self_test():
     assert parsed["atp_safe_bits"]["zero_speed"] == True
     assert parsed["atp_nonsafe_bits"]["fam_mode"] == True
     assert parsed["ato_nonsafe_bits"]["ato_active"] == True
-    print(f"    ✓ 信号→总控 {len(raw)}B: eb_output={parsed['atp_safe_bits']['eb_output']}")
+    print(f"    [OK] 信号->总控 {len(raw)}B: eb_output={parsed['atp_safe_bits']['eb_output']}")
 
-    # 7. 总控→信号 列车数据
-    print("\n[7] 总控→信号 列车数据")
+    # 7. 总控->信号 列车数据
+    print("\n[7] 总控->信号 列车数据")
     trains = [
         {"train_id": 1, "speed_cm_s": 5000, "distance_cm": 100000,
          "direction": 0x55, "load_kg": 50000, "fault_speed": 0, "eb_status": 0,
@@ -762,12 +1134,12 @@ def self_test():
     assert parsed["train_count"] == 2
     assert parsed["trains"][0]["speed_cm_s"] == 5000
     assert parsed["trains"][1]["direction"] == 0xAA
-    print(f"    ✓ 总控→信号 {len(raw)}B: {parsed['train_count']}列车, "
+    print(f"    [OK] 总控->信号 {len(raw)}B: {parsed['train_count']}列车, "
           f"列车1 speed={parsed['trains'][0]['speed_cm_s']}cm/s, "
           f"列车2 direction={parsed['trains'][1]['direction_str']}")
 
     print("\n" + "=" * 60)
-    print("所有自检通过 ✓")
+    print("所有自检通过 [OK]")
     print("=" * 60)
     return True
 
