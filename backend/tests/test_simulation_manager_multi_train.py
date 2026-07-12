@@ -32,7 +32,9 @@ def test_all_trains_finished_requires_full_fleet(manager):
     assert SimulationManager._all_trains_finished(orch) is False
     orch.trains[0].active = True
     orch.trains[1].active = True
-    terminal = orch.track.track.total_length - 1.0
+    direction = orch.trains[0].state.direction
+    total = orch.track.track.total_length
+    terminal = 0.0 if direction == "up" else total - 1.0
     orch.trains[0].state.position = terminal
     orch.trains[0].state.speed = 0.0
     assert SimulationManager._all_trains_finished(orch) is False

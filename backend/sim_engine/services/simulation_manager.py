@@ -378,14 +378,21 @@ class SimulationManager:
 
     @staticmethod
     def _all_trains_finished(orch: Orchestrator) -> bool:
-        """全部列车已 spawn 且均到终点停稳。"""
+        """全部列车已 spawn 且均到终点停稳（按各车 direction 判断）。"""
         active = [t for t in orch.trains if t.active]
         if len(active) < orch.sim_params.train_count:
             return False
-        terminal = orch.track.track.total_length - 1.0
-        return all(
-            t.state.position >= terminal and t.state.speed < 0.1 for t in active
-        )
+        total = orch.track.track.total_length
+        for run in active:
+            st = run.state
+            if st.speed >= 0.1:
+                return False
+            if st.direction == "up":
+                if st.position > 1.0:
+                    return False
+            elif st.position < total - 1.0:
+                return False
+        return True
 
     async def _run_loop(self) -> None:
         """后台仿真主循环：每步 step_once → broadcast → sleep(dt/multiplier)。"""
