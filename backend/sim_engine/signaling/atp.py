@@ -21,19 +21,31 @@ class ATPController:
             return SafetyStatus.EMERGENCY_BRAKE
         return SafetyStatus.NORMAL
 
-    def ma_end_chainage(self, train_position: float, target_station_chainage: float | None) -> float:
+    def ma_end_chainage(
+        self,
+        train_position: float,
+        target_station_chainage: float | None,
+        leading_chainage: float | None = None,
+    ) -> float:
         if target_station_chainage is None:
-            return train_position
-        return target_station_chainage
+            ma = train_position
+        else:
+            ma = target_station_chainage
+        if leading_chainage is not None:
+            ma = min(ma, leading_chainage - self._config.safety_distance)
+        return max(train_position, ma)
 
     def build_ma_profile(
         self,
         train_id: str,
         train_position: float,
         target_station_chainage: float | None,
+        leading_chainage: float | None = None,
     ) -> MaProfile:
         return MaProfile(
             train_id=train_id,
-            ma_end_chainage=self.ma_end_chainage(train_position, target_station_chainage),
+            ma_end_chainage=self.ma_end_chainage(
+                train_position, target_station_chainage, leading_chainage
+            ),
             safety_distance=self._config.safety_distance,
         )
