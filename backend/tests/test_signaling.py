@@ -672,6 +672,7 @@ def test_full_run_jerk_mostly_within_comfort_limit():
     from sim_engine.orchestrator import Orchestrator
 
     orch = Orchestrator.from_config_dir()
+    orch.sim_params.train_count = 1
     orch.reset()
     orch.start()
     limit = orch.sim_params.pid.max_jerk

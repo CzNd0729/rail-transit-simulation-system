@@ -23,6 +23,7 @@ from sim_engine.signaling.manual_drive import ManualDriveController
 from sim_engine.signaling.models import MaProfile, SafetyStatus, Timetable
 from sim_engine.signaling.three_stage import ThreeStageController
 from sim_engine.signaling.timetable_loader import load_timetable
+from sim_engine.signaling.train_following import is_interval_safe
 from sim_engine.track.config import load_track
 from sim_engine.track.occupancy import OccupancyDetector
 from sim_engine.track.switch import SwitchManager
@@ -230,12 +231,24 @@ class Orchestrator:
         run: TrainRun,
         dt: float,
         elapsed: float,
+        leading_pos: float | None = None,
     ) -> tuple[StepResult, ControlCommands, float, MaProfile, list[dict], float]:
         """步进单列车，返回动力学结果与 signaling 快照片段。"""
         track_params = self.track.query_at(run.state.position)
         speed_limit = effective_speed_limit_kmh(track_params, self.vehicle.params)
         cmd = run.signaling.compute_commands(run.state, dt, elapsed=elapsed)
         if self.atp.check_overspeed(run.state.speed, speed_limit) == SafetyStatus.EMERGENCY_BRAKE:
+            cmd = ControlCommands(
+                traction_level=0.0,
+                brake_level=0.0,
+                emergency_brake=True,
+                phase=cmd.phase or run.signaling.signal_state.phase.value,
+            )
+        min_interval = self.sim_params.signal.following_min_interval
+        if (
+            leading_pos is not None
+            and not is_interval_safe(leading_pos, run.state.position, min_interval)
+        ):
             cmd = ControlCommands(
                 traction_level=0.0,
                 brake_level=0.0,
@@ -302,9 +315,14 @@ class Orchestrator:
         step_outputs: list[
             tuple[TrainRun, StepResult, ControlCommands, float, MaProfile, list[dict], float]
         ] = []
-        for run in active_runs:
+        sorted_runs = sorted(active_runs, key=lambda r: r.state.position)
+        min_interval = self.sim_params.signal.following_min_interval
+        for i, run in enumerate(sorted_runs):
+            leading_pos = (
+                sorted_runs[i + 1].state.position if i + 1 < len(sorted_runs) else None
+            )
             result, cmd, speed_limit, ma, timetable_dev, power_demand = self._step_train(
-                run, dt, elapsed
+                run, dt, elapsed, leading_pos=leading_pos
             )
             step_outputs.append(
                 (run, result, cmd, speed_limit, ma, timetable_dev, power_demand)
@@ -391,6 +409,23 @@ class Orchestrator:
             })
             timetable_deviations.extend(timetable_dev)
 
+        train_intervals: list[dict] = []
+        if len(sorted_runs) >= 2:
+            post_sorted = sorted(active_runs, key=lambda r: r.state.position)
+            for i in range(len(post_sorted) - 1):
+                rear = post_sorted[i]
+                front = post_sorted[i + 1]
+                interval_m = front.state.position - rear.state.position
+                train_intervals.append({
+                    "trainId": rear.train_id,
+                    "leadingTrainId": front.train_id,
+                    "intervalM": interval_m,
+                    "minIntervalM": min_interval,
+                    "safe": is_interval_safe(
+                        front.state.position, rear.state.position, min_interval
+                    ),
+                })
+
         snapshot = build_simulation_snapshot(
             self.clock,
             self.sim_params,
@@ -404,6 +439,7 @@ class Orchestrator:
                 "speedLimits": speed_limits,
                 "maProfile": ma_profiles,
                 "timetableDeviation": timetable_deviations,
+                "trainIntervals": train_intervals,
             },
         )
         self.last_snapshot = snapshot

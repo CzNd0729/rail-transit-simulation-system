@@ -106,6 +106,7 @@ def build_simulation_snapshot(
         "speedLimits": extra.pop("speedLimits", []),
         "maProfile": extra.pop("maProfile", []),
         "timetableDeviation": extra.pop("timetableDeviation", []),
+        "trainIntervals": extra.pop("trainIntervals", []),
     }
     signaling.update(extra)
 
