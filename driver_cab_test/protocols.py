@@ -344,6 +344,9 @@ def parse_plc_to_upper(data: bytes) -> dict:
     main_handle = struct.unpack_from(">H", data, 38)[0]
     traction_level = struct.unpack_from(">H", data, 40)[0]
     brake_level = struct.unpack_from(">H", data, 42)[0]
+    # 极位换算：1% = 256 (100% -> 25600)
+    traction_level_pct = traction_level / 256.0
+    brake_level_pct = brake_level / 256.0
 
     # 预留字节 44-45
     reserved = struct.unpack_from(">H", data, 44)[0]
@@ -424,7 +427,9 @@ def parse_plc_to_upper(data: bytes) -> dict:
         "main_handle_str": main_handle_str,
         # 极位
         "traction_level": traction_level,
+        "traction_level_pct": round(traction_level_pct, 1),
         "brake_level": brake_level,
+        "brake_level_pct": round(brake_level_pct, 1),
         # 预留
         "reserved": reserved,
         # 原始字节
@@ -1029,7 +1034,7 @@ def self_test():
         eb_button=1, horn=0,
         door_mode_switch=2,
         key_switch=1, alert_flag=1,
-        dir_handle=1, main_handle=1, traction_level=50, brake_level=0,
+        dir_handle=1, main_handle=1, traction_level=12800, brake_level=0,  # 12800=50%
     )
     parsed = parse_plc_to_upper(raw)
     assert parsed["identify_ok"] == True
@@ -1046,11 +1051,14 @@ def self_test():
     assert parsed["alert_flag"] == True
     assert parsed["dir_handle_str"] == "向前"
     assert parsed["main_handle_str"] == "牵引"
-    assert parsed["traction_level"] == 50
+    assert parsed["traction_level"] == 50 * 256  # 原始值 50*256
+    assert parsed["traction_level_pct"] == 50.0  # 换算后 50%
     assert parsed["brake_level"] == 0
+    assert parsed["brake_level_pct"] == 0.0
     print(f"    [OK] 打包 {len(raw)}B -> 解析: time={parsed['timestamp_str']}, "
           f"speed={parsed['vehicle_speed']}, hscb={parsed['hscb']}, "
-          f"门模式={parsed['door_mode_switch_str']}, 方向={parsed['dir_handle_str']}")
+          f"牵引极位={parsed['traction_level_pct']}%, "
+          f"制动极位={parsed['brake_level_pct']}%")
 
     # 2. 上位机 -> PLC
     print("\n[2] 上位机 -> PLC 编解码")

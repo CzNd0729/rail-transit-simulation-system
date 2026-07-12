@@ -132,8 +132,8 @@ def display_pkt(parsed: dict, index: int):
     # ---- 手柄/极位 ----
     print(f"【手柄】  方向手柄={parsed['dir_handle_str']}  "
           f"主手柄={parsed['main_handle_str']}  "
-          f"牵引极位={parsed['traction_level']}%  "
-          f"制动极位={parsed['brake_level']}%")
+          f"牵引极位={parsed['traction_level_pct']}%  "
+          f"制动极位={parsed['brake_level_pct']}%")
 
     print(f"{'=' * 72}")
 
