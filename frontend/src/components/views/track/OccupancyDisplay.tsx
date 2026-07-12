@@ -2,7 +2,6 @@
  * OccupancyDisplay — SVG 轨道条带图
  * 展示全线轨道电路区段占用状态 + 列车位置
  */
-import { useState, useEffect, useMemo } from 'react';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { mockLineData } from '../../../data/mockLineData';
 import type { TrackCircuit } from '../../../types/simulation';
@@ -14,36 +13,18 @@ function circuitColor(occupied: boolean): { fill: string; stroke: string } {
 }
 
 export default function OccupancyDisplay() {
-  const { trains, lineLayout } = useSimulationState();
+  const { trains, lineLayout, track } = useSimulationState();
 
   // 使用后端数据，fallback 到 mock
   const segments = lineLayout?.segments ?? mockLineData.segments;
   const stations = lineLayout?.stations ?? mockLineData.stations;
   const total_length = lineLayout?.total_length ?? mockLineData.total_length;
 
-  const flatCircuits: TrackCircuit[] = useMemo(
-    () => segments.flatMap((seg) => seg.circuits),
-    [segments]
-  );
-
-  const [circuits, setCircuits] = useState<TrackCircuit[]>(flatCircuits);
-
-  // 每 500ms 随机翻转 1-3 个电路状态
-  useEffect(() => {
-    if (flatCircuits.length === 0) return;
-    const id = setInterval(() => {
-      setCircuits((prev) => {
-        const updated = [...prev];
-        const count = 1 + Math.floor(Math.random() * 3);
-        for (let i = 0; i < count; i++) {
-          const idx = Math.floor(Math.random() * updated.length);
-          updated[idx] = { ...updated[idx], occupied: !updated[idx].occupied };
-        }
-        return updated;
-      });
-    }, 500);
-    return () => clearInterval(id);
-  }, [flatCircuits.length]);
+  // 优先使用 WebSocket 推送的实时占用数据，回退到 lineLayout 静态定义
+  const circuits: TrackCircuit[] =
+    track.occupancy.length > 0
+      ? track.occupancy
+      : segments.flatMap((seg) => seg.circuits);
 
   const trackY = 35;
   const trackH = 16;
@@ -61,7 +42,9 @@ export default function OccupancyDisplay() {
           style={{ width: '100%', height: '100%' }}
         >
           {/* 公里标尺 */}
-          {Array.from({ length: 7 }, (_, i) => i * 2000).map((pos) => (
+          {Array.from({ length: Math.ceil(total_length / 2000) + 1 }, (_, i) => i * 2000)
+            .filter(pos => pos <= total_length)
+            .map((pos) => (
             <g key={`ruler-${pos}`}>
               <line x1={pos} y1={8} x2={pos} y2={14} stroke="#555" strokeWidth={1} />
               <text x={pos} y={24} textAnchor="middle" fontSize={8} fill="#888">

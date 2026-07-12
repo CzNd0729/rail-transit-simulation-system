@@ -3,6 +3,7 @@
 # 北段（安河桥北~国家图书馆）为地面/高架/地下过渡，南段（动物园~公益西桥）全地下
 line:
   name: 4号线（下行）
+  direction: "down"  # 下行方向；未来可扩展 "up" 上行线路
   stations:
     - { id: ST01,  name: 安河桥北,     chainage: 0,     dwell_time: 35 }
     - { id: ST02,  name: 北宫门,       chainage: 1100,  dwell_time: 25 }
@@ -236,3 +237,31 @@ line:
       curvature: 1000
       speed_limit: 80
       is_tunnel: true
+
+  # ── 轨道电路区段（TRK-07）──────────────────────────────
+  # 每相邻两站之间为一个轨道电路区段，共 23 个
+  # 用于检测列车占用/出清状态，供信号系统和前端轨道视图使用
+  track_circuits:
+    - { id: TC01, start_chainage: 0,     end_chainage: 1100,  direction: "down" }
+    - { id: TC02, start_chainage: 1100,  end_chainage: 2000,  direction: "down" }
+    - { id: TC03, start_chainage: 2000,  end_chainage: 2800,  direction: "down" }
+    - { id: TC04, start_chainage: 2800,  end_chainage: 3600,  direction: "down" }
+    - { id: TC05, start_chainage: 3600,  end_chainage: 4300,  direction: "down" }
+    - { id: TC06, start_chainage: 4300,  end_chainage: 5100,  direction: "down" }
+    - { id: TC07, start_chainage: 5100,  end_chainage: 5800,  direction: "down" }
+    - { id: TC08, start_chainage: 5800,  end_chainage: 6600,  direction: "down" }
+    - { id: TC09, start_chainage: 6600,  end_chainage: 7300,  direction: "down" }
+    - { id: TC10, start_chainage: 7300,  end_chainage: 8300,  direction: "down" }
+    - { id: TC11, start_chainage: 8300,  end_chainage: 9200,  direction: "down" }
+    - { id: TC12, start_chainage: 9200,  end_chainage: 10000, direction: "down" }
+    - { id: TC13, start_chainage: 10000, end_chainage: 10700, direction: "down" }
+    - { id: TC14, start_chainage: 10700, end_chainage: 11400, direction: "down" }
+    - { id: TC15, start_chainage: 11400, end_chainage: 12000, direction: "down" }
+    - { id: TC16, start_chainage: 12000, end_chainage: 12700, direction: "down" }
+    - { id: TC17, start_chainage: 12700, end_chainage: 13500, direction: "down" }
+    - { id: TC18, start_chainage: 13500, end_chainage: 14300, direction: "down" }
+    - { id: TC19, start_chainage: 14300, end_chainage: 15200, direction: "down" }
+    - { id: TC20, start_chainage: 15200, end_chainage: 15900, direction: "down" }
+    - { id: TC21, start_chainage: 15900, end_chainage: 16900, direction: "down" }
+    - { id: TC22, start_chainage: 16900, end_chainage: 17700, direction: "down" }
+    - { id: TC23, start_chainage: 17700, end_chainage: 18600, direction: "down" }

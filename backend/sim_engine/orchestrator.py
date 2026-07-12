@@ -24,6 +24,7 @@ from sim_engine.signaling.models import SafetyStatus
 from sim_engine.signaling.three_stage import ThreeStageController
 from sim_engine.signaling.timetable_loader import load_timetable
 from sim_engine.track.config import load_track
+from sim_engine.track.occupancy import OccupancyDetector
 from sim_engine.track.path_service import TrackPathService
 from sim_engine.vehicle.config import load_vehicle_params
 from sim_engine.vehicle.dynamics import VehicleSystem, effective_speed_limit_kmh
@@ -44,6 +45,7 @@ class Orchestrator:
     clock: SimulationClock
     sim_params: SimulationParams
     power_network: PowerNetwork = field(default_factory=PowerNetwork)
+    occupancy: OccupancyDetector = field(default_factory=lambda: OccupancyDetector([]))
     recorder: DataRecorder = field(default_factory=DataRecorder)
     train_id: str = "TRAIN_01"
     train_state: TrainState | None = None
@@ -59,6 +61,7 @@ class Orchestrator:
         sim_params = load_simulation_params(config_dir / "simulation.yaml")
         vehicle = VehicleSystem(load_vehicle_params(config_dir / "vehicle.yaml"))
         track = TrackPathService(load_track(config_dir / "track.yaml"))
+        occupancy = OccupancyDetector(track.track.circuits)
         timetable = load_timetable(config_dir / "timetable.yaml")
         ats = ATSController(sim_params.signal.ats, timetable)
         atp = ATPController(sim_params.signal.atp)
@@ -93,6 +96,7 @@ class Orchestrator:
             clock=clock,
             sim_params=sim_params,
             power_network=power_network,
+            occupancy=occupancy,
         )
 
     def set_snapshot_callback(self, callback: Callable[[dict], None]) -> None:
@@ -107,6 +111,7 @@ class Orchestrator:
         self.clock.reset()
         self.recorder.clear()
         self.signaling.reset()
+        self.occupancy.update({})  # 清空所有区段占用
         self.train_state = self.vehicle.create_initial_state(
             position=0.0, passenger_load=passenger_load
         )
@@ -177,6 +182,9 @@ class Orchestrator:
             )
         )
 
+        # ── 轨道区段占用检测 ──
+        self.occupancy.update({self.train_id: result.state.position})
+
         # ── 供电计算 ──
         v_ms = result.state.speed / 3.6 if result.state.speed > 0 else 0.0
         power_mode = self.sim_params.power.mode
@@ -244,6 +252,7 @@ class Orchestrator:
             power_demand=power_demand,
             voltage_profile=voltage_profile,
             substation_states=substation_states,
+            occupancy=self.occupancy.occupancy_list(),
             signaling_extra={
                 "runningPhase": running_phase,
                 "speedLimits": [{

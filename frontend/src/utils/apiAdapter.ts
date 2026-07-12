@@ -4,6 +4,7 @@ import type {
   SimulationParams,
   SimulationSnapshot,
   SimulationStats,
+  TrackCircuit,
   TrainState,
 } from '../types/simulation';
 
@@ -86,7 +87,18 @@ export function parseServerSnapshot(raw: ApiSimulationSnapshot): SimulationSnaps
       emergency_brake: [],
       train_intervals: [],
     },
-    track: { occupancy: [], switch_states: [] },
+    track: {
+      occupancy: ((raw.track?.occupancy ?? []) as Record<string, unknown>[]).map(
+        (o): TrackCircuit => ({
+          id: String(o.circuitId ?? ''),
+          start_chainage: Number(o.startChainage ?? 0),
+          end_chainage: Number(o.endChainage ?? 0),
+          direction: (o.direction as TrackCircuit['direction']) ?? 'down',
+          occupied: Boolean(o.occupied),
+        }),
+      ),
+      switch_states: [],
+    },
     events: raw.events ?? [],
   };
 }
