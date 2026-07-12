@@ -27,11 +27,29 @@ main              ← 生产分支（只合并不直接开发）
   └── dev         ← 开发集成分支（日常开发基准，从此迁出功能分支）
 ```
 
+### 核心原则：保持提交历史线性整洁
+
+**禁止产生 merge commit（合并节点）**。以下所有可能产生 merge 节点的操作，均必须使用变基（rebase）方式合并：
+
+| 场景 | 要求 |
+|------|------|
+| 拉取远程 `dev` 分支更新 | 必须使用 `git pull --rebase origin dev`（或 `git pull --ff-only`） |
+| 功能分支合并回 `dev` | 使用 `git rebase dev` + `git checkout dev && git merge --ff-only <分支>` |
+| 更新功能分支基准 | 使用 `git rebase dev`，不得使用 `git merge dev` |
+| 任何分支间合并 | 一律使用 rebase + --ff-only，禁止产生 merge commit |
+
 **当开发新功能时：**
 1. 从 `dev` 分支迁出新分支，命名规则：`feat/<简短描述>` 或 `fix/<简短描述>`
 2. 在功能分支上完成多次连续提交
-3. 功能开发完成后，**调用 finishing-a-development-branch skill** 来处理合并
-4. 合并回 `dev` 后，**删除**新创建的功能分支（不保留）
+3. 开发期间如需同步 `dev` 上的更新，执行：
+   ```bash
+   git fetch origin dev
+   git rebase origin/dev
+   ```
+4. 功能开发完成后，**调用 finishing-a-development-branch skill** 来处理合并
+5. 合并回 `dev` 后，**删除**新创建的功能分支（不保留）
+
+> **注意**：`git pull` 默认行为是 `fetch + merge`，会产生 merge commit。**始终使用 `git pull --rebase`** 或先 `git fetch` 再 `git rebase`。
 
 ## 必须使用的 Skills（技能）
 
