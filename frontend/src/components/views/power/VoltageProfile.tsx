@@ -3,7 +3,7 @@
  * 基于《需求文档》UI-PWR-01
  * 全线电压曲线，标示变电所位置和列车当前位置
  */
-import { useMemo, useRef } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { axisTooltip } from '../../../utils/format';
@@ -19,34 +19,74 @@ export default function VoltageProfile() {
   const trainVoltage = trains[0]?.pantograph_voltage;
   const totalLength = lineLayout?.total_length ?? 3200;
 
-  // 新仿真启动时清空上一次的曲线（仅 idle/stopped → running，不含 resumed）
-  if ((prevRunState === 'idle' || prevRunState === 'stopped') && runState === 'running') {
-    accumulatedCache = [];
-  }
-  prevRunState = runState;
+  // 用版本号触发 React 重新渲染
+  const [tick, setTick] = useState(0);
+  const scheduleTick = useCallback(() => setTick(t => t + 1), []);
 
-  if (power.voltage_profile.length > 0) {
+  // 新仿真启动时清空上一次的曲线（仅 idle/stopped → running，不含 resumed）
+  useEffect(() => {
+    if ((prevRunState === 'idle' || prevRunState === 'stopped') && runState === 'running') {
+      accumulatedCache = [];
+      scheduleTick();
+    }
+    prevRunState = runState;
+  }, [runState, scheduleTick]);
+
+  // 累积新数据点（在 effect 中执行，避免渲染期间触发无限循环）
+  useEffect(() => {
+    if (power.voltage_profile.length === 0) return;
     const newPoint = power.voltage_profile[0];
     const last = accumulatedCache[accumulatedCache.length - 1];
     if (!last || last.chainage !== newPoint.chainage || last.voltage !== newPoint.voltage) {
       accumulatedCache.push(newPoint);
-      if (accumulatedCache.length > 2000) {
-        accumulatedCache.shift();
+      scheduleTick();
+    }
+  }, [power.voltage_profile, scheduleTick]);
+
+  // 按距离排序 + 去重，然后在前段补点填满空白区域
+  const voltageCurve = useMemo(() => {
+    if (accumulatedCache.length === 0) return power.voltage_profile;
+
+    // 排序 + 去重（用展开避免修改原数组）
+    const sorted = [...accumulatedCache].sort((a, b) => a.chainage - b.chainage);
+    const deduped: VoltagePoint[] = [];
+    for (const p of sorted) {
+      const last = deduped[deduped.length - 1];
+      if (!last || last.chainage !== p.chainage) deduped.push(p);
+    }
+
+    if (deduped.length === 0) return power.voltage_profile;
+
+    // 在第一个真实数据点之前填充插值点，确保从 0 开始有连续曲线
+    const firstPoint = deduped[0];
+    const fillPoints: VoltagePoint[] = [];
+    if (firstPoint.chainage > 0) {
+      const step = 50; // 每 50m 插一个点
+      let pos = 0;
+      while (pos < firstPoint.chainage) {
+        const t = pos / firstPoint.chainage;
+        const voltage = 1500 + (firstPoint.voltage - 1500) * t;
+        fillPoints.push({ chainage: pos, voltage: Math.round(voltage * 10) / 10 });
+        pos += step;
       }
     }
-  }
-
-  // 确保曲线始终从 0 公里处开始
-  const voltageCurve = accumulatedCache.length > 0
-    ? [{ chainage: 0, voltage: 1500 }, ...accumulatedCache]
-    : power.voltage_profile;
+    return [...fillPoints, ...deduped];
+  }, [power.voltage_profile, tick]);
 
   // 列车位置在 X 轴的百分比
   const trainPercent = totalLength > 0 && trainPosition != null
     ? (trainPosition / totalLength) * 100
     : null;
 
-  const option = useMemo(() => ({
+  const option = useMemo(() => {
+    // 动态 Y 轴：默认 1000-1600，数据超出时自动扩展
+    const voltages = voltageCurve.map(p => p.voltage);
+    const dataMin = voltages.length > 0 ? Math.min(...voltages) : 1500;
+    const dataMax = voltages.length > 0 ? Math.max(...voltages) : 1500;
+    const yMin = Math.floor(Math.min(1000, dataMin - 100) / 100) * 100;
+    const yMax = Math.ceil(Math.max(1600, dataMax + 100) / 100) * 100;
+
+    return {
     backgroundColor: 'transparent',
     animation: false,
     tooltip: {
@@ -69,8 +109,8 @@ export default function VoltageProfile() {
     yAxis: {
       type: 'value' as const,
       name: '电压 (V)',
-      min: 1000,
-      max: 1600,
+      min: yMin,
+      max: yMax,
       nameTextStyle: { color: '#a0a0a0' },
       axisLabel: { color: '#a0a0a0' },
       axisLine: { lineStyle: { color: '#2a2a4a' } },
@@ -79,7 +119,6 @@ export default function VoltageProfile() {
       {
         name: '接触网电压',
         type: 'line',
-        smooth: true,
         data: voltageCurve.map((p) => [p.chainage, p.voltage]),
         lineStyle: { color: '#faad14', width: 2 },
         itemStyle: { color: '#faad14' },
@@ -114,7 +153,8 @@ export default function VoltageProfile() {
         },
       },
     ],
-  }), [voltageCurve, power.substations, trainPosition, totalLength]);
+    };
+  }, [voltageCurve, power.substations, trainPosition, totalLength]);
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -123,7 +163,7 @@ export default function VoltageProfile() {
         <ReactECharts
           option={option}
           style={{ height: '100%' }}
-          notMerge={false}
+          notMerge={true}
         />
         {/* 列车标注：公里标 + 网压值 */}
         {trainPercent != null && trainVoltage != null && (
