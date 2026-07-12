@@ -4,6 +4,7 @@
  */
 import { useMemo } from 'react';
 import { useSimulationState } from '../../../context/SimulationContext';
+import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import { mockLineData } from '../../../data/mockLineData';
 import { MA_ENVELOPE_LENGTH } from '../../../utils/constants';
 import { getSignalPhaseLabel, resolveSignalPhase } from '../../../utils/format';
@@ -15,8 +16,8 @@ function pct(chainage: number, totalLength: number): string {
 }
 
 export default function MAChart() {
-  const { trains, signaling, lineLayout } = useSimulationState();
-  const train = trains[0];
+  const { signaling, lineLayout } = useSimulationState();
+  const train = useSelectedTrain();
   const stations = lineLayout?.stations ?? mockLineData.stations;
   const totalLength = lineLayout?.total_length ?? mockLineData.total_length;
 
@@ -30,7 +31,8 @@ export default function MAChart() {
     MA_ENVELOPE_LENGTH,
   );
   const envelopeWidth = Math.max(envelopeEnd - position, 0);
-  const cmd = signaling.commands[0];
+  const cmd = signaling.commands.find((c) => c.train_id === train?.id)
+    ?? signaling.commands[0];
 
   const targetStation = useMemo(() => {
     if (!train) return stations[stations.length - 1] ?? null;

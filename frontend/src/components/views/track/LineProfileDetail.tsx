@@ -6,6 +6,8 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
+import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
+import { trainColorByIndex } from '../../../utils/constants';
 import { mockLineData, mockSegmentParams } from '../../../data/mockLineData';
 import { useViewport, parseViewBox } from '../../../hooks/useViewport';
 import ViewportControls from '../overview/ViewportControls';
@@ -21,6 +23,7 @@ function computeInitialZoom(totalLength: number): number {
 
 export default function LineProfileDetail() {
   const { trains, lineLayout, profileSegments } = useSimulationState();
+  const focusTrain = useSelectedTrain();
 
   const stations = lineLayout?.stations ?? mockLineData.stations;
   const total_length = lineLayout?.total_length ?? mockLineData.total_length;
@@ -29,7 +32,7 @@ export default function LineProfileDetail() {
 
   const animRef = useRef<number>(0);
   const [displayPos, setDisplayPos] = useState(0);
-  const targetPos = trains[0]?.position ?? 0;
+  const targetPos = focusTrain?.position ?? 0;
 
   useEffect(() => {
     let running = true;
@@ -176,7 +179,7 @@ export default function LineProfileDetail() {
     [gradientData, speedLimitData, stationMarkLines, tunnelAreas, panX, xMax],
   );
 
-  const trainSpeed = trains[0]?.speed ?? 0;
+  const trainSpeed = focusTrain?.speed ?? 0;
 
   const visibleStations = useMemo(
     () => stations.filter((s) => s.chainage >= panX - 200 && s.chainage <= xMax + 200),
@@ -221,6 +224,15 @@ export default function LineProfileDetail() {
             preserveAspectRatio="none"
             style={{ flex: 1, height: '100%' }}
           >
+            {trains.map((tr, idx) => (
+              <circle
+                key={tr.id}
+                cx={tr.position}
+                cy={10}
+                r={tr.id === focusTrain?.id ? 5 : 4}
+                fill={trainColorByIndex(idx)}
+              />
+            ))}
             {visibleStations.map((s) => (
               <line key={s.id} x1={s.chainage} y1={4} x2={s.chainage} y2={14} stroke="#555" strokeWidth={1} />
             ))}

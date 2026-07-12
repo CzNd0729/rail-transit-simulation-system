@@ -3,13 +3,15 @@
  * 展示运行相位、紧急制动、ATS 时刻偏差
  */
 import { useSimulationState } from '../../../context/SimulationContext';
+import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import { getSignalPhaseLabel, resolveSignalPhase } from '../../../utils/format';
 import { resolveLatestDeviation } from '../../../utils/signalSelectors';
 
 export default function SignalStatusBar() {
-  const { trains, signaling } = useSimulationState();
-  const train = trains[0];
-  const cmd = signaling.commands[0];
+  const { signaling } = useSimulationState();
+  const train = useSelectedTrain();
+  const cmd = signaling.commands.find((c) => c.train_id === train?.id)
+    ?? signaling.commands[0];
   const phase = resolveSignalPhase(
     cmd?.running_phase,
     train?.mode,

@@ -4,7 +4,7 @@
 import { exportCSV } from '../../services/api';
 import { useSimulationState } from '../../context/SimulationContext';
 import { USE_MOCK } from '../../utils/constants';
-import { chartHistoryToCsv } from '../../utils/chartHistoryExport';
+import { chartHistoryToCsv, getAllTrainHistories } from '../../utils/chartHistoryExport';
 import RunSummaryPanel from './RunSummaryPanel';
 
 function downloadCsv(csvData: string) {
@@ -23,7 +23,7 @@ export default function ExportPanel() {
   const handleExportCSV = async () => {
     try {
       if (USE_MOCK) {
-        if (chartHistory.speedTime.length === 0) {
+        if (getAllTrainHistories(chartHistory).length === 0) {
           alert('暂无仿真数据，请先运行仿真');
           return;
         }

@@ -7,6 +7,8 @@ import type { TrainState, StationLayout } from '../../../types/simulation';
 interface TrainMarkerProps {
   train: TrainState;
   direction?: 'up' | 'down';
+  selected?: boolean;
+  onSelect?: () => void;
   stations?: StationLayout[];
   transitionLength?: number;
 }
@@ -71,14 +73,29 @@ function getTrackY(x: number, direction: 'up' | 'down', stations?: StationLayout
   return SEGMENT_Y[direction];
 }
 
-export default function TrainMarker({ train, direction = 'up', stations, transitionLength = 500 }: TrainMarkerProps) {
+export default function TrainMarker({
+  train,
+  direction = 'up',
+  selected = false,
+  onSelect,
+  stations,
+  transitionLength = 500,
+}: TrainMarkerProps) {
   const color = MODE_COLORS[train.mode] || '#999';
+  const stroke = selected ? '#ffffff' : 'transparent';
+  const strokeWidth = selected ? 1.5 : 0;
 
   // position 是列车车尾位置，车身向前延伸
   const trainStart = train.position;
 
   return (
-    <g>
+    <g
+      style={{ cursor: onSelect ? 'pointer' : undefined }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect?.();
+      }}
+    >
       {/* 6 节车厢，每节根据位置计算 Y 坐标 */}
       {Array.from({ length: CAR_COUNT }).map((_, i) => {
         const carX = trainStart + i * (CAR_LENGTH + CAR_GAP);
@@ -92,6 +109,8 @@ export default function TrainMarker({ train, direction = 'up', stations, transit
             width={CAR_LENGTH - CAR_GAP}
             height={TRAIN_HEIGHT}
             fill={color}
+            stroke={stroke}
+            strokeWidth={strokeWidth}
             rx={2}
           />
         );
@@ -122,7 +141,7 @@ export default function TrainMarker({ train, direction = 'up', stations, transit
             fill={color}
             fontWeight={600}
           >
-            {train.speed.toFixed(0)}km/h
+            {train.id} · {train.speed.toFixed(0)}km/h
           </text>
         );
       })()}

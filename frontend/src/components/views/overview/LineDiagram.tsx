@@ -3,7 +3,7 @@
  * 支持双向轨道渲染，进出站贝塞尔曲线过渡
  */
 import { useRef, useState, useCallback } from 'react';
-import { useSimulationState } from '../../../context/SimulationContext';
+import { useSimulationState, useSimulationDispatch } from '../../../context/SimulationContext';
 import { useViewport } from '../../../hooks/useViewport';
 import StationNode from './StationNode';
 import TrainMarker from './TrainMarker';
@@ -47,14 +47,17 @@ function generateTransitionPath(
 }
 
 export default function LineDiagram() {
-  const { trains, lineLayout } = useSimulationState();
+  const { trains, lineLayout, selectedTrainId } = useSimulationState();
+  const dispatch = useSimulationDispatch();
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [selectedStation, setSelectedStation] = useState<string | null>(null);
   const [cardPosition, setCardPosition] = useState({ x: 0, y: 0 });
 
-  const trainPosition = trains[0]?.position;
+  const focusTrain =
+    trains.find((t) => t.id === selectedTrainId) ?? trains[0];
+  const trainPosition = focusTrain?.position;
   const totalLength = lineLayout?.total_length ?? 3200;
 
   // 动态计算过渡区长度
@@ -237,7 +240,11 @@ export default function LineDiagram() {
           <TrainMarker
             key={train.id}
             train={train}
-            direction="up" // TODO: 从 train 对象获取 direction
+            direction={train.direction}
+            selected={train.id === (selectedTrainId ?? trains[0]?.id)}
+            onSelect={() =>
+              dispatch({ type: 'SET_SELECTED_TRAIN', payload: train.id })
+            }
             stations={lineLayout.stations}
             transitionLength={TRANSITION_LENGTH}
           />

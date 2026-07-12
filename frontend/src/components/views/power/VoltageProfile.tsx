@@ -6,6 +6,7 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
+import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import { axisTooltip } from '../../../utils/format';
 import type { VoltagePoint } from '../../../types/simulation';
 
@@ -14,9 +15,10 @@ let accumulatedCache: VoltagePoint[] = [];
 let prevRunState: string = 'idle';
 
 export default function VoltageProfile() {
-  const { power, trains, lineLayout, runState } = useSimulationState();
-  const trainPosition = trains[0]?.position;
-  const trainVoltage = trains[0]?.pantograph_voltage;
+  const { power, lineLayout, runState } = useSimulationState();
+  const train = useSelectedTrain();
+  const trainPosition = train?.position;
+  const trainVoltage = train?.pantograph_voltage;
   const totalLength = lineLayout?.total_length ?? 3200;
 
   // 用版本号触发 React 重新渲染

@@ -5,10 +5,12 @@
  */
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
+import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
 import { axisTooltip } from '../../../utils/format';
 
 export default function AccelTimeCurve() {
-  const { chartHistory, clock } = useSimulationState();
+  const { clock } = useSimulationState();
+  const chartHistory = useActiveChartHistory();
 
   const option = {
     backgroundColor: 'transparent',

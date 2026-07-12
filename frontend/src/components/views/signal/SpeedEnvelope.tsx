@@ -5,8 +5,10 @@
  */
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
+import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
 import { axisTooltip } from '../../../utils/format';
 import { resolveAtpSpeedLimit } from '../../../utils/signalSelectors';
+import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import type { ProfileSegment } from '../../../data/mvpLineLayout';
 
 function toStepData(
@@ -22,11 +24,12 @@ function toStepData(
 }
 
 export default function SpeedEnvelope() {
-  const { chartHistory, lineLayout, profileSegments, params, trains, signaling } = useSimulationState();
+  const { lineLayout, profileSegments, params, signaling } = useSimulationState();
+  const chartHistory = useActiveChartHistory();
+  const train = useSelectedTrain();
   const maxPos = lineLayout?.total_length ?? 3200;
   const segments = profileSegments ?? [];
   const ratio = params.signal.target_speed_ratio ?? 0.85;
-  const train = trains[0];
   const defaultLimit = segments.length > 0 ? segments[0].speed_limit : 80;
   const atpLimitKmh = resolveAtpSpeedLimit(
     signaling.speed_limits,

@@ -5,6 +5,7 @@
 import { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
+import { useActiveChartHistory, useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import { mockLineData } from '../../../data/mockLineData';
 import { axisTooltip } from '../../../utils/format';
 import { resolveLatestDeviation } from '../../../utils/signalSelectors';
@@ -77,12 +78,14 @@ function buildStationLabel(
 }
 
 export default function TimetableChart() {
-  const { chartHistory, lineLayout, trains, signaling } = useSimulationState();
+  const chartHistory = useActiveChartHistory();
+  const { lineLayout, signaling } = useSimulationState();
+  const train = useSelectedTrain();
   const stations = lineLayout?.stations ?? mockLineData.stations;
   const maxPos = lineLayout?.total_length ?? mockLineData.total_length;
   const deviation = resolveLatestDeviation(
     signaling.timetable_deviations,
-    trains[0]?.id ?? 'TRAIN_01',
+    train?.id ?? 'TRAIN_01',
   );
 
   const xMax = useMemo(

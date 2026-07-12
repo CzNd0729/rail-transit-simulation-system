@@ -4,11 +4,12 @@
  * 4 个小卡片：当前速度、网压、工况、距站台距离
  */
 import { useSimulationState } from '../../../context/SimulationContext';
+import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import { formatSpeed, formatVoltage, getModeLabel, getModeColor } from '../../../utils/format';
 
 export default function StatusCards() {
-  const { trains, lineLayout } = useSimulationState();
-  const train = trains[0]; // 默认显示第一列车
+  const { lineLayout } = useSimulationState();
+  const train = useSelectedTrain();
 
   // 距站台距离显示
   let distanceText = '--';
