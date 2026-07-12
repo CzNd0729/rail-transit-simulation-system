@@ -265,3 +265,11 @@ line:
     - { id: TC21, start_chainage: 15900, end_chainage: 16900, direction: "down" }
     - { id: TC22, start_chainage: 16900, end_chainage: 17700, direction: "down" }
     - { id: TC23, start_chainage: 17700, end_chainage: 18600, direction: "down" }
+
+  # ── 道岔配置（TRK-06）────────────────────────────────
+  # 4 组道岔：两端折返 + 中间关键站侧线
+  switches:
+    - { id: SW01, chainage: 50,    switch_type: crossover, normal_direction: main, reverse_direction: siding, lateral_speed_limit: 30, state: normal }
+    - { id: SW02, chainage: 7300,  switch_type: single,    normal_direction: main, reverse_direction: siding, lateral_speed_limit: 30, state: normal }
+    - { id: SW03, chainage: 15900, switch_type: single,    normal_direction: main, reverse_direction: siding, lateral_speed_limit: 30, state: normal }
+    - { id: SW04, chainage: 18550, switch_type: crossover, normal_direction: main, reverse_direction: siding, lateral_speed_limit: 30, state: normal }

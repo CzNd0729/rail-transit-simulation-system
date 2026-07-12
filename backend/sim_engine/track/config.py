@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from .models import Segment, Station, Track, TrackCircuit
+from .models import Segment, Station, Switch, Track, TrackCircuit
 
 
 def load_track(path: str | Path) -> Track:
@@ -46,10 +46,23 @@ def load_track(path: str | Path) -> Track:
         )
         for c in data.get("track_circuits", [])
     ]
+    switches = [
+        Switch(
+            id=s["id"],
+            chainage=float(s["chainage"]),
+            switch_type=str(s.get("switch_type", "single")),
+            normal_direction=str(s.get("normal_direction", "main")),
+            reverse_direction=str(s.get("reverse_direction", "siding")),
+            lateral_speed_limit=float(s.get("lateral_speed_limit", 30.0)),
+            state=str(s.get("state", "normal")),
+        )
+        for s in data.get("switches", [])
+    ]
     return Track(
         name=data.get("name", "线路"),
         direction=str(data.get("direction", "down")),
         stations=stations,
         segments=segments,
         circuits=circuits,
+        switches=switches,
     )
