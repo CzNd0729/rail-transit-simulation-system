@@ -11,6 +11,7 @@
 import { useSimulationState, useSimulationDispatch } from '../context/SimulationContext';
 import { formatSimTime } from '../utils/format';
 import { VIEW_CONFIG } from '../utils/constants';
+import TrainSelector from '../components/common/TrainSelector';
 import type { ViewType } from '../types/simulation';
 
 export default function TopBar() {
@@ -46,8 +47,9 @@ export default function TopBar() {
         )}
       </nav>
 
-      {/* 右侧：仿真时钟 + 连接状态 */}
+      {/* 右侧：列车选择 + 仿真时钟 + 连接状态 */}
       <div style={styles.right}>
+        <TrainSelector />
         <span style={styles.clock}>⏱ {formatSimTime(clock.elapsed)}</span>
         <span style={styles.multiplier}>{clock.speed_multiplier}×</span>
         <span

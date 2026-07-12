@@ -102,6 +102,9 @@ export interface TractionCurvePoint {
   sort_order: number;
 }
 
+/** 列车运行方向（线路图上下行分轨） */
+export type TrainDirection = 'up' | 'down';
+
 /** 列车实时状态 */
 export interface TrainState {
   id: string;
@@ -117,6 +120,7 @@ export interface TrainState {
   power_demand: number;       // 功率请求 (kW)
   distance_to_station: number; // 距目标站距离 (m)
   target_station_id: string;   // 目标站 ID
+  direction: TrainDirection;   // 运行方向（上行/下行分轨）
   fault_alarm: FaultAlarm | null;
 }
 
@@ -202,11 +206,20 @@ export interface TimetableDeviationEntry {
   adjusted_dwell: number;
 }
 
+/** SIG-07 追踪间隔（后端 trainIntervals） */
+export interface TrainTrackingInterval {
+  train_id: string;
+  leading_train_id: string;
+  interval_m: number;
+  min_interval_m: number;
+  safe: boolean;
+}
+
 /** 信号状态 */
 export interface SignalState {
   commands: SignalCommand[];
   emergency_brake: EmergencyBrakeCommand[];
-  train_intervals: number[];   // 各列车发车间隔 (s)
+  train_intervals: TrainTrackingInterval[];
   ma_profiles: MaProfileEntry[];
   speed_limits: SpeedLimitEntry[];
   timetable_deviations: TimetableDeviationEntry[];
@@ -306,13 +319,18 @@ export interface SimulationStats {
 
 // ==================== 图表历史缓冲 ====================
 
-/** 实时曲线历史数据（前端累积，供 ECharts 绘制） */
-export interface ChartHistory {
+/** 单列车曲线历史 */
+export interface TrainChartHistory {
   speedTime: [number, number][];       // [时间s, 速度km/h]
   accelTime: [number, number][];       // [时间s, 加速度m/s²]
   jerkTime: [number, number][];        // [时间s, 冲击率m/s³]
   speedPosition: [number, number][];   // [位置m, 速度km/h]
   positionTime: [number, number][];    // [时间s, 位置m] — UI-SIG-03 运行图
+}
+
+/** 实时曲线历史数据（按列车 ID 分桶，供多车视图与选中车详情） */
+export interface ChartHistory {
+  byTrain: Record<string, TrainChartHistory>;
 }
 
 // ==================== Mock 回放数据 ====================
@@ -377,6 +395,8 @@ export interface AppState {
   clock: SimulationClock;
   /** 列车状态列表 */
   trains: TrainState[];
+  /** 详情视图当前选中的列车 ID */
+  selectedTrainId: string | null;
   /** 供电状态 */
   power: PowerState;
   /** 信号状态 */
@@ -426,6 +446,7 @@ export interface ApiTrainState {
   doorStatus: DoorStatus;
   distanceToStation: number;
   targetStationId: string;
+  direction?: TrainDirection;
   faultAlarm: FaultAlarm | null;
 }
 
@@ -481,6 +502,13 @@ export interface ApiSimulationSnapshot {
       delayArrival: number;
       nominalDwell: number;
       adjustedDwell: number;
+    }>;
+    trainIntervals?: Array<{
+      trainId: string;
+      leadingTrainId: string;
+      intervalM: number;
+      minIntervalM: number;
+      safe: boolean;
     }>;
   };
   track: { occupancy: unknown[]; switchStates: unknown[] };

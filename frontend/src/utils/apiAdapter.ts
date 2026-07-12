@@ -43,6 +43,7 @@ function mapTrain(t: ApiSimulationSnapshot['trains'][0]): TrainState {
     power_demand: t.powerDemand,
     distance_to_station: t.distanceToStation ?? 0,
     target_station_id: t.targetStationId ?? '',
+    direction: t.direction ?? 'up',
     fault_alarm: t.faultAlarm,
   };
 }
@@ -85,6 +86,18 @@ function mapTimetableDeviation(
   };
 }
 
+function mapTrainInterval(
+  entry: NonNullable<ApiSimulationSnapshot['signaling']['trainIntervals']>[0],
+) {
+  return {
+    train_id: entry.trainId,
+    leading_train_id: entry.leadingTrainId,
+    interval_m: entry.intervalM,
+    min_interval_m: entry.minIntervalM,
+    safe: entry.safe,
+  };
+}
+
 export function parseServerSnapshot(raw: ApiSimulationSnapshot): SimulationSnapshot {
   const controlCommands = raw.signaling?.controlCommands ?? [];
   return {
@@ -114,7 +127,7 @@ export function parseServerSnapshot(raw: ApiSimulationSnapshot): SimulationSnaps
     signaling: {
       commands: controlCommands.map(mapControlCommand),
       emergency_brake: [],
-      train_intervals: [],
+      train_intervals: (raw.signaling?.trainIntervals ?? []).map(mapTrainInterval),
       ma_profiles: (raw.signaling?.maProfile ?? []).map(mapMaProfile),
       speed_limits: (raw.signaling?.speedLimits ?? []).map(mapSpeedLimit),
       timetable_deviations: (raw.signaling?.timetableDeviation ?? []).map(mapTimetableDeviation),

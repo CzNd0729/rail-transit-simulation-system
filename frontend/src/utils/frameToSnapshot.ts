@@ -37,6 +37,7 @@ export function frameToSnapshot(
       power_demand: frame.power_demand,
       distance_to_station: frame.distance_to_station ?? 0,
       target_station_id: frame.target_station_id ?? '',
+      direction: 'up',
       fault_alarm: null,
     }],
     power: {
