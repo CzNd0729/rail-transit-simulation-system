@@ -13,14 +13,14 @@ from typing import Callable
 from sim_engine.core.clock import RunState, SimulationClock
 from sim_engine.core.config import SimulationParams, load_simulation_params
 from sim_engine.data.recorder import DataRecorder, StepRecord
-from sim_engine.data.snapshot import build_simulation_snapshot
+from sim_engine.data.snapshot import TrainSnapshotEntry, build_simulation_snapshot
 from sim_engine.power.load_flow import PowerFlowResult, PowerNetwork, calculate
 from sim_engine.power.regeneration import calculate_regen_power, calculate_traction_power
 from sim_engine.power.substation import Substation
 from sim_engine.signaling.atp import ATPController
 from sim_engine.signaling.ats import ATSController
 from sim_engine.signaling.manual_drive import ManualDriveController
-from sim_engine.signaling.models import SafetyStatus, Timetable
+from sim_engine.signaling.models import MaProfile, SafetyStatus, Timetable
 from sim_engine.signaling.three_stage import ThreeStageController
 from sim_engine.signaling.timetable_loader import load_timetable
 from sim_engine.track.config import load_track
@@ -50,7 +50,7 @@ class TrainRun:
 
 @dataclass
 class Orchestrator:
-    """仿真编排器（支持同向多列车，step_once 仍按首车步进直至 Task 3）。"""
+    """仿真编排器（同向多列车步进与 snapshot）。"""
 
     vehicle: VehicleSystem
     track: TrackPathService
@@ -209,107 +209,56 @@ class Orchestrator:
     def stop(self) -> None:
         self.run_state = RunState.STOPPED
 
-    def step_once(self) -> dict | None:
-        """推进一个仿真步（ENG-06 单步调试）。暂停/空闲时也可强制调用。"""
-        if self.train_state is None:
-            self.reset()
-        assert self.train_state is not None
+    def _spawn_trains(self, elapsed: float) -> None:
+        """按发车间隔激活尚未发车的列车。"""
+        for run in self.trains:
+            if run.active or elapsed < run.spawn_time:
+                continue
+            passenger_load = run.state.passenger_load
+            run.state = self.vehicle.create_initial_state(
+                position=0.0, passenger_load=passenger_load
+            )
+            run.signaling.reset()
+            run.active = True
 
-        dt = self.clock.time_step
-        elapsed = self.clock.elapsed
-        track_params = self.track.query_at(self.train_state.position)
+    def _step_train(
+        self,
+        run: TrainRun,
+        dt: float,
+        elapsed: float,
+    ) -> tuple[StepResult, ControlCommands, float, MaProfile, list[dict], float]:
+        """步进单列车，返回动力学结果与 signaling 快照片段。"""
+        track_params = self.track.query_at(run.state.position)
         speed_limit = effective_speed_limit_kmh(track_params, self.vehicle.params)
-        cmd = self.signaling.compute_commands(self.train_state, dt, elapsed=elapsed)
-        if self.atp.check_overspeed(self.train_state.speed, speed_limit) == SafetyStatus.EMERGENCY_BRAKE:
+        cmd = run.signaling.compute_commands(run.state, dt, elapsed=elapsed)
+        if self.atp.check_overspeed(run.state.speed, speed_limit) == SafetyStatus.EMERGENCY_BRAKE:
             cmd = ControlCommands(
                 traction_level=0.0,
                 brake_level=0.0,
                 emergency_brake=True,
-                phase=cmd.phase or self.signaling.signal_state.phase.value,
+                phase=cmd.phase or run.signaling.signal_state.phase.value,
             )
-        cmd = self.manual_driver.get_commands(cmd)  # 手动指令叠加（紧急制动覆盖）
+        cmd = run.manual_driver.get_commands(cmd)
         result = self.vehicle.step(
-            self.train_state, cmd, track_params, dt, self.sim_params.pid.max_jerk
+            run.state, cmd, track_params, dt, self.sim_params.pid.max_jerk
         )
-        self.train_state = result.state
-        self.last_step = result
+        run.state = result.state
+        run.last_step = result
 
-        # 复制信号系统的距站距离到 TrainState（供 snapshot 输出）
-        sig_st = self.signaling.signal_state
-        self.train_state.distance_to_station = sig_st.distance_to_station
-        self.train_state.target_station_id = sig_st.target_station_id
+        sig_st = run.signaling.signal_state
+        run.state.distance_to_station = sig_st.distance_to_station
+        run.state.target_station_id = sig_st.target_station_id
 
-        self.clock.tick()
-
-        self.recorder.record(
-            StepRecord(
-                time=self.clock.elapsed,
-                position=result.state.position,
-                speed=result.state.speed,
-                acceleration=result.state.acceleration,
-                jerk=result.state.jerk,
-                mode=result.state.mode,
-                traction_force=result.forces.traction,
-                brake_force=result.forces.brake,
-                total_resistance=result.forces.resistance_total,
-            )
-        )
-
-        # ── 轨道区段占用检测 ──
-        self.occupancy.update({self.train_id: result.state.position})
-
-        # ── 道岔转换时延推进 ──
-        self.switch_manager.update(dt)
-
-        # ── 供电计算 ──
-        v_ms = result.state.speed / 3.6 if result.state.speed > 0 else 0.0
-        power_mode = self.sim_params.power.mode
-
-        # 计算列车功率需求
-        if result.forces.traction > 0:
-            power_demand = calculate_traction_power(result.forces.traction, v_ms)
-        elif result.forces.brake > 0:
-            # 再生制动功率（负值表示回馈，不模拟吸收）
-            power_demand = -calculate_regen_power(
-                result.forces.brake, v_ms,
-                self.vehicle.params.regeneration_efficiency,
-            )
-        else:
-            power_demand = 0.0
-
-        if power_mode == "simple_ohm":
-            power_flow: PowerFlowResult = calculate(
-                self.power_network,
-                result.state.position,
-                power_demand,
-            )
-            pantograph_voltage = power_flow.pantograph_voltage
-            substation_states = power_flow.substation_states
-        else:
-            # "fixed" 模式：固定网压
-            from sim_engine.power.static_power import get_pantograph_voltage
-
-            pantograph_voltage = get_pantograph_voltage()
-            substation_states = []
-
-        # 电压曲线采样点（当前时刻列车位置与网压）
-        voltage_profile = [
-            {
-                "chainage": result.state.position,
-                "voltage": pantograph_voltage,
-            }
-        ]
-
-        running_phase = cmd.phase or sig_st.phase.value
         target_chainage = (
             self.track.get_station_chainage(sig_st.target_station_id)
             if sig_st.target_station_id
             else None
         )
-        ma = self.atp.build_ma_profile(self.train_id, self.train_state.position, target_chainage)
+        ma = self.atp.build_ma_profile(run.train_id, run.state.position, target_chainage)
+
         timetable_dev: list[dict] = []
-        if self.ats.last_deviation is not None:
-            d = self.ats.last_deviation
+        if run.ats.last_deviation is not None:
+            d = run.ats.last_deviation
             timetable_dev = [{
                 "trainId": d.train_id,
                 "stationId": d.station_id,
@@ -318,41 +267,141 @@ class Orchestrator:
                 "adjustedDwell": d.adjusted_dwell,
             }]
 
+        v_ms = result.state.speed / 3.6 if result.state.speed > 0 else 0.0
+        if result.forces.traction > 0:
+            power_demand = calculate_traction_power(result.forces.traction, v_ms)
+        elif result.forces.brake > 0:
+            power_demand = -calculate_regen_power(
+                result.forces.brake,
+                v_ms,
+                self.vehicle.params.regeneration_efficiency,
+            )
+        else:
+            power_demand = 0.0
+
+        return result, cmd, speed_limit, ma, timetable_dev, power_demand
+
+    def step_once(self) -> dict | None:
+        """推进一个仿真步（ENG-06 单步调试）。暂停/空闲时也可强制调用。"""
+        if not self.trains:
+            self.reset()
+        assert self.trains
+
+        dt = self.clock.time_step
+        elapsed = self.clock.elapsed
+        self._spawn_trains(elapsed)
+
+        active_runs = [r for r in self.trains if r.active]
+        if not active_runs:
+            return None
+
+        step_outputs: list[
+            tuple[TrainRun, StepResult, ControlCommands, float, MaProfile, list[dict], float]
+        ] = []
+        for run in active_runs:
+            result, cmd, speed_limit, ma, timetable_dev, power_demand = self._step_train(
+                run, dt, elapsed
+            )
+            step_outputs.append(
+                (run, result, cmd, speed_limit, ma, timetable_dev, power_demand)
+            )
+
+        self.clock.tick()
+
+        leading = max(active_runs, key=lambda r: r.state.position)
+        lead_result = leading.last_step
+        assert lead_result is not None
+        self.recorder.record(
+            StepRecord(
+                time=self.clock.elapsed,
+                position=lead_result.state.position,
+                speed=lead_result.state.speed,
+                acceleration=lead_result.state.acceleration,
+                jerk=lead_result.state.jerk,
+                mode=lead_result.state.mode,
+                traction_force=lead_result.forces.traction,
+                brake_force=lead_result.forces.brake,
+                total_resistance=lead_result.forces.resistance_total,
+            )
+        )
+
+        self.occupancy.update({r.train_id: r.state.position for r in active_runs})
+        self.switch_manager.update(dt)
+
+        total_power_demand = sum(item[6] for item in step_outputs)
+        power_mode = self.sim_params.power.mode
+        sample_position = leading.state.position
+
+        if power_mode == "simple_ohm":
+            power_flow: PowerFlowResult = calculate(
+                self.power_network,
+                sample_position,
+                total_power_demand,
+            )
+            pantograph_voltage = power_flow.pantograph_voltage
+            substation_states = power_flow.substation_states
+        else:
+            from sim_engine.power.static_power import get_pantograph_voltage
+
+            pantograph_voltage = get_pantograph_voltage()
+            substation_states = []
+
+        voltage_profile = [
+            {"chainage": sample_position, "voltage": pantograph_voltage}
+        ]
+
+        train_entries: list[TrainSnapshotEntry] = []
+        control_commands: list[dict] = []
+        speed_limits: list[dict] = []
+        ma_profiles: list[dict] = []
+        timetable_deviations: list[dict] = []
+
+        for run, result, cmd, speed_limit, ma, timetable_dev, train_power in step_outputs:
+            sig_st = run.signaling.signal_state
+            running_phase = cmd.phase or sig_st.phase.value
+            train_entries.append(
+                TrainSnapshotEntry(
+                    train_id=run.train_id,
+                    state=result.state,
+                    forces=result.forces,
+                    pantograph_voltage=pantograph_voltage,
+                    power_demand=train_power,
+                )
+            )
+            control_commands.append({
+                "trainId": run.train_id,
+                "tractionLevel": cmd.traction_level,
+                "brakeLevel": cmd.brake_level,
+                "emergencyBrake": cmd.emergency_brake,
+                "runningPhase": running_phase,
+            })
+            speed_limits.append({
+                "trainId": run.train_id,
+                "permanentLimit": speed_limit,
+                "atpLimit": self.atp.atp_speed_limit(speed_limit),
+            })
+            ma_profiles.append({
+                "trainId": ma.train_id,
+                "maEndChainage": ma.ma_end_chainage,
+                "safetyDistance": ma.safety_distance,
+            })
+            timetable_deviations.extend(timetable_dev)
+
         snapshot = build_simulation_snapshot(
             self.clock,
             self.sim_params,
-            self.train_id,
-            result.state,
-            result.forces,
-            pantograph_voltage=pantograph_voltage,
-            power_demand=power_demand,
+            train_entries,
             voltage_profile=voltage_profile,
             substation_states=substation_states,
             occupancy=self.occupancy.occupancy_list(),
             switch_states=self.switch_manager.switch_list(),
             signaling_extra={
-                "runningPhase": running_phase,
-                "speedLimits": [{
-                    "trainId": self.train_id,
-                    "permanentLimit": speed_limit,
-                    "atpLimit": self.atp.atp_speed_limit(speed_limit),
-                }],
-                "maProfile": [{
-                    "trainId": ma.train_id,
-                    "maEndChainage": ma.ma_end_chainage,
-                    "safetyDistance": ma.safety_distance,
-                }],
-                "timetableDeviation": timetable_dev,
+                "controlCommands": control_commands,
+                "speedLimits": speed_limits,
+                "maProfile": ma_profiles,
+                "timetableDeviation": timetable_deviations,
             },
         )
-        # 写入本步实际控车指令
-        snapshot["data"]["signaling"]["controlCommands"][0].update({
-            "trainId": self.train_id,
-            "tractionLevel": cmd.traction_level,
-            "brakeLevel": cmd.brake_level,
-            "emergencyBrake": cmd.emergency_brake,
-            "runningPhase": running_phase,
-        })
         self.last_snapshot = snapshot
         if self._on_snapshot:
             self._on_snapshot(snapshot)

@@ -13,7 +13,7 @@ import pytest
 from sim_engine.core.clock import SimulationClock
 from sim_engine.core.config import SimulationParams
 from sim_engine.data.recorder import DataRecorder, StepRecord
-from sim_engine.data.snapshot import build_simulation_snapshot
+from sim_engine.data.snapshot import TrainSnapshotEntry, build_simulation_snapshot
 from sim_engine.vehicle.models import (
     ForceBreakdown,
     TrainState,
@@ -169,6 +169,10 @@ def test_export_csv_empty_buffer():
 
 # ── build_simulation_snapshot ────────────────────────────────────────
 
+def _entry(train_id: str, state: TrainState, forces: ForceBreakdown, **kwargs) -> list[TrainSnapshotEntry]:
+    return [TrainSnapshotEntry(train_id=train_id, state=state, forces=forces, **kwargs)]
+
+
 def test_snapshot_basic_structure():
     clock = SimulationClock(time_step=0.1, elapsed=5.0, speed_multiplier=2.0)
     sim_params = SimulationParams()
@@ -181,7 +185,7 @@ def test_snapshot_basic_structure():
         gradient=0.0, curve=0.0, tunnel=0.0,
         resistance_total=5000.0, net=95000.0,
     )
-    snap = build_simulation_snapshot(clock, sim_params, "TRAIN_01", state, forces)
+    snap = build_simulation_snapshot(clock, sim_params, _entry("TRAIN_01", state, forces))
     assert snap["type"] == "simulation_snapshot"
     assert snap["timestamp"] == 5.0
     assert "data" in snap
@@ -201,7 +205,7 @@ def test_snapshot_train_fields():
         gradient=1000.0, curve=0.0, tunnel=0.0,
         resistance_total=5000.0, net=-5000.0,
     )
-    snap = build_simulation_snapshot(clock, sim_params, "TRAIN_02", state, forces)
+    snap = build_simulation_snapshot(clock, sim_params, _entry("TRAIN_02", state, forces))
     train = snap["data"]["trains"][0]
     assert train["id"] == "TRAIN_02"
     assert train["position"] == 200.0
@@ -223,7 +227,7 @@ def test_snapshot_stopped_display_mode():
         mode="braking", mass=260000.0, passenger_load=0.6,
     )
     forces = ForceBreakdown(brake=350000.0)
-    snap = build_simulation_snapshot(clock, sim_params, "T1", state, forces)
+    snap = build_simulation_snapshot(clock, sim_params, _entry("T1", state, forces))
     assert snap["data"]["trains"][0]["mode"] == "stopped"
 
 
@@ -232,7 +236,7 @@ def test_snapshot_has_power_section():
     sim_params = SimulationParams()
     state = TrainState(mass=260000.0)
     forces = ForceBreakdown()
-    snap = build_simulation_snapshot(clock, sim_params, "T1", state, forces)
+    snap = build_simulation_snapshot(clock, sim_params, _entry("T1", state, forces))
     pwr = snap["data"]["power"]
     assert "substations" in pwr
     assert "voltageProfile" in pwr
@@ -245,7 +249,7 @@ def test_snapshot_has_signaling_section():
     sim_params = SimulationParams()
     state = TrainState(mass=260000.0)
     forces = ForceBreakdown()
-    snap = build_simulation_snapshot(clock, sim_params, "T1", state, forces)
+    snap = build_simulation_snapshot(clock, sim_params, _entry("T1", state, forces))
     sig = snap["data"]["signaling"]
     assert "controlCommands" in sig
     assert len(sig["controlCommands"]) == 1
@@ -256,7 +260,9 @@ def test_snapshot_custom_pantograph_voltage():
     sim_params = SimulationParams()
     state = TrainState(mass=260000.0)
     forces = ForceBreakdown()
-    snap = build_simulation_snapshot(clock, sim_params, "T1", state, forces, pantograph_voltage=1800.0)
+    snap = build_simulation_snapshot(
+        clock, sim_params, _entry("T1", state, forces, pantograph_voltage=1800.0)
+    )
     assert snap["data"]["trains"][0]["pantographVoltage"] == 1800.0
 
 
@@ -265,7 +271,7 @@ def test_snapshot_clock_fields():
     sim_params = SimulationParams()
     state = TrainState(mass=260000.0)
     forces = ForceBreakdown()
-    snap = build_simulation_snapshot(clock, sim_params, "T1", state, forces)
+    snap = build_simulation_snapshot(clock, sim_params, _entry("T1", state, forces))
     c = snap["data"]["clock"]
     assert c["elapsed"] == 123.45
     assert c["speedMultiplier"] == 5.0
@@ -276,7 +282,7 @@ def test_snapshot_passenger_count():
     sim_params = SimulationParams()
     state = TrainState(mass=260000.0, passenger_load=0.8)
     forces = ForceBreakdown()
-    snap = build_simulation_snapshot(clock, sim_params, "T1", state, forces)
+    snap = build_simulation_snapshot(clock, sim_params, _entry("T1", state, forces))
     # passengerCount = int(0.8 * 1500) = 1200
     assert snap["data"]["trains"][0]["passengerCount"] == 1200
 
@@ -289,11 +295,15 @@ def test_snapshot_signaling_extended_fields():
     snap = build_simulation_snapshot(
         clock,
         sim_params,
-        "TRAIN_01",
-        state,
-        forces,
+        _entry("TRAIN_01", state, forces),
         signaling_extra={
-            "runningPhase": "traction",
+            "controlCommands": [{
+                "trainId": "TRAIN_01",
+                "tractionLevel": 0.0,
+                "brakeLevel": 0.0,
+                "emergencyBrake": False,
+                "runningPhase": "traction",
+            }],
             "speedLimits": [{"trainId": "TRAIN_01", "permanentLimit": 80, "atpLimit": 76.0}],
             "maProfile": [{"trainId": "TRAIN_01", "maEndChainage": 1000.0, "safetyDistance": 300.0}],
             "timetableDeviation": [],

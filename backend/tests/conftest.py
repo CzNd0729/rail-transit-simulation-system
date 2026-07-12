@@ -9,5 +9,8 @@ from sim_engine.orchestrator import Orchestrator
 
 @pytest.fixture
 def orchestrator() -> Orchestrator:
-    """返回一个初始化的编排器实例（使用默认配置）。"""
-    return Orchestrator.from_config_dir()
+    """返回一个初始化的编排器实例（单车回归隔离）。"""
+    orch = Orchestrator.from_config_dir()
+    orch.sim_params.train_count = 1
+    orch.reset()
+    return orch
