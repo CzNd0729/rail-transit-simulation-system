@@ -189,6 +189,7 @@ export default function LineProfileDetail() {
         <span className="panel-title" style={{ margin: 0 }}>🏔️ 线路综合剖面图</span>
         <ViewportControls
           zoom={viewport.zoom}
+          maxZoom={viewport.maxZoom}
           followMode={viewport.followMode}
           onZoomChange={viewport.setZoom}
           onToggleFollow={viewport.toggleFollow}

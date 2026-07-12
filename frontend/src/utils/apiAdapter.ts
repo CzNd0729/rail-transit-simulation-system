@@ -57,6 +57,34 @@ function mapControlCommand(c: ApiControlCommand) {
   };
 }
 
+function mapMaProfile(entry: NonNullable<ApiSimulationSnapshot['signaling']['maProfile']>[0]) {
+  return {
+    train_id: entry.trainId,
+    ma_end_chainage: entry.maEndChainage,
+    safety_distance: entry.safetyDistance,
+  };
+}
+
+function mapSpeedLimit(entry: NonNullable<ApiSimulationSnapshot['signaling']['speedLimits']>[0]) {
+  return {
+    train_id: entry.trainId,
+    permanent_limit: entry.permanentLimit,
+    atp_limit: entry.atpLimit,
+  };
+}
+
+function mapTimetableDeviation(
+  entry: NonNullable<ApiSimulationSnapshot['signaling']['timetableDeviation']>[0],
+) {
+  return {
+    train_id: entry.trainId,
+    station_id: entry.stationId,
+    delay_arrival: entry.delayArrival,
+    nominal_dwell: entry.nominalDwell,
+    adjusted_dwell: entry.adjustedDwell,
+  };
+}
+
 export function parseServerSnapshot(raw: ApiSimulationSnapshot): SimulationSnapshot {
   const controlCommands = raw.signaling?.controlCommands ?? [];
   return {
@@ -87,6 +115,9 @@ export function parseServerSnapshot(raw: ApiSimulationSnapshot): SimulationSnaps
       commands: controlCommands.map(mapControlCommand),
       emergency_brake: [],
       train_intervals: [],
+      ma_profiles: (raw.signaling?.maProfile ?? []).map(mapMaProfile),
+      speed_limits: (raw.signaling?.speedLimits ?? []).map(mapSpeedLimit),
+      timetable_deviations: (raw.signaling?.timetableDeviation ?? []).map(mapTimetableDeviation),
     },
     track: {
       occupancy: ((raw.track?.occupancy ?? []) as Record<string, unknown>[]).map(

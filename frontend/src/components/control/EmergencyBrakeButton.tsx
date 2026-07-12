@@ -19,7 +19,6 @@ export default function EmergencyBrakeButton({ send, runState, speed }: Props) {
 
   const isRunning = runState === 'running';
   const isStopped = speed < 0.1;
-  const canDeactivate = activated && isStopped;
 
   const handleClick = () => {
     if (activated && !isStopped) return;  // 停稳前不可解除

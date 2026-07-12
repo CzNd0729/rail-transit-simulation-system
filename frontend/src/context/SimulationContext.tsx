@@ -15,14 +15,17 @@ import type {
 } from '../types/simulation';
 import type { ProfileSegment } from '../data/mvpLineLayout';
 import { DEFAULT_VEHICLE_PARAMS } from '../data/mockVehicleParams';
+import { EMPTY_SIGNAL_STATE } from '../types/simulation';
 import { EMPTY_CHART_HISTORY, appendChartHistory, clearChartHistory } from '../utils/chartHistory';
 import {
   extractVehicleParamBaselines,
   extractTrackParamBaselines,
   extractSignalParamBaselines,
+  extractPowerParamBaselines,
   extractTractionCurveBaselines,
   DEFAULT_TRACK_PARAMS,
   DEFAULT_SIGNAL_PARAMS,
+  DEFAULT_POWER_PARAMS,
 } from '../utils/paramStep';
 
 // ==================== 初始状态 ====================
@@ -40,11 +43,7 @@ export const initialState: AppState = {
     total_regeneration: 0,
     regeneration_rate: 0,
   },
-  signaling: {
-    commands: [],
-    emergency_brake: [],
-    train_intervals: [],
-  },
+  signaling: { ...EMPTY_SIGNAL_STATE },
   track: {
     occupancy: [],
     switch_states: [],
@@ -72,6 +71,7 @@ export const initialState: AppState = {
   vehicleParamBaselines: extractVehicleParamBaselines(DEFAULT_VEHICLE_PARAMS),
   trackParamBaselines: extractTrackParamBaselines(DEFAULT_TRACK_PARAMS),
   signalParamBaselines: extractSignalParamBaselines(DEFAULT_SIGNAL_PARAMS),
+  powerParamBaselines: extractPowerParamBaselines(DEFAULT_POWER_PARAMS),
   tractionCurveBaselines: extractTractionCurveBaselines(DEFAULT_VEHICLE_PARAMS.traction_curve),
 };
 
@@ -183,18 +183,20 @@ export function simulationReducer(state: AppState, action: SimulationAction): Ap
       const mergedVehicle = { ...DEFAULT_VEHICLE_PARAMS, ...action.payload.vehicle };
       const mergedTrack = { ...DEFAULT_TRACK_PARAMS, ...state.params.track, ...action.payload.track };
       const mergedSignal = { ...DEFAULT_SIGNAL_PARAMS, ...state.params.signal, ...action.payload.signal };
+      const mergedPower = { ...DEFAULT_POWER_PARAMS, ...state.params.power, ...action.payload.power };
       const mergedCurve = mergedVehicle.traction_curve ?? DEFAULT_VEHICLE_PARAMS.traction_curve;
       return {
         ...state,
         params: {
           vehicle: mergedVehicle,
           track: mergedTrack,
-          power: { ...state.params.power, ...action.payload.power },
+          power: mergedPower,
           signal: mergedSignal,
         },
         vehicleParamBaselines: extractVehicleParamBaselines(mergedVehicle),
         trackParamBaselines: extractTrackParamBaselines(mergedTrack),
         signalParamBaselines: extractSignalParamBaselines(mergedSignal),
+        powerParamBaselines: extractPowerParamBaselines(mergedPower),
         tractionCurveBaselines: extractTractionCurveBaselines(mergedCurve),
       };
     }

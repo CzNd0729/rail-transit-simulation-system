@@ -9,37 +9,36 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { axisTooltip } from '../../../utils/format';
 import type { VoltagePoint } from '../../../types/simulation';
 
+// 模块级缓存，组件切换时不丢失累积数据
+let accumulatedCache: VoltagePoint[] = [];
+let prevRunState: string = 'idle';
+
 export default function VoltageProfile() {
   const { power, trains, lineLayout, runState } = useSimulationState();
   const trainPosition = trains[0]?.position;
   const trainVoltage = trains[0]?.pantograph_voltage;
   const totalLength = lineLayout?.total_length ?? 3200;
 
-  // 累积后端每次推送的单个电压数据点，形成完整曲线
-  const accumulatedRef = useRef<VoltagePoint[]>([]);
   // 新仿真启动时清空上一次的曲线（仅 idle/stopped → running，不含 resumed）
-  const prevRunStateRef = useRef(runState);
-  if ((prevRunStateRef.current === 'idle' || prevRunStateRef.current === 'stopped') && runState === 'running') {
-    accumulatedRef.current = [];
+  if ((prevRunState === 'idle' || prevRunState === 'stopped') && runState === 'running') {
+    accumulatedCache = [];
   }
-  prevRunStateRef.current = runState;
+  prevRunState = runState;
 
   if (power.voltage_profile.length > 0) {
     const newPoint = power.voltage_profile[0];
-    // 避免重复添加同一点
-    const last = accumulatedRef.current[accumulatedRef.current.length - 1];
+    const last = accumulatedCache[accumulatedCache.length - 1];
     if (!last || last.chainage !== newPoint.chainage || last.voltage !== newPoint.voltage) {
-      accumulatedRef.current.push(newPoint);
-      // 限制最大点数防止内存泄漏
-      if (accumulatedRef.current.length > 2000) {
-        accumulatedRef.current.shift();
+      accumulatedCache.push(newPoint);
+      if (accumulatedCache.length > 2000) {
+        accumulatedCache.shift();
       }
     }
   }
 
   // 确保曲线始终从 0 公里处开始
-  const voltageCurve = accumulatedRef.current.length > 0
-    ? [{ chainage: 0, voltage: 1500 }, ...accumulatedRef.current]
+  const voltageCurve = accumulatedCache.length > 0
+    ? [{ chainage: 0, voltage: 1500 }, ...accumulatedCache]
     : power.voltage_profile;
 
   // 列车位置在 X 轴的百分比

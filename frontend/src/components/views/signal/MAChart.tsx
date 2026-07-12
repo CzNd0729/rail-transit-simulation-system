@@ -7,6 +7,7 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { mockLineData } from '../../../data/mockLineData';
 import { MA_ENVELOPE_LENGTH } from '../../../utils/constants';
 import { getSignalPhaseLabel, resolveSignalPhase } from '../../../utils/format';
+import { resolveMaEnvelope } from '../../../utils/signalSelectors';
 
 function pct(chainage: number, totalLength: number): string {
   if (totalLength <= 0) return '0%';
@@ -20,7 +21,14 @@ export default function MAChart() {
   const totalLength = lineLayout?.total_length ?? mockLineData.total_length;
 
   const position = train?.position ?? 0;
-  const envelopeEnd = Math.min(position + MA_ENVELOPE_LENGTH, totalLength);
+  const maEntry = signaling.ma_profiles.find((m) => m.train_id === train?.id)
+    ?? signaling.ma_profiles[0];
+  const { envelopeEnd, safetyDistance } = resolveMaEnvelope(
+    position,
+    totalLength,
+    maEntry,
+    MA_ENVELOPE_LENGTH,
+  );
   const envelopeWidth = Math.max(envelopeEnd - position, 0);
   const cmd = signaling.commands[0];
 
@@ -83,7 +91,7 @@ export default function MAChart() {
         <div style={styles.labelRow}>
           <span style={styles.stationLabel}>{startStation?.name ?? '起点'}</span>
           <span style={{ flex: 1, textAlign: 'center', color: '#1890ff', fontSize: 11 }}>
-            安全包络 {MA_ENVELOPE_LENGTH} m
+            安全包络 {safetyDistance.toFixed(0)} m
           </span>
           <span style={{ ...styles.stationLabel, color: '#52c41a' }}>
             {targetStation?.name ?? '终点'}
@@ -103,7 +111,8 @@ export default function MAChart() {
         {' · '}
         距目标站: {train ? `${train.distance_to_station.toFixed(0)} m` : '--'}
         {' · '}
-        安全包络: {MA_ENVELOPE_LENGTH} m
+        安全包络: {safetyDistance.toFixed(0)} m
+        {maEntry ? ' · 后端 MA' : ' · 固定包络'}
       </div>
     </div>
   );

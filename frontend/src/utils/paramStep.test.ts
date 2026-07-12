@@ -5,9 +5,11 @@ import {
   extractVehicleParamBaselines,
   extractTrackParamBaselines,
   extractSignalParamBaselines,
+  extractPowerParamBaselines,
   extractTractionCurveBaselines,
   DEFAULT_TRACK_PARAMS,
   DEFAULT_SIGNAL_PARAMS,
+  DEFAULT_POWER_PARAMS,
 } from './paramStep';
 import { DEFAULT_VEHICLE_PARAMS } from '../data/mockVehicleParams';
 
@@ -69,6 +71,18 @@ describe('extractParamBaselines', () => {
     const baselines = extractSignalParamBaselines(DEFAULT_SIGNAL_PARAMS);
     expect(baselines.dwell_time).toBe(30);
     expect(baselines.target_speed_ratio).toBe(0.8);
+  });
+
+  it('extracts power numeric fields', () => {
+    const baselines = extractPowerParamBaselines(DEFAULT_POWER_PARAMS);
+    expect(baselines.pantograph_voltage).toBe(1500);
+    expect(baselines.substation_capacity).toBe(5000);
+  });
+
+  it('computes 10% fixed steps for power params', () => {
+    const baselines = extractPowerParamBaselines(DEFAULT_POWER_PARAMS);
+    expect(computeFixedParamStep(baselines.pantograph_voltage!)).toBe(150);
+    expect(computeFixedParamStep(baselines.substation_capacity!)).toBe(500);
   });
 });
 

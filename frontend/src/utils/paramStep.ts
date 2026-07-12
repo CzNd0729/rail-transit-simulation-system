@@ -48,6 +48,20 @@ export const DEFAULT_SIGNAL_PARAMS = {
   target_speed_ratio: 0.8,
 } as const;
 
+/** 供电参数步进字段 */
+export const POWER_PARAM_STEP_KEYS = [
+  'pantograph_voltage',
+  'substation_capacity',
+] as const;
+
+export type PowerParamStepKey = (typeof POWER_PARAM_STEP_KEYS)[number];
+export type PowerParamBaselines = Partial<Record<PowerParamStepKey, number>>;
+
+export const DEFAULT_POWER_PARAMS = {
+  pantograph_voltage: 1500,
+  substation_capacity: 5000,
+} as const;
+
 /** 从对象提取指定数值字段作为步进基准 */
 export function extractParamBaselines<K extends string>(
   keys: readonly K[],
@@ -79,6 +93,12 @@ export function extractSignalParamBaselines(
   signal: Partial<Record<SignalParamStepKey, number>>,
 ): SignalParamBaselines {
   return extractParamBaselines(SIGNAL_PARAM_STEP_KEYS, signal);
+}
+
+export function extractPowerParamBaselines(
+  power: Partial<Record<PowerParamStepKey, number>>,
+): PowerParamBaselines {
+  return extractParamBaselines(POWER_PARAM_STEP_KEYS, power);
 }
 
 /** 牵引特性曲线各折点的步进基准（按索引锁定） */

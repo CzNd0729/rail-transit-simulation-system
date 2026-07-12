@@ -6,6 +6,7 @@
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { axisTooltip } from '../../../utils/format';
+import { resolveAtpSpeedLimit } from '../../../utils/signalSelectors';
 import type { ProfileSegment } from '../../../data/mvpLineLayout';
 
 function toStepData(
@@ -21,10 +22,17 @@ function toStepData(
 }
 
 export default function SpeedEnvelope() {
-  const { chartHistory, lineLayout, profileSegments, params } = useSimulationState();
+  const { chartHistory, lineLayout, profileSegments, params, trains, signaling } = useSimulationState();
   const maxPos = lineLayout?.total_length ?? 3200;
   const segments = profileSegments ?? [];
   const ratio = params.signal.target_speed_ratio ?? 0.85;
+  const train = trains[0];
+  const defaultLimit = segments.length > 0 ? segments[0].speed_limit : 80;
+  const atpLimitKmh = resolveAtpSpeedLimit(
+    signaling.speed_limits,
+    train?.id ?? 'TRAIN_01',
+    defaultLimit,
+  );
 
   const speedLimitData = segments.length > 0
     ? toStepData(segments, 'speed_limit')
@@ -37,11 +45,18 @@ export default function SpeedEnvelope() {
       ] as [number, number][])
     : ([[0, 80 * ratio], [maxPos, 80 * ratio]] as [number, number][]);
 
+  const atpLimitData = segments.length > 0
+    ? segments.flatMap((seg) => [
+        [seg.start_chainage, Math.min(seg.speed_limit, atpLimitKmh)],
+        [seg.end_chainage, Math.min(seg.speed_limit, atpLimitKmh)],
+      ] as [number, number][])
+    : ([[0, atpLimitKmh], [maxPos, atpLimitKmh]] as [number, number][]);
+
   const option = {
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis' as const, formatter: axisTooltip(1) },
     legend: {
-      data: ['区段限速', '目标速度', '实际速度'],
+      data: ['区段限速', 'ATP 限速', '目标速度', '实际速度'],
       textStyle: { color: '#a0a0a0', fontSize: 11 },
       top: 0,
     },
@@ -69,6 +84,14 @@ export default function SpeedEnvelope() {
         data: speedLimitData,
         lineStyle: { color: '#ff4d4f', type: 'dashed' as const, width: 1 },
         itemStyle: { color: '#ff4d4f' },
+        showSymbol: false,
+      },
+      {
+        name: 'ATP 限速',
+        type: 'line',
+        data: atpLimitData,
+        lineStyle: { color: '#eb2f96', type: 'dotted' as const, width: 1 },
+        itemStyle: { color: '#eb2f96' },
         showSymbol: false,
       },
       {
