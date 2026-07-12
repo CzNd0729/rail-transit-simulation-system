@@ -1,0 +1,776 @@
+"""
+司机台联动测试 — 协议编解码核心库
+=====================================
+实现 PLC 协议、网络屏协议、信号屏协议、信号系统 UDP 协议的
+报文打包（编码）与解析（解码）功能。
+"""
+
+import struct
+import logging
+from typing import Optional
+
+from .config import (
+    PLC_OFFSET, UPPER_OFFSET,
+    PLC_TO_UPPER_LEN, UPPER_TO_PLC_LEN,
+    NETWORK_SCREEN_LEN, SIGNAL_SCREEN_LEN,
+    ATP_SAFE_INPUT, ATP_NONSAFE_INPUT, ATO_NONSAFE_INPUT,
+    ATP_SAFE_OUTPUT, ATP_NONSAFE_OUTPUT, ATO_NONSAFE_OUTPUT,
+    TRACTION_BRAKE, TRAIN_DIRECTION,
+)
+
+logger = logging.getLogger(__name__)
+
+
+# ====================================================================
+# PLC 协议编解码
+# ====================================================================
+
+def pack_plc_to_upper(
+    train_id: int = 1,
+    speed_cm_s: int = 0,
+    accel: int = 0,
+    master_controller: int = 0,
+    brake_pressure: int = 0,
+    door_status: int = 0,
+    cab_active: int = 0,
+    key_status: int = 0,
+    eb_status: int = 0,
+    mode: int = 0,
+) -> bytes:
+    """
+    打包 PLC → 上位机 报文（46字节）
+
+    格式：小端序 WORD(16bit) 为单位
+    """
+    data = bytearray(PLC_TO_UPPER_LEN)
+    struct.pack_into("<H", data, 0, 0xABCD)       # header
+    struct.pack_into("<H", data, 2, train_id & 0xFFFF)
+    struct.pack_into("<H", data, 4, speed_cm_s & 0xFFFF)
+    struct.pack_into("<H", data, 6, (speed_cm_s >> 16) & 0xFFFF)
+    struct.pack_into("<H", data, 8, accel & 0xFFFF)
+    struct.pack_into("<H", data, 10, (accel >> 16) & 0xFFFF)
+    struct.pack_into("<H", data, 12, master_controller & 0xFFFF)
+    struct.pack_into("<H", data, 14, brake_pressure & 0xFFFF)
+    struct.pack_into("<H", data, 16, door_status & 0xFFFF)
+    struct.pack_into("<H", data, 18, cab_active & 0xFFFF)
+    struct.pack_into("<H", data, 20, key_status & 0xFFFF)
+    struct.pack_into("<H", data, 22, eb_status & 0xFFFF)
+    struct.pack_into("<H", data, 24, mode & 0xFFFF)
+    # 预留 20 字节 (偏移 26-45)，保持为 0
+    return bytes(data)
+
+
+def parse_plc_to_upper(data: bytes) -> dict:
+    """
+    解析 PLC → 上位机 报文（46字节）
+    """
+    if len(data) < PLC_TO_UPPER_LEN:
+        raise ValueError(f"PLC报文长度不足: {len(data)} < {PLC_TO_UPPER_LEN}")
+
+    result = {
+        "header": struct.unpack_from("<H", data, 0)[0],
+        "train_id": struct.unpack_from("<H", data, 2)[0],
+        "speed_cm_s": struct.unpack_from("<H", data, 4)[0] | (struct.unpack_from("<H", data, 6)[0] << 16),
+        "accel": struct.unpack_from("<H", data, 8)[0] | (struct.unpack_from("<H", data, 10)[0] << 16),
+        "master_controller": struct.unpack_from("<H", data, 12)[0],
+        "brake_pressure": struct.unpack_from("<H", data, 14)[0],
+        "door_status": struct.unpack_from("<H", data, 16)[0],
+        "cab_active": struct.unpack_from("<H", data, 18)[0],
+        "key_status": struct.unpack_from("<H", data, 20)[0],
+        "eb_status": struct.unpack_from("<H", data, 22)[0],
+        "mode": struct.unpack_from("<H", data, 24)[0],
+    }
+    return result
+
+
+def pack_upper_to_plc(
+    header: int = 0xDCBA,
+    traction_cmd: int = 0,
+    traction_pct: int = 0,
+    brake_pct: int = 0,
+    target_speed_cm_s: int = 0,
+    door_cmd: int = 0,
+    ato_cmd: int = 0,
+    eb_reset: int = 0,
+) -> bytes:
+    """
+    打包 上位机 → PLC 报文（26字节）
+    """
+    data = bytearray(UPPER_TO_PLC_LEN)
+    struct.pack_into("<H", data, 0, header & 0xFFFF)
+    struct.pack_into("<H", data, 2, traction_cmd & 0xFFFF)
+    struct.pack_into("<H", data, 4, traction_pct & 0xFFFF)
+    struct.pack_into("<H", data, 6, brake_pct & 0xFFFF)
+    struct.pack_into("<H", data, 8, target_speed_cm_s & 0xFFFF)
+    struct.pack_into("<H", data, 10, (target_speed_cm_s >> 16) & 0xFFFF)
+    struct.pack_into("<H", data, 12, door_cmd & 0xFFFF)
+    struct.pack_into("<H", data, 14, ato_cmd & 0xFFFF)
+    struct.pack_into("<H", data, 16, eb_reset & 0xFFFF)
+    # 预留 8 字节 (偏移 18-25)
+    return bytes(data)
+
+
+def parse_upper_to_plc(data: bytes) -> dict:
+    """
+    解析 上位机 → PLC 报文（26字节）
+    """
+    if len(data) < UPPER_TO_PLC_LEN:
+        raise ValueError(f"上位机报文长度不足: {len(data)} < {UPPER_TO_PLC_LEN}")
+
+    result = {
+        "header": struct.unpack_from("<H", data, 0)[0],
+        "traction_cmd": struct.unpack_from("<H", data, 2)[0],
+        "traction_pct": struct.unpack_from("<H", data, 4)[0],
+        "brake_pct": struct.unpack_from("<H", data, 6)[0],
+        "target_speed_cm_s": struct.unpack_from("<H", data, 8)[0] | (struct.unpack_from("<H", data, 10)[0] << 16),
+        "door_cmd": struct.unpack_from("<H", data, 12)[0],
+        "ato_cmd": struct.unpack_from("<H", data, 14)[0],
+        "eb_reset": struct.unpack_from("<H", data, 16)[0],
+    }
+    return result
+
+
+# ====================================================================
+# 网络屏协议编解码（572字节）
+# ====================================================================
+
+def pack_network_screen(
+    train_id: int = 1,
+    speed_km_h: float = 0.0,
+    target_speed_km_h: float = 0.0,
+    limit_speed_km_h: float = 80.0,
+    next_station: str = "车站A",
+    door_status: str = "关",
+    mode_name: str = "RM",
+    voltage: float = 1500.0,
+    current: float = 0.0,
+    pressure: float = 0.0,
+    is_ato: bool = False,
+    fault_info: str = "",
+) -> bytes:
+    """
+    打包网络屏显示数据（572字节）
+
+    注意：这是简化实现，实际协议需根据文档完整定义
+    """
+    data = bytearray(NETWORK_SCREEN_LEN)
+
+    # 前4字节：报文头
+    struct.pack_into("<I", data, 0, 0xAA55AA55)
+
+    # 4-7: 列车ID
+    struct.pack_into("<I", data, 4, train_id & 0xFFFFFFFF)
+
+    # 8-11: 当前速度 (km/h * 100)
+    struct.pack_into("<I", data, 8, int(speed_km_h * 100) & 0xFFFFFFFF)
+
+    # 12-15: 目标速度
+    struct.pack_into("<I", data, 12, int(target_speed_km_h * 100) & 0xFFFFFFFF)
+
+    # 16-19: 限速
+    struct.pack_into("<I", data, 16, int(limit_speed_km_h * 100) & 0xFFFFFFFF)
+
+    # 20-23: 网压
+    struct.pack_into("<I", data, 20, int(voltage * 10) & 0xFFFFFFFF)
+
+    # 24-27: 网流
+    struct.pack_into("<I", data, 24, int(current * 10) & 0xFFFFFFFF)
+
+    # 28-31: 制动缸压力
+    struct.pack_into("<I", data, 28, int(pressure * 10) & 0xFFFFFFFF)
+
+    # 32-33: 门状态 (0=关, 1=开)
+    door_val = 1 if door_status == "开" else 0
+    struct.pack_into("<H", data, 32, door_val & 0xFFFF)
+
+    # 34-35: 驾驶模式
+    mode_map = {"INIT": 0, "RD": 2, "RM": 3, "CM": 4, "AM": 5,
+                "AR": 6, "EUM": 7, "CAM": 8, "FAM": 9}
+    mode_val = mode_map.get(mode_name, 0)
+    struct.pack_into("<H", data, 34, mode_val & 0xFFFF)
+
+    # 36-37: ATO状态
+    struct.pack_into("<H", data, 36, 1 if is_ato else 0)
+
+    # 38-201: 下一站名 (UTF-8, 最多164字节)
+    station_bytes = next_station.encode("utf-8")[:164]
+    data[38:38 + len(station_bytes)] = station_bytes
+
+    # 202-365: 故障信息
+    fault_bytes = fault_info.encode("utf-8")[:164]
+    data[202:202 + len(fault_bytes)] = fault_bytes
+
+    # 366-571: 预留
+    return bytes(data)
+
+
+def parse_network_screen(data: bytes) -> dict:
+    """
+    解析网络屏数据（572字节）
+    """
+    if len(data) < NETWORK_SCREEN_LEN:
+        raise ValueError(f"网络屏报文长度不足: {len(data)} < {NETWORK_SCREEN_LEN}")
+
+    header = struct.unpack_from("<I", data, 0)[0]
+    train_id = struct.unpack_from("<I", data, 4)[0]
+    speed_raw = struct.unpack_from("<I", data, 8)[0]
+    target_raw = struct.unpack_from("<I", data, 12)[0]
+    limit_raw = struct.unpack_from("<I", data, 16)[0]
+
+    # 解析站名（空字符截断）
+    station_raw = data[38:202]
+    null_pos = station_raw.find(b"\x00")
+    if null_pos >= 0:
+        station_raw = station_raw[:null_pos]
+    next_station = station_raw.decode("utf-8", errors="replace")
+
+    mode_val = struct.unpack_from("<H", data, 34)[0]
+    mode_map_rev = {0: "INIT", 2: "RD", 3: "RM", 4: "CM", 5: "AM",
+                    6: "AR", 7: "EUM", 8: "CAM", 9: "FAM"}
+
+    return {
+        "header": hex(header),
+        "train_id": train_id,
+        "speed_km_h": speed_raw / 100.0,
+        "target_speed_km_h": target_raw / 100.0,
+        "limit_speed_km_h": limit_raw / 100.0,
+        "next_station": next_station,
+        "mode_name": mode_map_rev.get(mode_val, "UNKNOWN"),
+    }
+
+
+# ====================================================================
+# 信号屏协议编解码（66字节）
+# ====================================================================
+
+def pack_signal_screen(
+    train_id: int = 1,
+    current_speed_cm_s: int = 0,
+    permit_speed_cm_s: int = 0,
+    eb_trigger_speed_cm_s: int = 0,
+    target_speed_cm_s: int = 0,
+    target_distance_cm: int = 0,
+    speed_change_distance_cm: int = 0,
+    current_mode: int = 0,
+    max_mode: int = 0,
+    run_level: int = 0,
+    signal_aspect: int = 0,
+    next_signal_id: int = 0,
+    dmi_display: int = 1,
+) -> bytes:
+    """
+    打包信号屏（DMI）显示数据（66字节）
+
+    参考 ATP → DMI 应用数据包格式
+    """
+    data = bytearray(SIGNAL_SCREEN_LEN)
+
+    # 0-1: 报文头
+    struct.pack_into("<H", data, 0, 0xAA55)
+
+    # 2-3: 报文长度
+    struct.pack_into("<H", data, 2, SIGNAL_SCREEN_LEN)
+
+    # 4: DMI显示状态
+    data[4] = dmi_display & 0xFF
+
+    # 5-6: 当前速度 (cm/s)
+    struct.pack_into("<H", data, 5, current_speed_cm_s & 0xFFFF)
+
+    # 7-8: 允许速度 (cm/s)
+    struct.pack_into("<H", data, 7, permit_speed_cm_s & 0xFFFF)
+
+    # 9-10: 紧急制动触发速度 (cm/s)
+    struct.pack_into("<H", data, 9, eb_trigger_speed_cm_s & 0xFFFF)
+
+    # 11-12: 目标速度 (cm/s)
+    struct.pack_into("<H", data, 11, target_speed_cm_s & 0xFFFF)
+
+    # 13-15: 限速变化点距离 (cm, 24bit)
+    data[13] = (speed_change_distance_cm >> 16) & 0xFF
+    data[14] = (speed_change_distance_cm >> 8) & 0xFF
+    data[15] = speed_change_distance_cm & 0xFF
+
+    # 16-18: 目标距离 (cm, 24bit)
+    data[16] = (target_distance_cm >> 16) & 0xFF
+    data[17] = (target_distance_cm >> 8) & 0xFF
+    data[18] = target_distance_cm & 0xFF
+
+    # 19: 当前驾驶模式
+    data[19] = current_mode & 0x0F
+
+    # 20: 最大可用驾驶模式
+    data[20] = max_mode & 0x0F
+
+    # 21: 运行等级
+    data[21] = run_level & 0x0F
+
+    # 22-25: 列车ID
+    struct.pack_into("<I", data, 22, train_id & 0xFFFFFFFF)
+
+    # 26: 信号机显示
+    data[26] = signal_aspect & 0xFF
+
+    # 27-28: 下一架信号机ID
+    struct.pack_into("<H", data, 27, next_signal_id & 0xFFFF)
+
+    # 29-65: 预留
+    return bytes(data)
+
+
+def parse_signal_screen(data: bytes) -> dict:
+    """
+    解析信号屏（DMI）数据（66字节）
+    """
+    if len(data) < SIGNAL_SCREEN_LEN:
+        raise ValueError(f"信号屏报文长度不足: {len(data)} < {SIGNAL_SCREEN_LEN}")
+
+    header = struct.unpack_from("<H", data, 0)[0]
+    pkt_len = struct.unpack_from("<H", data, 2)[0]
+    dmi_display = data[4]
+    current_speed = struct.unpack_from("<H", data, 5)[0]
+    permit_speed = struct.unpack_from("<H", data, 7)[0]
+    eb_speed = struct.unpack_from("<H", data, 9)[0]
+    target_speed = struct.unpack_from("<H", data, 11)[0]
+    speed_change_dist = (data[13] << 16) | (data[14] << 8) | data[15]
+    target_dist = (data[16] << 16) | (data[17] << 8) | data[18]
+    current_mode = data[19] & 0x0F
+    max_mode = data[20] & 0x0F
+    run_level = data[21] & 0x0F
+    train_id = struct.unpack_from("<I", data, 22)[0]
+    signal_aspect = data[26]
+    next_signal_id = struct.unpack_from("<H", data, 27)[0]
+
+    mode_map = {0: "INIT", 2: "RD", 3: "RM", 4: "CM", 5: "AM",
+                6: "AR", 7: "EUM", 8: "CAM", 9: "FAM"}
+
+    return {
+        "header": hex(header),
+        "length": pkt_len,
+        "dmi_display": dmi_display,
+        "current_speed_cm_s": current_speed,
+        "current_speed_km_h": current_speed / 100.0,
+        "permit_speed_cm_s": permit_speed,
+        "permit_speed_km_h": permit_speed / 100.0,
+        "eb_trigger_speed_cm_s": eb_speed,
+        "eb_trigger_speed_km_h": eb_speed / 100.0,
+        "target_speed_cm_s": target_speed,
+        "target_speed_km_h": target_speed / 100.0,
+        "speed_change_distance_m": speed_change_dist / 100.0,
+        "target_distance_m": target_dist / 100.0,
+        "current_mode": mode_map.get(current_mode, f"UNKNOWN({current_mode})"),
+        "max_mode": max_mode,
+        "run_level": run_level,
+        "train_id": train_id,
+        "signal_aspect": hex(signal_aspect),
+        "next_signal_id": next_signal_id,
+    }
+
+
+# ====================================================================
+# 信号系统 UDP 报文编解码
+# ====================================================================
+
+def pack_signal_to_db_train_data(trains: list) -> bytes:
+    """
+    打包 信号系统 → 总控数据库节点 列车数据报文
+
+    Args:
+        trains: 列车信息列表，每项为 dict:
+            - train_id: int
+            - speed_cm_s: int
+            - distance_cm: int
+            - direction: int (0x55 上行, 0xAA 下行)
+            - load_kg: int
+            - fault_speed: int (故障限速)
+            - eb_status: int (0/1)
+            - traction_avail: int
+            - brake_avail: int
+    """
+    n = len(trains)
+    if n == 0:
+        return b""
+
+    content_len = n * 18  # 单列车18字节
+    packet_len = 2 + content_len  # 数据长度字段+CONTENT
+
+    data = bytearray(14 + packet_len)  # 固定头14字节 + 数据长度(2) + content
+
+    # 报文头
+    data[0] = 0xFF
+    data[1] = 0xF0
+    # 源标识（信号系统）
+    data[2:10] = b"\x00\x10\x00\x10\x00\x10\x00\x10"
+    # 目的标识（总控数据库）
+    data[10:14] = b"\x01\x00\x01\x00"
+
+    # 数据长度
+    struct.pack_into("<H", data, 14, content_len)
+
+    offset = 16
+    for t in trains:
+        struct.pack_into("<B", data, offset, t["train_id"] & 0xFF)
+        struct.pack_into("<I", data, offset + 1, t["speed_cm_s"] & 0xFFFFFFFF)
+        struct.pack_into("<I", data, offset + 5, t["distance_cm"] & 0xFFFFFFFF)
+        data[offset + 9] = t.get("direction", 0x55) & 0xFF
+        struct.pack_into("<I", data, offset + 10, t["load_kg"] & 0xFFFFFFFF)
+        data[offset + 14] = t.get("fault_speed", 0) & 0xFF
+        data[offset + 15] = t.get("eb_status", 0) & 0xFF
+        data[offset + 16] = t.get("traction_avail", 1) & 0xFF
+        data[offset + 17] = t.get("brake_avail", 1) & 0xFF
+        offset += 18
+
+    return bytes(data)
+
+
+def pack_signal_to_db_cab_binary(
+    train_id: int = 1,
+    atp_safe_output: int = 0,
+    atp_nonsafe_output: int = 0,
+    ato_nonsafe_output: int = 0,
+    vehicle_output: int = 0,
+) -> bytes:
+    """
+    打包 信号系统 → 总控数据库节点 驾驶台开关量信息
+
+    报文头：0xff 0xf1
+    """
+    data = bytearray(22)  # 14头 + 2数据长度 + 1列车ID + 4*4输出
+
+    # 报文头
+    data[0] = 0xFF
+    data[1] = 0xF1
+    # 源标识（信号系统）
+    data[2:10] = b"\x00\x10\x00\x10\x00\x10\x00\x10"
+    # 目的标识（总控数据库）
+    data[10:14] = b"\x01\x00\x01\x00"
+
+    # 数据长度 (2+1+16=19)
+    struct.pack_into("<H", data, 14, 19)
+
+    # CONTENT
+    data[16] = train_id & 0xFF
+    struct.pack_into("<I", data, 17, atp_safe_output & 0xFFFFFFFF)
+    struct.pack_into("<I", data, 21, atp_nonsafe_output & 0xFFFFFFFF)
+    struct.pack_into("<I", data, 25, ato_nonsafe_output & 0xFFFFFFFF)
+    struct.pack_into("<I", data, 29, vehicle_output & 0xFFFFFFFF)
+
+    return bytes(data)
+
+
+def parse_signal_to_db_cab_binary(data: bytes) -> dict:
+    """
+    解析 信号系统 → 总控数据库节点 驾驶台开关量信息
+    """
+    if len(data) < 22:
+        raise ValueError(f"驾驶台开关量报文长度不足: {len(data)}")
+
+    result = {
+        "header": (data[0], data[1]),
+        "train_id": data[16],
+        "atp_safe_output": struct.unpack_from("<I", data, 17)[0],
+        "atp_nonsafe_output": struct.unpack_from("<I", data, 21)[0],
+        "ato_nonsafe_output": struct.unpack_from("<I", data, 25)[0],
+        "vehicle_output": struct.unpack_from("<I", data, 29)[0],
+    }
+
+    # 解码比特位
+    result["atp_safe_bits"] = _decode_bits(result["atp_safe_output"], ATP_SAFE_OUTPUT)
+    result["atp_nonsafe_bits"] = _decode_bits(result["atp_nonsafe_output"], ATP_NONSAFE_OUTPUT)
+    result["ato_nonsafe_bits"] = _decode_bits(result["ato_nonsafe_output"], ATO_NONSAFE_OUTPUT)
+
+    return result
+
+
+def pack_db_to_signal_train_data(trains: list) -> bytes:
+    """
+    打包 总控数据库节点 → 信号系统 列车数据报文
+
+    报文头：0xff 0xf0
+    单列车18字节，单包最多40列车
+    """
+    n = min(len(trains), 40)
+    if n == 0:
+        return b""
+
+    content_len = n * 18
+    data = bytearray(16 + content_len)
+
+    # 报文头
+    data[0] = 0xFF
+    data[1] = 0xF0
+    # 源标识（总控数据库）
+    data[2:10] = b"\x01\x00\x01\x00\x01\x00\x01\x00"
+    # 目的标识（信号系统）
+    data[10:14] = b"\x00\x10\x00\x10"
+
+    # 数据长度
+    struct.pack_into("<H", data, 14, content_len)
+
+    offset = 16
+    for t in trains:
+        data[offset] = t["train_id"] & 0xFF
+        struct.pack_into("<I", data, offset + 1, t["speed_cm_s"] & 0xFFFFFFFF)
+        struct.pack_into("<I", data, offset + 5, t["distance_cm"] & 0xFFFFFFFF)
+        data[offset + 9] = t.get("direction", 0x55) & 0xFF
+        struct.pack_into("<I", data, offset + 10, t["load_kg"] & 0xFFFFFFFF)
+        data[offset + 14] = t.get("fault_speed", 0) & 0xFF
+        data[offset + 15] = t.get("eb_status", 0) & 0xFF
+        data[offset + 16] = t.get("traction_avail", 1) & 0xFF
+        data[offset + 17] = t.get("brake_avail", 1) & 0xFF
+        offset += 18
+
+    return bytes(data)
+
+
+def parse_db_to_signal_train_data(data: bytes) -> dict:
+    """
+    解析 总控数据库节点 → 信号系统 列车数据报文
+    """
+    if len(data) < 16:
+        raise ValueError(f"总控→信号报文长度不足: {len(data)}")
+
+    content_len = struct.unpack_from("<H", data, 14)[0]
+    n = content_len // 18
+
+    trains = []
+    offset = 16
+    for _ in range(n):
+        if offset + 18 > len(data):
+            break
+        train = {
+            "train_id": data[offset],
+            "speed_cm_s": struct.unpack_from("<I", data, offset + 1)[0],
+            "distance_cm": struct.unpack_from("<I", data, offset + 5)[0],
+            "direction": data[offset + 9],
+            "load_kg": struct.unpack_from("<I", data, offset + 10)[0],
+            "fault_speed": data[offset + 14],
+            "eb_status": data[offset + 15],
+            "traction_avail": data[offset + 16],
+            "brake_avail": data[offset + 17],
+        }
+        train["direction_str"] = "上行" if train["direction"] == 0x55 else "下行" if train["direction"] == 0xAA else "无效"
+        trains.append(train)
+        offset += 18
+
+    return {
+        "header": (data[0], data[1]),
+        "train_count": n,
+        "trains": trains,
+    }
+
+
+def pack_db_to_signal_cab_binary(
+    train_id: int = 1,
+    atp_safe_input: int = 0,
+    atp_nonsafe_input: int = 0,
+    ato_nonsafe_input: int = 0,
+) -> bytes:
+    """
+    打包 总控数据库节点 → 信号系统 驾驶台开关量信息（仅1车）
+
+    报文头：0xff 0xf1
+    """
+    data = bytearray(21)
+
+    data[0] = 0xFF
+    data[1] = 0xF1
+    data[2:10] = b"\x01\x00\x01\x00\x01\x00\x01\x00"
+    data[10:14] = b"\x00\x10\x00\x10"
+
+    # 数据长度 (2+1+12=15)
+    struct.pack_into("<H", data, 14, 15)
+
+    # CONTENT
+    data[16] = train_id & 0xFF
+    struct.pack_into("<I", data, 17, atp_safe_input & 0xFFFFFFFF)
+    struct.pack_into("<I", data, 21, atp_nonsafe_input & 0xFFFFFFFF)
+    struct.pack_into("<I", data, 25, ato_nonsafe_input & 0xFFFFFFFF)
+
+    return bytes(data)
+
+
+def parse_db_to_signal_cab_binary(data: bytes) -> dict:
+    """
+    解析 总控数据库节点 → 信号系统 驾驶台开关量信息
+    """
+    if len(data) < 21:
+        raise ValueError(f"驾驶台开关量报文长度不足: {len(data)}")
+
+    result = {
+        "header": (data[0], data[1]),
+        "train_id": data[16],
+        "atp_safe_input": struct.unpack_from("<I", data, 17)[0],
+        "atp_nonsafe_input": struct.unpack_from("<I", data, 21)[0],
+        "ato_nonsafe_input": struct.unpack_from("<I", data, 25)[0],
+    }
+
+    # 解码比特位
+    result["atp_safe_bits"] = _decode_bits(result["atp_safe_input"], ATP_SAFE_INPUT)
+    result["atp_nonsafe_bits"] = _decode_bits(result["atp_nonsafe_input"], ATP_NONSAFE_INPUT)
+    result["ato_nonsafe_bits"] = _decode_bits(result["ato_nonsafe_input"], ATO_NONSAFE_INPUT)
+
+    return result
+
+
+# ====================================================================
+# 辅助函数
+# ====================================================================
+
+def _decode_bits(value: int, bit_map: dict) -> dict:
+    """将 UINT32 按位图字典解码为布尔值"""
+    return {name: (value & mask) != 0 for name, mask in bit_map.items()}
+
+
+def _encode_bits(bits: dict, bit_map: dict) -> int:
+    """将布尔值字典按位图编码为 UINT32"""
+    value = 0
+    for name, mask in bit_map.items():
+        if bits.get(name, False):
+            value |= mask
+    return value
+
+
+def encode_atp_safe_input(bits: dict) -> int:
+    """编码 ATP安全输入 UINT32"""
+    return _encode_bits(bits, ATP_SAFE_INPUT)
+
+
+def encode_atp_nonsafe_input(bits: dict) -> int:
+    """编码 ATP非安全输入 UINT32"""
+    return _encode_bits(bits, ATP_NONSAFE_INPUT)
+
+
+def encode_ato_nonsafe_input(bits: dict) -> int:
+    """编码 ATO非安全输入 UINT32"""
+    return _encode_bits(bits, ATO_NONSAFE_INPUT)
+
+
+def encode_atp_safe_output(bits: dict) -> int:
+    """编码 ATP安全输出 UINT32"""
+    return _encode_bits(bits, ATP_SAFE_OUTPUT)
+
+
+def encode_atp_nonsafe_output(bits: dict) -> int:
+    """编码 ATP非安全输出 UINT32"""
+    return _encode_bits(bits, ATP_NONSAFE_OUTPUT)
+
+
+def encode_ato_nonsafe_output(bits: dict) -> int:
+    """编码 ATO非安全输出 UINT32"""
+    return _encode_bits(bits, ATO_NONSAFE_OUTPUT)
+
+
+# ====================================================================
+# 自检
+# ====================================================================
+def self_test():
+    """运行协议编解码自检"""
+    print("=" * 60)
+    print("协议编解码自检")
+    print("=" * 60)
+
+    # 1. PLC → 上位机
+    print("\n[1] PLC → 上位机 编解码")
+    raw = pack_plc_to_upper(train_id=1, speed_cm_s=5000, cab_active=1, key_status=1, mode=3)
+    parsed = parse_plc_to_upper(raw)
+    assert parsed["train_id"] == 1
+    assert parsed["speed_cm_s"] == 5000
+    assert parsed["cab_active"] == 1
+    assert parsed["mode"] == 3
+    print(f"    ✓ 打包 {len(raw)}B → 解析: speed={parsed['speed_cm_s']}cm/s, mode={parsed['mode']}")
+
+    # 2. 上位机 → PLC
+    print("\n[2] 上位机 → PLC 编解码")
+    raw = pack_upper_to_plc(traction_cmd=0x55, traction_pct=80, target_speed_cm_s=5000)
+    parsed = parse_upper_to_plc(raw)
+    assert parsed["traction_cmd"] == 0x55
+    assert parsed["traction_pct"] == 80
+    assert parsed["target_speed_cm_s"] == 5000
+    print(f"    ✓ 打包 {len(raw)}B → 解析: cmd=0x{parsed['traction_cmd']:02x}, pct={parsed['traction_pct']}%")
+
+    # 3. 网络屏
+    print("\n[3] 网络屏 编解码")
+    raw = pack_network_screen(speed_km_h=60.0, next_station="人民广场", mode_name="CM")
+    parsed = parse_network_screen(raw)
+    assert abs(parsed["speed_km_h"] - 60.0) < 0.01
+    assert parsed["next_station"] == "人民广场"
+    print(f"    ✓ 打包 {len(raw)}B → 解析: speed={parsed['speed_km_h']}km/h, station={parsed['next_station']}")
+
+    # 4. 信号屏
+    print("\n[4] 信号屏(DMI) 编解码")
+    raw = pack_signal_screen(current_speed_cm_s=5000, permit_speed_cm_s=8000,
+                             target_distance_cm=100000, current_mode=3)
+    parsed = parse_signal_screen(raw)
+    assert parsed["current_speed_cm_s"] == 5000
+    assert parsed["permit_speed_cm_s"] == 8000
+    assert parsed["target_distance_m"] == 1000.0
+    assert parsed["current_mode"] == "RM"
+    print(f"    ✓ 打包 {len(raw)}B → 解析: speed={parsed['current_speed_km_h']}km/h, "
+          f"dist={parsed['target_distance_m']}m, mode={parsed['current_mode']}")
+
+    # 5. 驾驶台开关量 ATP位编解码
+    print("\n[5] 驾驶台开关量 ATP位编解码")
+    bits = {
+        "cab_active": True,
+        "key_active": True,
+        "door_closed": True,
+        "traction_cut": False,
+        "eb_applied": False,
+        "handle_zero_forward": True,
+        "confirm_btn": False,
+        "brake_fault": False,
+    }
+    atp_safe = encode_atp_safe_input(bits)
+    decoded = _decode_bits(atp_safe, ATP_SAFE_INPUT)
+    assert decoded["cab_active"] == True
+    assert decoded["key_active"] == True
+    assert decoded["door_closed"] == True
+    assert decoded["traction_cut"] == False
+    assert decoded["handle_zero_forward"] == True
+    print(f"    ✓ 编码 0x{atp_safe:08x} → 解码: cab_active={decoded['cab_active']}, "
+          f"key={decoded['key_active']}, door={decoded['door_closed']}")
+
+    # 6. 信号系统 ⇄ 总控 驾驶台开关量
+    print("\n[6] 信号系统 ⇄ 总控 驾驶台开关量")
+    raw = pack_signal_to_db_cab_binary(
+        train_id=1,
+        atp_safe_output=encode_atp_safe_output({"eb_output": True, "zero_speed": True}),
+        atp_nonsafe_output=encode_atp_nonsafe_output({"fam_mode": True}),
+        ato_nonsafe_output=encode_ato_nonsafe_output({"ato_active": True}),
+    )
+    parsed = parse_signal_to_db_cab_binary(raw)
+    assert parsed["train_id"] == 1
+    assert parsed["atp_safe_bits"]["eb_output"] == True
+    assert parsed["atp_safe_bits"]["zero_speed"] == True
+    assert parsed["atp_nonsafe_bits"]["fam_mode"] == True
+    assert parsed["ato_nonsafe_bits"]["ato_active"] == True
+    print(f"    ✓ 信号→总控 {len(raw)}B: eb_output={parsed['atp_safe_bits']['eb_output']}")
+
+    # 7. 总控→信号 列车数据
+    print("\n[7] 总控→信号 列车数据")
+    trains = [
+        {"train_id": 1, "speed_cm_s": 5000, "distance_cm": 100000,
+         "direction": 0x55, "load_kg": 50000, "fault_speed": 0, "eb_status": 0,
+         "traction_avail": 1, "brake_avail": 1},
+        {"train_id": 2, "speed_cm_s": 0, "distance_cm": 50000,
+         "direction": 0xAA, "load_kg": 48000, "fault_speed": 0, "eb_status": 0,
+         "traction_avail": 1, "brake_avail": 1},
+    ]
+    raw = pack_db_to_signal_train_data(trains)
+    parsed = parse_db_to_signal_train_data(raw)
+    assert parsed["train_count"] == 2
+    assert parsed["trains"][0]["speed_cm_s"] == 5000
+    assert parsed["trains"][1]["direction"] == 0xAA
+    print(f"    ✓ 总控→信号 {len(raw)}B: {parsed['train_count']}列车, "
+          f"列车1 speed={parsed['trains'][0]['speed_cm_s']}cm/s, "
+          f"列车2 direction={parsed['trains'][1]['direction_str']}")
+
+    print("\n" + "=" * 60)
+    print("所有自检通过 ✓")
+    print("=" * 60)
+    return True
+
+
+if __name__ == "__main__":
+    self_test()
