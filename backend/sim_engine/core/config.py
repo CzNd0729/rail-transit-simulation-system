@@ -94,6 +94,10 @@ class SimulationParams:
     target_speed_ratio: float = 0.8
     station_stop_tolerance: float = 1.0
     coasting_min_speed: float = 30.0
+    train_count: int = 1
+    """同方向仿真列车数。"""
+    departure_interval: float = 120.0
+    """同方向发车间隔 (s)。"""
     pid: PidParams = field(default_factory=PidParams)
     power: PowerConfig = field(default_factory=PowerConfig)
     signal: SignalConfig = field(default_factory=SignalConfig)
@@ -225,6 +229,8 @@ def load_simulation_params(path: str | Path) -> SimulationParams:
         target_speed_ratio=float(data.get("target_speed_ratio", 0.8)),
         station_stop_tolerance=float(data.get("station_stop_tolerance", 1.0)),
         coasting_min_speed=float(data.get("coasting_min_speed", 30.0)),
+        train_count=int(data.get("train_count", 1)),
+        departure_interval=float(data.get("departure_interval", 120.0)),
         pid=pid,
         power=power,
         signal=signal,
