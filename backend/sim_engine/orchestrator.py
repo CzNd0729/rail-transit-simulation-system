@@ -271,7 +271,12 @@ class Orchestrator:
             if sig_st.target_station_id
             else None
         )
-        ma = self.atp.build_ma_profile(run.train_id, run.state.position, target_chainage)
+        ma = self.atp.build_ma_profile(
+            run.train_id,
+            run.state.position,
+            target_chainage,
+            leading_chainage=leading_pos,
+        )
 
         timetable_dev: list[dict] = []
         if run.ats.last_deviation is not None:
