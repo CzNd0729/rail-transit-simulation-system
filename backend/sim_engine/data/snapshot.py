@@ -18,6 +18,7 @@ class TrainSnapshotEntry:
     forces: ForceBreakdown
     pantograph_voltage: float = 1500.0
     power_demand: float = 0.0
+    direction: str = "up"
 
 
 def _serialize_train(entry: TrainSnapshotEntry) -> dict:
@@ -44,6 +45,7 @@ def _serialize_train(entry: TrainSnapshotEntry) -> dict:
         "faultAlarm": None,
         "distanceToStation": entry.state.distance_to_station,
         "targetStationId": entry.state.target_station_id,
+        "direction": entry.direction,
     }
 
 
