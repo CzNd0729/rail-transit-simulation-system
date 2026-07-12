@@ -4,4 +4,4 @@ simulation:
   station_stop_tolerance: 1.0
   target_speed_ratio: 0.8
   time_step: 0.1
-  total_time: 600
+  total_time: 6000
