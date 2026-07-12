@@ -17,10 +17,9 @@ export default function VoltageProfile() {
 
   // 累积后端每次推送的单个电压数据点，形成完整曲线
   const accumulatedRef = useRef<VoltagePoint[]>([]);
-  // 新仿真启动时清空上一次的曲线
+  // 新仿真启动时清空上一次的曲线（仅 idle/stopped → running，不含 resumed）
   const prevRunStateRef = useRef(runState);
-  const justStarted = prevRunStateRef.current !== 'running' && runState === 'running';
-  if (justStarted) {
+  if ((prevRunStateRef.current === 'idle' || prevRunStateRef.current === 'stopped') && runState === 'running') {
     accumulatedRef.current = [];
   }
   prevRunStateRef.current = runState;
