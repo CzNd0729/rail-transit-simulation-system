@@ -292,7 +292,7 @@ class PlcSimulator:
         return self.last_upper_cmd
 
 
-def run_plc_simulator(port: int = PLC_PORT_A):
+def run_plc_simulator(port: int = PLC_PORT_A, local_only: bool = False, interactive: bool = True):
     """运行独立 PLC 模拟器"""
     logging.basicConfig(
         level=logging.INFO,
@@ -300,19 +300,67 @@ def run_plc_simulator(port: int = PLC_PORT_A):
         datefmt="%H:%M:%S",
     )
 
-    sim = PlcSimulator(port=port)
+    host = "127.0.0.1" if local_only else "0.0.0.0"
+    sim = PlcSimulator(host=host, port=port)
     sim.start()
 
     print(f"\nPLC模拟器运行中 (端口 {port})")
+    print(f"  绑定地址: {host}")
+
+    if not interactive:
+        # 非交互模式：保持运行直到被终止
+        try:
+            while sim.running:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            sim.stop()
+        return
+
     print("  按 Enter 停止模拟器")
-    print("  在控制台输入命令可改变模拟状态:")
-    print("    speed <cm/s>  - 设置速度")
-    print("    eb 0/1        - 设置紧急制动")
-    print("    cab 0/1       - 设置驾驶室激活")
-    print("    key 0/1       - 设置钥匙状态")
-    print("    mode <N>      - 设置驾驶模式")
-    print("    status        - 显示当前状态")
-    print("    quit          - 退出")
+    print("  在控制台输入命令改变模拟状态:")
+    print("  ── 基本参数 ──")
+    print("    speed <N>       车辆速度值 (0-65535)")
+    print("    eb 0/1          紧急制动按钮锁定")
+    print("    key 0/1         钥匙开关")
+    print("  ── 指示灯(字节24) ──")
+    print("    hscb 0/1        高断合指示灯")
+    print("    bf 0/1          制动缓解不良指示灯")
+    print("    dc 0/1          门关好指示灯")
+    print("    nf 0/1          网络故障指示灯")
+    print("    ar_avail 0/1    具备AR模式")
+    print("  ── 模式标志(字节25) ──")
+    print("    ato_avail 0/1   具备ATO模式")
+    print("    ato_act 0/1     ATO已激活")
+    print("    ar_act 0/1      AR已激活")
+    print("    wash 0/1        洗车模式")
+    print("  ── 按钮(字节28) ──")
+    print("    eb_btn 0/1      紧急制动按钮锁定")
+    print("    bus 0/1         母线控制按钮锁定")
+    print("    fr 0/1          强迫缓解")
+    print("    fp 0/1          强迫泵风")
+    print("    emerg 0/1       应急指挥按钮锁定")
+    print("    pk_apply 0/1    停放制动施加")
+    print("    pk_rel 0/1      停放制动缓解")
+    print("    horn 0/1        电笛")
+    print("  ── 门控(字节29) ──")
+    print("    ol 0/1          开左门")
+    print("    or 0/1          开右门")
+    print("    cl 0/1          关左门")
+    print("    cr 0/1          关右门")
+    print("  ── 开关/照明/手柄 ──")
+    print("    light <N>       外部照明 (0=停止 1=自动 2=近光 4=远光)")
+    print("    door_mode <N>   门模式 (0=半自动 1=手动 2=自动)")
+    print("    dir <N>         方向手柄 (0=0位 1=向前 2=向后)")
+    print("    handle <N>      主手柄 (0=0位 1=牵引 2=制动 4=快制)")
+    print("    traction <N>    牵引极位 (0-25600, 100%=25600)")
+    print("    brake <N>       制动极位 (0-25600, 100%=25600)")
+    print("  ── 其他 ──")
+    print("    alert 0/1       警惕标志")
+    print("    alert_rel 0/1   警惕允许解除")
+    print("    status          显示当前状态")
+    print("    quit            退出")
     print()
 
     try:
@@ -326,30 +374,136 @@ def run_plc_simulator(port: int = PLC_PORT_A):
             if action == "quit" or action == "exit":
                 break
             elif action == "speed" and len(parts) > 1:
-                sim.set_speed(int(parts[1]))
-                print(f"  速度已设为 {parts[1]} cm/s")
+                sim.vehicle_speed = int(parts[1])
+                print(f"  车辆速度已设为 {parts[1]}")
             elif action == "eb" and len(parts) > 1:
-                sim.set_eb_status(int(parts[1]) == 1)
-                print(f"  紧急制动: {'施加' if int(parts[1]) == 1 else '解除'}")
-            elif action == "cab" and len(parts) > 1:
-                sim.set_cab_active(int(parts[1]) == 1)
-                print(f"  驾驶室: {'激活' if int(parts[1]) == 1 else '未激活'}")
+                v = int(parts[1])
+                sim.eb_button = v
+                print(f"  紧急制动按钮: {'锁定' if v else '解除'}")
             elif action == "key" and len(parts) > 1:
-                sim.set_key_status(int(parts[1]) == 1)
-                print(f"  钥匙: {'打开' if int(parts[1]) == 1 else '关闭'}")
-            elif action == "mode" and len(parts) > 1:
-                sim.set_mode(int(parts[1]))
-                print(f"  驾驶模式已设为 {parts[1]}")
+                v = int(parts[1])
+                sim.key_switch = v
+                sim.key_status = v
+                print(f"  钥匙开关: {'开' if v else '关'}")
+            # 指示灯 (字节24)
+            elif action == "hscb" and len(parts) > 1:
+                sim.hscb = int(parts[1])
+                print(f"  高断合指示灯: {'亮' if int(parts[1]) else '灭'}")
+            elif action == "bf" and len(parts) > 1:
+                sim.brake_fault_indicator = int(parts[1])
+                print(f"  制动缓解不良指示灯: {'亮' if int(parts[1]) else '灭'}")
+            elif action == "dc" and len(parts) > 1:
+                sim.door_closed_indicator = int(parts[1])
+                print(f"  门关好指示灯: {'亮' if int(parts[1]) else '灭'}")
+            elif action == "nf" and len(parts) > 1:
+                sim.net_fault_indicator = int(parts[1])
+                print(f"  网络故障指示灯: {'亮' if int(parts[1]) else '灭'}")
+            elif action == "ar_avail" and len(parts) > 1:
+                sim.ar_available = int(parts[1])
+                print(f"  具备AR模式: {'是' if int(parts[1]) else '否'}")
+            # 模式标志 (字节25)
+            elif action == "ato_avail" and len(parts) > 1:
+                sim.ato_available = int(parts[1])
+                print(f"  具备ATO模式: {'是' if int(parts[1]) else '否'}")
+            elif action == "ato_act" and len(parts) > 1:
+                sim.ato_active = int(parts[1])
+                print(f"  ATO已激活: {'是' if int(parts[1]) else '否'}")
+            elif action == "ar_act" and len(parts) > 1:
+                sim.ar_active = int(parts[1])
+                print(f"  AR已激活: {'是' if int(parts[1]) else '否'}")
+            elif action == "wash" and len(parts) > 1:
+                sim.wash_mode = int(parts[1])
+                print(f"  洗车模式: {'是' if int(parts[1]) else '否'}")
+            # 按钮 (字节28)
+            elif action == "eb_btn" and len(parts) > 1:
+                sim.eb_button = int(parts[1])
+                print(f"  紧急制动按钮: {'锁定' if int(parts[1]) else '解除'}")
+            elif action == "bus" and len(parts) > 1:
+                sim.bus_ctrl = int(parts[1])
+                print(f"  母线控制按钮: {'锁定' if int(parts[1]) else '解除'}")
+            elif action == "fr" and len(parts) > 1:
+                sim.forced_release = int(parts[1])
+                print(f"  强迫缓解: {'触发' if int(parts[1]) else '复位'}")
+            elif action == "fp" and len(parts) > 1:
+                sim.forced_pump = int(parts[1])
+                print(f"  强迫泵风: {'触发' if int(parts[1]) else '复位'}")
+            elif action == "emerg" and len(parts) > 1:
+                sim.emergency_cmd = int(parts[1])
+                print(f"  应急指挥按钮: {'锁定' if int(parts[1]) else '解除'}")
+            elif action == "pk_apply" and len(parts) > 1:
+                sim.parking_apply = int(parts[1])
+                print(f"  停放制动施加: {'触发' if int(parts[1]) else '复位'}")
+            elif action == "pk_rel" and len(parts) > 1:
+                sim.parking_release = int(parts[1])
+                print(f"  停放制动缓解: {'触发' if int(parts[1]) else '复位'}")
+            elif action == "horn" and len(parts) > 1:
+                sim.horn = int(parts[1])
+                print(f"  电笛: {'触发' if int(parts[1]) else '复位'}")
+            # 门控 (字节29)
+            elif action == "ol" and len(parts) > 1:
+                sim.open_left_door = int(parts[1])
+                print(f"  开左门: {'触发' if int(parts[1]) else '复位'}")
+            elif action == "or" and len(parts) > 1:
+                sim.open_right_door = int(parts[1])
+                print(f"  开右门: {'触发' if int(parts[1]) else '复位'}")
+            elif action == "cl" and len(parts) > 1:
+                sim.close_left_door = int(parts[1])
+                print(f"  关左门: {'触发' if int(parts[1]) else '复位'}")
+            elif action == "cr" and len(parts) > 1:
+                sim.close_right_door = int(parts[1])
+                print(f"  关右门: {'触发' if int(parts[1]) else '复位'}")
+            # 照明/门模式/手柄
+            elif action == "light" and len(parts) > 1:
+                sim.light_switch = int(parts[1])
+                light_map = {0: "停止", 1: "自动", 2: "近光", 4: "远光"}
+                print(f"  外部照明: {light_map.get(int(parts[1]), parts[1])}")
+            elif action == "door_mode" and len(parts) > 1:
+                sim.door_mode_switch = int(parts[1])
+                dm_map = {0: "半自动", 1: "手动", 2: "自动"}
+                print(f"  门模式: {dm_map.get(int(parts[1]), parts[1])}")
+            elif action == "dir" and len(parts) > 1:
+                sim.dir_handle = int(parts[1])
+                dir_map = {0: "0位", 1: "向前", 2: "向后"}
+                print(f"  方向手柄: {dir_map.get(int(parts[1]), parts[1])}")
+            elif action == "handle" and len(parts) > 1:
+                sim.main_handle = int(parts[1])
+                h_map = {0: "0位", 1: "牵引", 2: "制动", 4: "快制"}
+                print(f"  主手柄: {h_map.get(int(parts[1]), parts[1])}")
+            elif action == "traction" and len(parts) > 1:
+                sim.traction_level = int(parts[1])
+                pct = int(parts[1]) / 256.0
+                print(f"  牵引极位: {parts[1]} ({pct:.1f}%)")
+            elif action == "brake" and len(parts) > 1:
+                sim.brake_level = int(parts[1])
+                pct = int(parts[1]) / 256.0
+                print(f"  制动极位: {parts[1]} ({pct:.1f}%)")
+            elif action == "alert" and len(parts) > 1:
+                sim.alert_flag = int(parts[1])
+                print(f"  警惕标志: {'触发' if int(parts[1]) else '复位'}")
+            elif action == "alert_rel" and len(parts) > 1:
+                sim.alert_release = int(parts[1])
+                print(f"  警惕允许解除: {'允许' if int(parts[1]) else '不允许'}")
             elif action == "status":
-                print(f"  速度: {sim.speed_cm_s} cm/s")
-                print(f"  加速度: {sim.accel}")
-                print(f"  驾驶室激活: {sim.cab_active}")
-                print(f"  钥匙状态: {sim.key_status}")
-                print(f"  紧急制动: {sim.eb_status}")
-                print(f"  驾驶模式: {sim.mode}")
-                print(f"  制动缸压力: {sim.brake_pressure}")
+                print(f"  时间: {sim.year:04d}-{sim.month:02d}-{sim.day:02d} "
+                      f"{sim.hour:02d}:{sim.minute:02d}:{sim.second:02d}")
+                print(f"  车辆速度: {sim.vehicle_speed}")
+                print(f"  指示灯: hscb={sim.hscb} bf={sim.brake_fault_indicator} "
+                      f"dc={sim.door_closed_indicator} nf={sim.net_fault_indicator}")
+                print(f"  模式: ato_avail={sim.ato_available} ato_act={sim.ato_active} "
+                      f"ar_act={sim.ar_active} wash={sim.wash_mode}")
+                print(f"  按钮: eb={sim.eb_button} bus={sim.bus_ctrl} "
+                      f"fr={sim.forced_release} fp={sim.forced_pump}")
+                print(f"  门控: ol={sim.open_left_door} or={sim.open_right_door} "
+                      f"cl={sim.close_left_door} cr={sim.close_right_door}")
+                print(f"  照明={sim.light_switch} 门模式={sim.door_mode_switch}")
+                print(f"  手柄: dir={sim.dir_handle} main={sim.main_handle} "
+                      f"牵引={sim.traction_level}({sim.traction_level/256:.1f}%) "
+                      f"制动={sim.brake_level}({sim.brake_level/256:.1f}%)")
+                print(f"  钥匙开关={sim.key_switch} 警惕={sim.alert_flag} "
+                      f"警惕解除={sim.alert_release}")
                 if sim.last_upper_cmd:
                     print(f"  上位机指令: {sim.last_upper_cmd}")
+                print(f"  连接状态: {'已连接' if sim.client_socket else '等待连接'}")
             else:
                 print(f"  未知命令: {cmd}")
     except KeyboardInterrupt:
@@ -358,5 +512,16 @@ def run_plc_simulator(port: int = PLC_PORT_A):
         sim.stop()
 
 
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="PLC 模拟器（文档 7.1 节 46字节大端序）")
+    parser.add_argument("--port", type=int, default=PLC_PORT_A, help="监听端口")
+    parser.add_argument("--local", action="store_true", help="仅绑定 127.0.0.1（无真实硬件时使用）")
+    parser.add_argument("--interactive", "-i", action="store_true", help="交互模式（默认后台运行）")
+    args = parser.parse_args()
+
+    run_plc_simulator(port=args.port, local_only=args.local, interactive=args.interactive)
+
+
 if __name__ == "__main__":
-    run_plc_simulator()
+    main()

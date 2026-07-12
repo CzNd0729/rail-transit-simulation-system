@@ -6,9 +6,9 @@
 用于验证内网连通性和 PLC 数据格式。
 
 用法：
-  python -m driver_cab_test.listen_plc              # 默认接收20包
-  python -m driver_cab_test.listen_plc --count 100   # 接收100包
-  python -m driver_cab_test.listen_plc --continuous  # 持续接收
+  python -m driver_cab_test.listen_plc              # 持续接收（每秒刷新）
+  python -m driver_cab_test.listen_plc --count 100   # 接收100包后退出
+  python -m driver_cab_test.listen_plc --interval 2  # 每2秒刷新一次
 """
 
 import socket
@@ -139,16 +139,18 @@ def display_pkt(parsed: dict, index: int):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="监听 PLC 全部数据（7.1 节 46字节）")
-    parser.add_argument("--count", type=int, default=20, help="接收包数 (默认20)")
-    parser.add_argument("--continuous", "-c", action="store_true", help="持续接收（需 Ctrl+C 停止）")
+    parser = argparse.ArgumentParser(description="监听 PLC 全部数据（7.1 节 46字节，持续运行）")
+    parser.add_argument("--count", type=int, default=0, help="接收 N 包后退出（默认持续运行）")
+    parser.add_argument("--local", action="store_true", help="连接本地模拟器 (127.0.0.1)")
+    parser.add_argument("--interval", type=float, default=1.0, help="显示刷新间隔（秒，默认1.0）")
     args = parser.parse_args()
 
-    PLC_ADDR = (PLC_SERVER_IP, PLC_PORT_A)
-    max_packets = args.count if not args.continuous else 999999
+    plc_ip = "127.0.0.1" if args.local else PLC_SERVER_IP
+    PLC_ADDR = (plc_ip, PLC_PORT_A)
+    max_packets = args.count if args.count > 0 else 999999
 
-    print(f"连接 PLC: {PLC_SERVER_IP}:{PLC_PORT_A} ...")
-    print(f"接收模式: {'持续接收' if args.continuous else f'接收 {args.count} 包后退出'}")
+    print(f"连接 PLC: {plc_ip}:{PLC_PORT_A} ...")
+    print(f"接收模式: {'持续接收（Ctrl+C 停止）' if args.count == 0 else f'接收 {args.count} 包后退出'}")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(5.0)
 
@@ -157,17 +159,23 @@ def main():
         print(f"✓ 连接成功！开始接收数据（每100ms一包）\n")
     except Exception as e:
         print(f"✗ 连接失败: {e}")
-        print("\n尝试 ping 测试...")
-        ret = os.system(f"ping -n 2 {PLC_SERVER_IP} > nul 2>&1")
-        if ret == 0:
-            print(f"  Ping {PLC_SERVER_IP} 可达，但端口 {PLC_PORT_A} 可能未开放或被防火墙阻断")
+        if args.local:
+            print("\n提示：请先启动本地模拟器")
+            print("  python -m driver_cab_test.plc_simulator --local")
         else:
-            print(f"  Ping {PLC_SERVER_IP} 不通，请检查网络连接")
+            print("\n尝试 ping 测试...")
+            ret = os.system(f"ping -n 2 {PLC_SERVER_IP} > nul 2>&1")
+            if ret == 0:
+                print(f"  Ping {PLC_SERVER_IP} 可达，但端口 {PLC_PORT_A} 可能未开放或被防火墙阻断")
+            else:
+                print(f"  Ping {PLC_SERVER_IP} 不通，请检查网络连接")
         sock.close()
         return
 
     try:
-        for i in range(max_packets):
+        last_display = 0.0
+        i = 0
+        while i < max_packets:
             try:
                 data = sock.recv(PLC_TO_UPPER_LEN, socket.MSG_WAITALL)
             except Exception:
@@ -177,14 +185,15 @@ def main():
                 print(f"  [{i+1}] 收到 {len(data) if data else 0} 字节（不足46，可能断开）")
                 break
 
+            i += 1
             parsed = parse_plc_to_upper(data[:PLC_TO_UPPER_LEN])
 
-            # 清屏
-            if i > 0:
+            # 按 interval 刷新显示，不闪屏
+            now = time.time()
+            if now - last_display >= args.interval:
+                last_display = now
                 os.system("cls" if os.name == "nt" else "clear")
-
-            display_pkt(parsed, i + 1)
-            time.sleep(0.05)  # 避免刷屏太快
+                display_pkt(parsed, i)
 
     except KeyboardInterrupt:
         print("\n用户中断")
