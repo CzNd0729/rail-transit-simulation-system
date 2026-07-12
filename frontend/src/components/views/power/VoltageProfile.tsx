@@ -47,11 +47,6 @@ export default function VoltageProfile() {
     ? (trainPosition / totalLength) * 100
     : null;
 
-  // 网压在图表 Y 轴的百分比位置（Y: 1000V→1600V）
-  const voltagePercent = trainVoltage != null
-    ? ((1600 - trainVoltage) / 600) * 100
-    : null;
-
   const option = useMemo(() => ({
     backgroundColor: 'transparent',
     animation: false,
