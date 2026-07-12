@@ -1,6 +1,6 @@
 /**
  * OccupancyDisplay — SVG 轨道条带图
- * 展示全线轨道电路区段占用状态 + 列车位置
+ * 展示全线上下行轨道电路区段占用状态 + 列车位置
  */
 import { useSimulationState } from '../../../context/SimulationContext';
 import { mockLineData } from '../../../data/mockLineData';
@@ -12,25 +12,58 @@ function circuitColor(occupied: boolean): { fill: string; stroke: string } {
     : { fill: '#1a3a1a', stroke: '#2a5a2a' };
 }
 
+function renderBar(
+  circuits: TrackCircuit[],
+  y: number,
+  h: number,
+) {
+  return circuits.map((c) => {
+    const w = c.end_chainage - c.start_chainage;
+    const colors = circuitColor(c.occupied);
+    return (
+      <rect
+        key={c.id}
+        x={c.start_chainage}
+        y={y}
+        width={Math.max(w, 2)}
+        height={h}
+        rx={2}
+        fill={colors.fill}
+        stroke={colors.stroke}
+        strokeWidth={0.5}
+      >
+        <title>
+          {`${c.id}\n${c.start_chainage}m - ${c.end_chainage}m\n${c.occupied ? '占用' : '空闲'}`}
+        </title>
+      </rect>
+    );
+  });
+}
+
 export default function OccupancyDisplay() {
   const { trains, lineLayout, track } = useSimulationState();
 
-  // 使用后端数据，fallback 到 mock
   const segments = lineLayout?.segments ?? mockLineData.segments;
   const stations = lineLayout?.stations ?? mockLineData.stations;
   const total_length = lineLayout?.total_length ?? mockLineData.total_length;
 
-  // 优先使用 WebSocket 推送的实时占用数据，回退到 lineLayout 静态定义
   const circuits: TrackCircuit[] =
     track.occupancy.length > 0
       ? track.occupancy
       : segments.flatMap((seg) => seg.circuits);
 
-  const trackY = 35;
-  const trackH = 16;
+  const downCircuits = circuits.filter((c) => c.direction === 'down');
+  const upCircuits = circuits.filter((c) => c.direction === 'up');
 
-  const occupiedCount = circuits.filter((c) => c.occupied).length;
-  const freeCount = circuits.length - occupiedCount;
+  const downOccupied = downCircuits.filter((c) => c.occupied).length;
+  const downFree = downCircuits.length - downOccupied;
+  const upOccupied = upCircuits.filter((c) => c.occupied).length;
+  const upFree = upCircuits.length - upOccupied;
+
+  const trackY = 30;  // 下行条 y
+  const trackH = 14;  // 条高度
+  const barGap = 4;   // 两条间距
+  const upY = trackY + trackH + barGap; // 上行条 y
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -43,49 +76,32 @@ export default function OccupancyDisplay() {
         >
           {/* 公里标尺 */}
           {Array.from({ length: Math.ceil(total_length / 2000) + 1 }, (_, i) => i * 2000)
-            .filter(pos => pos <= total_length)
+            .filter((pos) => pos <= total_length)
             .map((pos) => (
-            <g key={`ruler-${pos}`}>
-              <line x1={pos} y1={8} x2={pos} y2={14} stroke="#555" strokeWidth={1} />
-              <text x={pos} y={24} textAnchor="middle" fontSize={8} fill="#888">
-                {pos}m
-              </text>
-            </g>
-          ))}
+              <g key={`ruler-${pos}`}>
+                <line x1={pos} y1={8} x2={pos} y2={14} stroke="#555" strokeWidth={1} />
+                <text x={pos} y={24} textAnchor="middle" fontSize={8} fill="#888">
+                  {pos}m
+                </text>
+              </g>
+            ))}
 
-          {/* 轨道电路色块 */}
-          {circuits.map((c) => {
-            const w = c.end_chainage - c.start_chainage;
-            const colors = circuitColor(c.occupied);
-            return (
-              <rect
-                key={c.id}
-                x={c.start_chainage}
-                y={trackY}
-                width={Math.max(w, 2)}
-                height={trackH}
-                rx={2}
-                fill={colors.fill}
-                stroke={colors.stroke}
-                strokeWidth={0.5}
-              >
-                <title>
-                  {`${c.id}\n${c.start_chainage}m - ${c.end_chainage}m\n${c.occupied ? '占用' : '空闲'}`}
-                </title>
-              </rect>
-            );
-          })}
+          {/* 下行轨道电路色块 */}
+          {renderBar(downCircuits, trackY, trackH)}
+
+          {/* 上行轨道电路色块 */}
+          {renderBar(upCircuits, upY, trackH)}
 
           {/* 车站标签 */}
           {stations.map((s) => (
             <g key={s.id}>
               <line
-                x1={s.chainage} y1={trackY + trackH + 2}
-                x2={s.chainage} y2={trackY + trackH + 12}
+                x1={s.chainage} y1={upY + trackH + 2}
+                x2={s.chainage} y2={upY + trackH + 12}
                 stroke="#555" strokeWidth={1}
               />
               <text
-                x={s.chainage} y={trackY + trackH + 24}
+                x={s.chainage} y={upY + trackH + 24}
                 textAnchor="middle" fontSize={8} fill="#ccc"
               >
                 {s.name}
@@ -112,14 +128,17 @@ export default function OccupancyDisplay() {
         </svg>
       </div>
 
-      {/* 统计描述 */}
+      {/* 分方向统计 */}
       <div style={styles.summary}>
-        <span>总计 <b>{circuits.length}</b> 个区段</span>
-        <span style={{ color: '#ff4d4f' }}>
-          ● 占用 <b>{occupiedCount}</b>
+        <span>
+          ↓ 下行 <b>{downCircuits.length}</b> 区段
+          <span style={{ color: '#ff4d4f' }}> ●占用 {downOccupied}</span>
+          <span style={{ color: '#52c41a' }}> ●空闲 {downFree}</span>
         </span>
-        <span style={{ color: '#52c41a' }}>
-          ● 空闲 <b>{freeCount}</b>
+        <span>
+          ↑ 上行 <b>{upCircuits.length}</b> 区段
+          <span style={{ color: '#ff4d4f' }}> ●占用 {upOccupied}</span>
+          <span style={{ color: '#52c41a' }}> ●空闲 {upFree}</span>
         </span>
       </div>
     </div>
@@ -129,7 +148,7 @@ export default function OccupancyDisplay() {
 const styles: Record<string, React.CSSProperties> = {
   summary: {
     display: 'flex',
-    gap: '16px',
+    gap: '24px',
     padding: '6px 4px 0',
     fontSize: '11px',
     color: 'var(--text-secondary)',
