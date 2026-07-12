@@ -53,6 +53,7 @@ def params_from_dict(data: dict) -> VehicleParams:
         traction_curve=curve,
         regeneration_efficiency=float(data.get("regeneration_efficiency", 0.3)),
         length=float(data.get("length", 120.0)),
+        direction=str(data.get("direction", "down")),
     )
 
 

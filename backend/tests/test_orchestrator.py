@@ -126,8 +126,9 @@ def test_reset_clears_state():
     assert orch.clock.elapsed == 0.0
     assert len(orch.recorder.buffer) == 0
     assert orch.train_state is not None
-    # 上行方向重置后位置应为线路终点
-    expected_start = orch.track.track.total_length if orch.train_direction == "up" else 0.0
+    # 上行方向重置后位置应为线路终点，下行为 0
+    expected_direction = orch.vehicle.params.direction
+    expected_start = orch.track.track.total_length if expected_direction == "up" else 0.0
     assert orch.train_state.position == expected_start
     assert orch.train_state.speed == 0.0
 

@@ -80,6 +80,9 @@ class VehicleParams:
     length: float = 120.0
     """列车长度 (m)。"""
 
+    direction: str = "down"
+    """运行方向：``up`` (上行，公里标递减) / ``down`` (下行，公里标递增)。"""
+
     def mass_at_load(self, passenger_load: float) -> float:
         """按载客率 (0.0~1.0) 折算列车总质量 (kg)。"""
         load = min(max(passenger_load, 0.0), 1.0)

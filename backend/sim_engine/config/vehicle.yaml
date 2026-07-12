@@ -3,6 +3,7 @@
 vehicle:
   id: SFM05
   name: SFM05型B车
+  direction: "up"           # 运行方向："up"(上行) / "down"(下行)
   empty_mass: 220000          # 空车质量 (kg)，AW0 约 220t
   passenger_capacity: 1460    # 满员载客人数（AW2，6节B型车）
   max_speed: 80               # 构造速度 (km/h)

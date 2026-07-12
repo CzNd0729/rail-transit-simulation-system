@@ -149,6 +149,8 @@ class Orchestrator:
         """按 train_count / departure_interval 创建各列车运行单元。"""
         base_tt = load_timetable(self._timetable_path)
         interval = self.sim_params.departure_interval
+        direction = self.vehicle.params.direction
+        start_pos = self.track.track.total_length if direction == "up" else 0.0
         self.trains = []
         for i in range(self.sim_params.train_count):
             train_id = f"TRAIN_{i + 1:02d}"
@@ -157,11 +159,13 @@ class Orchestrator:
             signaling = ThreeStageController(
                 self.track, self.vehicle.params, self.sim_params, ats=ats
             )
+            signaling.reset(direction=direction)
             self.trains.append(
                 TrainRun(
                     train_id=train_id,
                     state=self.vehicle.create_initial_state(
-                        position=0.0, passenger_load=passenger_load
+                        position=start_pos, passenger_load=passenger_load,
+                        direction=direction,
                     ),
                     signaling=signaling,
                     ats=ats,
@@ -325,7 +329,7 @@ class Orchestrator:
             )
         )
 
-        self.occupancy.update({r.train_id: r.state.position for r in active_runs})
+        self.occupancy.update({r.train_id: (r.state.position, r.state.direction) for r in active_runs})
         self.switch_manager.update(dt)
 
         total_power_demand = sum(item[6] for item in step_outputs)
