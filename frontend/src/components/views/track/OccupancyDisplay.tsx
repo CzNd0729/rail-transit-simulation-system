@@ -74,18 +74,6 @@ export default function OccupancyDisplay() {
           preserveAspectRatio="none"
           style={{ width: '100%', height: '100%' }}
         >
-          {/* 公里标尺 */}
-          {Array.from({ length: Math.ceil(total_length / 2000) + 1 }, (_, i) => i * 2000)
-            .filter((pos) => pos <= total_length)
-            .map((pos) => (
-              <g key={`ruler-${pos}`}>
-                <line x1={pos} y1={8} x2={pos} y2={14} stroke="#555" strokeWidth={1} />
-                <text x={pos} y={24} textAnchor="middle" fontSize={8} fill="#888">
-                  {pos}m
-                </text>
-              </g>
-            ))}
-
           {/* 下行轨道电路色块 */}
           {renderBar(downCircuits, trackY, trackH)}
 
