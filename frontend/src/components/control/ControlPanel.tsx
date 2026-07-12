@@ -5,11 +5,9 @@
  * 功能：
  * - UI-CTRL-01: 运行/暂停/停止按钮
  * - UI-CTRL-02: 仿真速度倍率选择器 (1× / 5× / 10×)
- * - UI-CTRL-03: 单步执行按钮（仅暂停/空闲可用）
  */
 import RunControlButtons from './RunControlButtons';
 import SpeedSelector from './SpeedSelector';
-import StepButton from './StepButton';
 import EmergencyBrakeButton from './EmergencyBrakeButton';
 import { useSimulationState } from '../../context/SimulationContext';
 
@@ -28,7 +26,6 @@ export default function ControlPanel({ send }: Props) {
         <RunControlButtons send={send} />
         <SpeedSelector send={send} />
         <EmergencyBrakeButton send={send} runState={runState} speed={speed} />
-        <StepButton send={send} />
       </div>
     </div>
   );

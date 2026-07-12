@@ -1,20 +1,31 @@
 /**
  * PowerParams — 供电参数编辑表单
- * 基于《需求文档》UI-PARAM-03（迭代三）
+ * 基于《需求文档》UI-PARAM-03
  */
 import { useSimulationState } from '../../context/SimulationContext';
 import { useSimulation } from '../../hooks/useSimulation';
+import ParamStepper from './ParamStepper';
+import {
+  POWER_PARAM_STEP_KEYS,
+  computeFixedParamStep,
+  type PowerParamStepKey,
+} from '../../utils/paramStep';
 
 interface Props {
   send: (data: object) => void;
   disabled?: boolean;
 }
 
+const PARAM_LABELS: Record<PowerParamStepKey, string> = {
+  pantograph_voltage: '网压 (V)',
+  substation_capacity: '变电所容量 (kW)',
+};
+
 export default function PowerParamsForm({ send, disabled = false }: Props) {
-  const { params } = useSimulationState();
+  const { params, powerParamBaselines } = useSimulationState();
   const { updateParams } = useSimulation(send);
 
-  const handleChange = (key: string, value: number) => {
+  const handleChange = (key: PowerParamStepKey, value: number) => {
     if (disabled) return;
     updateParams({ power: { ...params.power, [key]: value } });
   };
@@ -22,40 +33,21 @@ export default function PowerParamsForm({ send, disabled = false }: Props) {
   return (
     <fieldset style={styles.fieldset}>
       <legend style={styles.legend}>⚡ 供电参数</legend>
-      <ParamRow
-        label="网压 (V)"
-        value={params.power.pantograph_voltage}
-        onChange={(v) => handleChange('pantograph_voltage', v)}
-        disabled={disabled}
-      />
-      <ParamRow
-        label="变电所容量 (kW)"
-        value={params.power.substation_capacity}
-        onChange={(v) => handleChange('substation_capacity', v)}
-        disabled={disabled}
-      />
+      {POWER_PARAM_STEP_KEYS.map((key) => {
+        const baseline = powerParamBaselines[key] ?? params.power[key] ?? 0;
+        return (
+          <ParamStepper
+            key={key}
+            label={PARAM_LABELS[key]}
+            value={params.power[key]}
+            step={computeFixedParamStep(baseline)}
+            min={1}
+            onChange={(v) => handleChange(key, v)}
+            disabled={disabled}
+          />
+        );
+      })}
     </fieldset>
-  );
-}
-
-function ParamRow({ label, value, onChange, disabled = false }: {
-  label: string;
-  value: number | undefined;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div style={styles.row}>
-      <label>{label}</label>
-      <input
-        type="number"
-        value={value ?? ''}
-        onChange={(e) => onChange(Number(e.target.value))}
-        style={styles.input}
-        placeholder="默认值"
-        disabled={disabled}
-      />
-    </div>
   );
 }
 
@@ -69,15 +61,5 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: 'var(--text-highlight)',
     padding: '0 4px',
-  },
-  row: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '3px 0',
-  },
-  input: {
-    width: '100px',
-    textAlign: 'right' as const,
   },
 };

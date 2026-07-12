@@ -403,6 +403,8 @@ export interface AppState {
   trackParamBaselines: import('../utils/paramStep').TrackParamBaselines;
   /** 信号参数步进基准值 */
   signalParamBaselines: import('../utils/paramStep').SignalParamBaselines;
+  /** 供电参数步进基准值 */
+  powerParamBaselines: import('../utils/paramStep').PowerParamBaselines;
   /** 牵引特性曲线各折点步进基准值 */
   tractionCurveBaselines: import('../utils/paramStep').TractionCurvePointBaseline[];
 }
