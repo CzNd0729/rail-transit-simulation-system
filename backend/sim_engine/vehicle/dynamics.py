@@ -50,7 +50,8 @@ class VehicleSystem:
         return cls(load_vehicle_params(path))
 
     def create_initial_state(
-        self, position: float = 0.0, passenger_load: float = 0.0
+        self, position: float = 0.0, passenger_load: float = 0.0,
+        direction: str = "down",
     ) -> TrainState:
         """构造一个初始（静止）列车状态，质量按载客率折算。"""
         return TrainState(
@@ -60,6 +61,7 @@ class VehicleSystem:
             mode=MODE_COASTING,
             mass=self.params.mass_at_load(passenger_load),
             passenger_load=passenger_load,
+            direction=direction,
         )
 
     def step(
@@ -148,6 +150,7 @@ class VehicleSystem:
             passenger_load=state.passenger_load,
             traction_energy=traction_energy,
             regen_energy=regen_energy,
+            direction=state.direction,
         )
 
         forces = ForceBreakdown(

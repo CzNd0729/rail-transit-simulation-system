@@ -32,31 +32,31 @@ class OccupancyDetector:
 
     # ── TRK-11: 批量更新占用 ──────────────────────────────
 
-    def update(self, train_positions: dict[str, float]) -> None:
-        """根据所有列车位置更新占用状态。
+    def update(self, train_positions: dict[str, tuple[float, str]]) -> None:
+        """根据所有列车位置与方向更新占用状态。
 
         Args:
-            train_positions: {train_id: chainage} 映射
+            train_positions: {train_id: (chainage, direction)} 映射
         """
         # 清空所有区段
         for c in self._circuits:
             c.occupied = False
 
         # 标记占用
-        for position in train_positions.values():
-            tc = self._circuit_at(position)
+        for position, direction in train_positions.values():
+            tc = self._circuit_at(position, direction)
             if tc is not None:
                 tc.occupied = True
 
     # ── TRK-10: 单区段占用查询 ────────────────────────────
 
-    def query_circuit(self, chainage: float) -> TrackCircuit | None:
-        """给定公里标，返回所在轨道电路区段（TRK-10）。"""
-        return self._circuit_at(chainage)
+    def query_circuit(self, chainage: float, direction: str = "down") -> TrackCircuit | None:
+        """给定公里标与方向，返回所在轨道电路区段（TRK-10）。"""
+        return self._circuit_at(chainage, direction)
 
-    def is_occupied(self, chainage: float) -> bool:
-        """给定公里标，返回该位置所在区段是否被占用。"""
-        tc = self._circuit_at(chainage)
+    def is_occupied(self, chainage: float, direction: str = "down") -> bool:
+        """给定公里标与方向，返回该位置所在区段是否被占用。"""
+        tc = self._circuit_at(chainage, direction)
         return tc.occupied if tc else False
 
     # ── 状态快照 ──────────────────────────────────────────
@@ -94,13 +94,15 @@ class OccupancyDetector:
 
     # ── 内部 ──────────────────────────────────────────────
 
-    def _circuit_at(self, chainage: float) -> TrackCircuit | None:
-        for c in self._circuits:
+    def _circuit_at(self, chainage: float, direction: str = "down") -> TrackCircuit | None:
+        """按方向与公里标查找轨道电路区段。"""
+        candidates = [c for c in self._circuits if c.direction == direction]
+        for c in candidates:
             if c.start_chainage <= chainage <= c.end_chainage:
                 return c
         # 边界外处理：小于最小起点取第一个，大于最大终点取最后一个
-        if self._circuits:
-            if chainage < self._circuits[0].start_chainage:
-                return self._circuits[0]
-            return self._circuits[-1]
+        if candidates:
+            if chainage < candidates[0].start_chainage:
+                return candidates[0]
+            return candidates[-1]
         return None

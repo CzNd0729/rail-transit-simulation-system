@@ -158,6 +158,9 @@ class TrainState:
     target_station_id: str = ""
     """当前目标站 ID。无目标站时为空字符串。"""
 
+    direction: str = "down"
+    """列车运行方向：``up`` (上行) / ``down`` (下行)。"""
+
 
 @dataclass
 class ForceBreakdown:

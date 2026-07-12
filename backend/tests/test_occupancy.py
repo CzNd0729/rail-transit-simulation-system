@@ -33,63 +33,63 @@ class TestOccupancyUpdate:
 
     def test_single_train_occupancy(self):
         det = make_detector()
-        det.update({"TRAIN_01": 500.0})
+        det.update({"TRAIN_01": (500.0, "down")})
         s = det.state()
         assert s[0].occupied  # TC01
         assert not s[1].occupied  # TC02
 
     def test_train_in_second_circuit(self):
         det = make_detector()
-        det.update({"TRAIN_01": 2000.0})
+        det.update({"TRAIN_01": (2000.0, "down")})
         s = det.state()
         assert not s[0].occupied  # TC01
         assert s[1].occupied  # TC02
 
     def test_cleared_between_updates(self):
         det = make_detector()
-        det.update({"TRAIN_01": 500.0})
+        det.update({"TRAIN_01": (500.0, "down")})
         assert det.state()[0].occupied
 
-        det.update({"TRAIN_01": 2000.0})
+        det.update({"TRAIN_01": (2000.0, "down")})
         assert not det.state()[0].occupied  # TC01 已出清
         assert det.state()[1].occupied  # TC02 已占用
 
     def test_clear_all_when_no_trains(self):
         det = make_detector()
-        det.update({"TRAIN_01": 500.0})
+        det.update({"TRAIN_01": (500.0, "down")})
         det.update({})
         assert all(not c.occupied for c in det.state())
 
     def test_boundary_start_chainage(self):
         det = make_detector()
-        det.update({"TRAIN_01": 0.0})
+        det.update({"TRAIN_01": (0.0, "down")})
         assert det.state()[0].occupied
 
     def test_boundary_end_chainage(self):
         det = make_detector()
-        det.update({"TRAIN_01": 3200.0})
+        det.update({"TRAIN_01": (3200.0, "down")})
         assert det.state()[1].occupied
 
     def test_before_first_circuit_clamps(self):
         det = make_detector()
-        det.update({"TRAIN_01": -100.0})
+        det.update({"TRAIN_01": (-100.0, "down")})
         assert det.state()[0].occupied  # 截断到第一个区段
 
     def test_after_last_circuit_clamps(self):
         det = make_detector()
-        det.update({"TRAIN_01": 5000.0})
+        det.update({"TRAIN_01": (5000.0, "down")})
         assert det.state()[1].occupied  # 截断到最后一个区段
 
     def test_multi_train(self):
         det = make_detector()
-        det.update({"TRAIN_01": 500.0, "TRAIN_02": 2000.0})
+        det.update({"TRAIN_01": (500.0, "down"), "TRAIN_02": (2000.0, "down")})
         s = det.state()
         assert s[0].occupied  # TC01 被 TRAIN_01 占用
         assert s[1].occupied  # TC02 被 TRAIN_02 占用
 
     def test_state_is_copy(self):
         det = make_detector()
-        det.update({"TRAIN_01": 500.0})
+        det.update({"TRAIN_01": (500.0, "down")})
         s1 = det.state()
         s2 = det.state()
         assert s1 is not s2  # 每次返回新副本
@@ -116,7 +116,7 @@ class TestOccupancyQuery:
 
     def test_is_occupied(self):
         det = make_detector()
-        det.update({"TRAIN_01": 500.0})
+        det.update({"TRAIN_01": (500.0, "down")})
         assert det.is_occupied(500.0)
         assert not det.is_occupied(2000.0)
 
@@ -135,7 +135,7 @@ class TestOccupancyQuery:
 class TestOccupancyList:
     def test_format(self):
         det = make_detector()
-        det.update({"TRAIN_01": 500.0})
+        det.update({"TRAIN_01": (500.0, "down")})
         lst = det.occupancy_list()
         assert len(lst) == 2
         assert lst[0]["circuitId"] == "TC01"
@@ -150,4 +150,4 @@ class TestOccupancyList:
         assert det.occupancy_list() == []
         assert det.state() == []
         # update should not crash
-        det.update({"TRAIN_01": 100.0})
+        det.update({"TRAIN_01": (100.0, "down")})
