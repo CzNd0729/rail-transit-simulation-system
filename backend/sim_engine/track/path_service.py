@@ -64,11 +64,18 @@ class TrackPathService:
 
     # ── 辅助查询 ────────────────────────────────────────────────────
 
-    def next_station_ahead(self, chainage: float) -> Station | None:
-        """前方最近车站（严格大于当前位置）。
+    def next_station_ahead(self, chainage: float, direction: str = "down") -> Station | None:
+        """前方最近车站。
 
+        下行：返回 chainage 严格大于当前位置的第一个车站。
+        上行：返回 chainage 严格小于当前位置的第一个车站（反向遍历）。
         不含列车当前所在车站——到站后调用方应通过 station_at() 检测。
         """
+        if direction == "up":
+            for st in reversed(self._stations):
+                if st.chainage < chainage:
+                    return st
+            return None
         for st in self._stations:
             if st.chainage > chainage:
                 return st

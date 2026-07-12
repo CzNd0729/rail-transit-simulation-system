@@ -36,7 +36,8 @@ def test_run_advances_position():
     orch.start()
     for _ in range(100):
         orch.step_once()
-    assert orch.train_state.position > 0
+    # 上行：从终点出发往起点方向，公里标减小但应 > 0
+    assert orch.train_state.position < orch.track.track.total_length
 
 
 def test_snapshot_has_vehicle_fields():
@@ -96,12 +97,13 @@ def test_track_next_station():
 
 
 def test_full_run_reaches_near_terminal():
-    """列车应能运行到接近 C 站（不要求精确对标，集成级验证）。"""
+    """列车应能运行到接近终点站（不要求精确对标，集成级验证）。"""
     orch = Orchestrator.from_config_dir()
     orch.sim_params.total_time = 2000  # 放宽时间上限
     orch.start()
     summary = orch.run_until(max_steps=15000)
     assert summary["steps"] > 100
+    # max_position 应大于 2500m（上行起始位 18600m；下行应跑过 2500m）
     assert summary["max_position"] > 2500
 
 
@@ -124,7 +126,9 @@ def test_reset_clears_state():
     assert orch.clock.elapsed == 0.0
     assert len(orch.recorder.buffer) == 0
     assert orch.train_state is not None
-    assert orch.train_state.position == 0.0
+    # 上行方向重置后位置应为线路终点
+    expected_start = orch.track.track.total_length if orch.train_direction == "up" else 0.0
+    assert orch.train_state.position == expected_start
     assert orch.train_state.speed == 0.0
 
 
@@ -180,5 +184,6 @@ def test_multiple_runs_with_reset():
         orch.start()
         for _ in range(20):
             orch.step_once()
-        assert orch.train_state.position > 0
+        # 上行方向位置应从终点递减；下行应 > 0
+        assert orch.train_state.position != orch.track.track.total_length
         orch.stop()

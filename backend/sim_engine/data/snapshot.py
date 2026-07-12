@@ -31,6 +31,7 @@ def _serialize_train(entry: TrainSnapshotEntry) -> dict:
         "acceleration": entry.state.acceleration,
         "jerk": entry.state.jerk,
         "mode": display_mode,
+        "direction": entry.state.direction,
         "mass": entry.state.mass,
         "passengerCount": int(entry.state.passenger_load * 1500),
         "pantographVoltage": entry.pantograph_voltage,

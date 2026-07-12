@@ -692,7 +692,10 @@ def test_full_run_jerk_mostly_within_comfort_limit():
             over_hard += 1
         if (
             orch.train_state
-            and orch.train_state.position >= orch.track.track.total_length - 1.0
+            and (
+                (orch.train_state.direction == "up" and orch.train_state.position <= 1.0)
+                or (orch.train_state.direction != "up" and orch.train_state.position >= orch.track.track.total_length - 1.0)
+            )
             and orch.train_state.speed < 0.1
         ):
             break

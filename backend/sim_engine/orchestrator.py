@@ -416,13 +416,13 @@ class Orchestrator:
             if self.clock.elapsed >= self.sim_params.total_time:
                 break
             # 到达终点且停稳
-            if (
-                self.train_state
-                and self.train_state.position
-                >= self.track.track.total_length - 1.0
-                and self.train_state.speed < 0.1
-            ):
-                break
+            if self.train_state:
+                if self.train_state.direction == "up":
+                    if self.train_state.position <= 1.0 and self.train_state.speed < 0.1:
+                        break
+                else:
+                    if self.train_state.position >= self.track.track.total_length - 1.0 and self.train_state.speed < 0.1:
+                        break
             self.step_once()
             steps += 1
             if max_steps is not None and steps >= max_steps:

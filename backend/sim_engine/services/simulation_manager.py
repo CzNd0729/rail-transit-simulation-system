@@ -392,13 +392,17 @@ class SimulationManager:
                     },
                 })
             # 终点停稳判断
+            line_end = (
+                orch.train_state is not None
+                and orch.train_state.speed < 0.1
+                and (
+                    (orch.train_state.direction == "up" and orch.train_state.position <= 1.0)
+                    or (orch.train_state.direction != "up" and orch.train_state.position >= orch.track.track.total_length - 1.0)
+                )
+            )
             if (
                 orch.clock.elapsed >= orch.sim_params.total_time
-                or (
-                    orch.train_state is not None
-                    and orch.train_state.position >= orch.track.track.total_length - 1.0
-                    and orch.train_state.speed < 0.1
-                )
+                or line_end
             ):
                 # 先记录结束时刻的摘要
                 summary = orch.recorder.summary()

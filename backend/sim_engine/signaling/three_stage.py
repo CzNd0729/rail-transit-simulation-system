@@ -82,13 +82,15 @@ class ThreeStageController:
         """制动 PID 参数（测试可通过此属性验证配置）。"""
         return self.sim_params.pid
 
-    def reset(self) -> None:
+    def reset(self, direction: str = "down") -> None:
         self._state = TrainSignalState()
         self._prev_traction_level = 0.0
         self._prev_brake_level = 0.0
         self._ato.reset()
         if self.track._stations:
-            self._state._dwell_station_id = self.track._stations[0].id
+            # 下行起点标记首站已停靠，上行起点标记末站已停靠
+            init_station = self.track._stations[-1] if direction == "up" else self.track._stations[0]
+            self._state._dwell_station_id = init_station.id
 
     def _max_level_delta(self, train: TrainState, dt: float) -> float:
         """由 max_jerk 推导每步允许的最大牵引/制动级位变化量。
@@ -165,11 +167,14 @@ class ThreeStageController:
         )
 
     def _update_distance(self, train: TrainState, target: Station | None) -> None:
-        """更新距当前目标站距离。"""
+        """更新距当前目标站距离。上行方向公里标递减，距离 = position - chainage。"""
         st = self._state
         if target is not None:
             st.target_station_id = target.id
-            st.distance_to_station = target.chainage - train.position
+            if train.direction == "up":
+                st.distance_to_station = train.position - target.chainage
+            else:
+                st.distance_to_station = target.chainage - train.position
         else:
             st.target_station_id = ""
             st.distance_to_station = 0.0
@@ -197,7 +202,7 @@ class ThreeStageController:
                 ControlCommands(brake_level=0.20, phase="dwell"), train, dt
             )
 
-        target = self.track.next_station_ahead(train.position)
+        target = self.track.next_station_ahead(train.position, train.direction)
 
         # 制动阶段锁定目标站：进入 BRAKING 时保存的目标站 ID，
         # 防止越过站台后 next_station_ahead 切换为下一站导致前馈制动归零
@@ -209,7 +214,7 @@ class ThreeStageController:
         # ── 跳站检测 ──
         if st._last_target_station_id and target is not None and target.id != st._last_target_station_id:
             old_station = self.track.get_station_by_id(st._last_target_station_id)
-            if old_station is not None and train.position > old_station.chainage:
+            if old_station is not None and self._has_passed(train, old_station.chainage):
                 if old_station.id != st._dwell_station_id:
                     if train.speed < 0.1 and abs(train.position - old_station.chainage) <= 50.0:
                         st.phase = Phase.DWELL
@@ -237,7 +242,7 @@ class ThreeStageController:
         speed_limit = effective_speed_limit_kmh(track_params, self.vehicle_params)
         v_cruise = self.sim_params.target_speed_ratio * speed_limit
         brake_dist = self._brake_trigger_distance(train)
-        dist_to_station = target.chainage - train.position
+        dist_to_station = self._signed_dist(train, target.chainage)
 
         # ── 到站停稳检测 ──
         if train.speed < 0.1 and abs(dist_to_station) <= tol:
@@ -250,7 +255,12 @@ class ThreeStageController:
                 ControlCommands(brake_level=0.20, phase="dwell"), train, dt
             )
 
-        if train.speed < 0.1 and dist_to_station > tol and train.position > tol:
+        line_end_tol = tol  # 用于判断列车是否接近线路物理端点
+        if train.direction == "up":
+            near_line_end = train.position < self.track.track.total_length - line_end_tol
+        else:
+            near_line_end = train.position > line_end_tol
+        if train.speed < 0.1 and dist_to_station > tol and near_line_end:
             current_station = self.track.station_at(train.position, half_length=50.0)
             if current_station is not None and current_station.id != st._dwell_station_id:
                 st.phase = Phase.DWELL
@@ -267,7 +277,7 @@ class ThreeStageController:
 
         # ── TRACTION: 开环满牵引 ──
         if st.phase == Phase.TRACTION:
-            if train.position + brake_dist >= target.chainage - tol:
+            if self._should_brake(train, target.chainage, brake_dist, tol):
                 st.phase = Phase.BRAKING
                 st._brake_target_id = target.id
                 self._update_distance(train, target)
@@ -283,7 +293,7 @@ class ThreeStageController:
 
         # ── COASTING: 惰行 + 开环补偿 ──
         if st.phase == Phase.COASTING:
-            if train.position + brake_dist >= target.chainage - tol:
+            if self._should_brake(train, target.chainage, brake_dist, tol):
                 st.phase = Phase.BRAKING
                 st._brake_target_id = target.id
                 self._update_distance(train, target)
@@ -307,13 +317,36 @@ class ThreeStageController:
         self._update_distance(train, target)
         return self._braking_output(train, target, dt)
 
+    # ── 方向感知辅助 ──
+
+    @staticmethod
+    def _signed_dist(train: TrainState, chainage: float) -> float:
+        """带符号距离：正值=目标在前方尚未到达，负值=已越过。"""
+        if train.direction == "up":
+            return train.position - chainage
+        return chainage - train.position
+
+    @staticmethod
+    def _should_brake(train: TrainState, target_chainage: float, brake_dist: float, tol: float) -> bool:
+        """判断（当前位置+制动距离）是否触及制动触发点。"""
+        if train.direction == "up":
+            return train.position - brake_dist <= target_chainage + tol
+        return train.position + brake_dist >= target_chainage - tol
+
+    @staticmethod
+    def _has_passed(train: TrainState, chainage: float) -> bool:
+        """列车是否已越过给定公里标。"""
+        if train.direction == "up":
+            return train.position < chainage
+        return train.position > chainage
+
     # ── 制动阶段核心 ──
 
     def _braking_output(
         self, train: TrainState, target: Station, dt: float
     ) -> ControlCommands:
         raw = self._braking_step(train, target, dt)
-        remaining = target.chainage - train.position
+        remaining = self._signed_dist(train, target.chainage)
         urgent = (
             raw.brake_level >= 1.0
             and remaining <= 0
@@ -330,7 +363,7 @@ class ThreeStageController:
         P 微调：以 ATO 制动曲线为目标做归一化误差修正。
         全程工作到站台停稳，不使用蠕行模式。
         """
-        remaining = target.chainage - train.position
+        remaining = self._signed_dist(train, target.chainage)
 
         # 已越过站台：低速时保持制动而非满制动，避免停稳瞬间冲击率尖峰
         if remaining <= 0:

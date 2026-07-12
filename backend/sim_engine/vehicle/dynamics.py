@@ -124,7 +124,9 @@ class VehicleSystem:
             new_v_ms = speed_limit_ms
             accel = (new_v_ms - v_ms) / dt if dt > 0 else 0.0
 
-        new_position = state.position + new_v_ms * dt
+        # 上行方向公里标递减，下行方向公里标递增
+        dir_sign = -1.0 if state.direction == "up" else 1.0
+        new_position = state.position + dir_sign * new_v_ms * dt
 
         jerk = (accel - prev_accel) / dt if dt > 0 else 0.0
 
