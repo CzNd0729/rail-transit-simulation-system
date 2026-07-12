@@ -20,7 +20,7 @@ from sim_engine.power.substation import Substation
 from sim_engine.signaling.atp import ATPController
 from sim_engine.signaling.ats import ATSController
 from sim_engine.signaling.manual_drive import ManualDriveController
-from sim_engine.signaling.models import SafetyStatus
+from sim_engine.signaling.models import SafetyStatus, Timetable
 from sim_engine.signaling.three_stage import ThreeStageController
 from sim_engine.signaling.timetable_loader import load_timetable
 from sim_engine.track.config import load_track
@@ -35,27 +35,71 @@ CONFIG_DIR = Path(__file__).resolve().parent / "config"
 
 
 @dataclass
+class TrainRun:
+    """单列车运行单元（独立信号链与状态）。"""
+
+    train_id: str
+    state: TrainState
+    signaling: ThreeStageController
+    ats: ATSController
+    manual_driver: ManualDriveController
+    spawn_time: float = 0.0
+    active: bool = False
+    last_step: StepResult | None = None
+
+
+@dataclass
 class Orchestrator:
-    """单列车 MVP 仿真编排器。"""
+    """仿真编排器（支持同向多列车，step_once 仍按首车步进直至 Task 3）。"""
 
     vehicle: VehicleSystem
     track: TrackPathService
-    signaling: ThreeStageController
     atp: ATPController
-    ats: ATSController
     clock: SimulationClock
     sim_params: SimulationParams
     power_network: PowerNetwork = field(default_factory=PowerNetwork)
     occupancy: OccupancyDetector = field(default_factory=lambda: OccupancyDetector([]))
     switch_manager: SwitchManager = field(default_factory=lambda: SwitchManager([]))
     recorder: DataRecorder = field(default_factory=DataRecorder)
-    train_id: str = "TRAIN_01"
-    train_state: TrainState | None = None
+    trains: list[TrainRun] = field(default_factory=list)
+    _timetable_path: Path = field(default_factory=lambda: CONFIG_DIR / "timetable.yaml")
     run_state: RunState = RunState.IDLE
-    manual_driver: ManualDriveController = field(default_factory=ManualDriveController)
     last_snapshot: dict | None = None
-    last_step: StepResult | None = None
     _on_snapshot: Callable[[dict], None] | None = None
+
+    @property
+    def train_state(self) -> TrainState | None:
+        return self.trains[0].state if self.trains else None
+
+    @train_state.setter
+    def train_state(self, value: TrainState | None) -> None:
+        if self.trains and value is not None:
+            self.trains[0].state = value
+
+    @property
+    def train_id(self) -> str:
+        return self.trains[0].train_id if self.trains else "TRAIN_01"
+
+    @property
+    def signaling(self) -> ThreeStageController:
+        return self.trains[0].signaling
+
+    @property
+    def ats(self) -> ATSController:
+        return self.trains[0].ats
+
+    @property
+    def manual_driver(self) -> ManualDriveController:
+        return self.trains[0].manual_driver
+
+    @property
+    def last_step(self) -> StepResult | None:
+        return self.trains[0].last_step if self.trains else None
+
+    @last_step.setter
+    def last_step(self, value: StepResult | None) -> None:
+        if self.trains:
+            self.trains[0].last_step = value
 
     @classmethod
     def from_config_dir(cls, config_dir: str | Path | None = None) -> "Orchestrator":
@@ -65,10 +109,7 @@ class Orchestrator:
         track = TrackPathService(load_track(config_dir / "track.yaml"))
         occupancy = OccupancyDetector(track.track.circuits)
         switch_manager = SwitchManager(track.track.switches)
-        timetable = load_timetable(config_dir / "timetable.yaml")
-        ats = ATSController(sim_params.signal.ats, timetable)
         atp = ATPController(sim_params.signal.atp)
-        signaling = ThreeStageController(track, vehicle.params, sim_params, ats=ats)
         clock = SimulationClock(
             time_step=sim_params.time_step,
             speed_multiplier=sim_params.speed_multiplier,
@@ -90,44 +131,67 @@ class Orchestrator:
             rail_resistance=sim_params.power.rail_resistance,
         )
 
-        return cls(
+        orch = cls(
             vehicle=vehicle,
             track=track,
-            signaling=signaling,
             atp=atp,
-            ats=ats,
             clock=clock,
             sim_params=sim_params,
             power_network=power_network,
             occupancy=occupancy,
             switch_manager=switch_manager,
+            _timetable_path=config_dir / "timetable.yaml",
         )
+        orch._init_trains()
+        return orch
+
+    def _init_trains(self, passenger_load: float = 0.6) -> None:
+        """按 train_count / departure_interval 创建各列车运行单元。"""
+        base_tt = load_timetable(self._timetable_path)
+        interval = self.sim_params.departure_interval
+        self.trains = []
+        for i in range(self.sim_params.train_count):
+            train_id = f"TRAIN_{i + 1:02d}"
+            timetable = Timetable(train_id=train_id, entries=list(base_tt.entries))
+            ats = ATSController(self.sim_params.signal.ats, timetable)
+            signaling = ThreeStageController(
+                self.track, self.vehicle.params, self.sim_params, ats=ats
+            )
+            self.trains.append(
+                TrainRun(
+                    train_id=train_id,
+                    state=self.vehicle.create_initial_state(
+                        position=0.0, passenger_load=passenger_load
+                    ),
+                    signaling=signaling,
+                    ats=ats,
+                    manual_driver=ManualDriveController(),
+                    spawn_time=i * interval,
+                    active=(i == 0),
+                )
+            )
 
     def set_snapshot_callback(self, callback: Callable[[dict], None]) -> None:
         """注册每步快照回调（供 WebSocket 推送层使用）。"""
         self._on_snapshot = callback
 
     def set_emergency_brake(self, active: bool) -> None:
-        """设置/解除手动紧急制动。"""
-        self.manual_driver.set_emergency_brake(active)
+        """设置/解除手动紧急制动（作用于所有列车）。"""
+        for run in self.trains:
+            run.manual_driver.set_emergency_brake(active)
 
     def reset(self, passenger_load: float = 0.6) -> None:
         self.clock.reset()
         self.recorder.clear()
-        self.signaling.reset()
         self.occupancy.update({})  # 清空所有区段占用
         # Reset all switches to normal
         for sw in self.switch_manager._switches.values():
             sw.state = "normal"
             sw.transition_elapsed = 0.0
             sw._target_state = "normal"
-        self.train_state = self.vehicle.create_initial_state(
-            position=0.0, passenger_load=passenger_load
-        )
+        self._init_trains(passenger_load=passenger_load)
         self.run_state = RunState.IDLE
         self.last_snapshot = None
-        self.last_step = None
-        self.manual_driver = ManualDriveController()
 
     def start(self, passenger_load: float = 0.6) -> None:
         if self.train_state is None:
