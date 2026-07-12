@@ -435,7 +435,7 @@ def pack_signal_to_db_cab_binary(
 
     报文头：0xff 0xf1
     """
-    data = bytearray(22)  # 14头 + 2数据长度 + 1列车ID + 4*4输出
+    data = bytearray(33)  # 14头 + 2数据长度 + 1列车ID + 4*4输出
 
     # 报文头
     data[0] = 0xFF
@@ -462,7 +462,7 @@ def parse_signal_to_db_cab_binary(data: bytes) -> dict:
     """
     解析 信号系统 → 总控数据库节点 驾驶台开关量信息
     """
-    if len(data) < 22:
+    if len(data) < 33:
         raise ValueError(f"驾驶台开关量报文长度不足: {len(data)}")
 
     result = {
@@ -571,7 +571,7 @@ def pack_db_to_signal_cab_binary(
 
     报文头：0xff 0xf1
     """
-    data = bytearray(21)
+    data = bytearray(29)
 
     data[0] = 0xFF
     data[1] = 0xF1
@@ -594,7 +594,7 @@ def parse_db_to_signal_cab_binary(data: bytes) -> dict:
     """
     解析 总控数据库节点 → 信号系统 驾驶台开关量信息
     """
-    if len(data) < 21:
+    if len(data) < 29:
         raise ValueError(f"驾驶台开关量报文长度不足: {len(data)}")
 
     result = {

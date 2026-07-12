@@ -16,15 +16,16 @@
 ## 文件结构
 
 ```
-driver-cab-test/
+driver_cab_test/
+├── __init__.py               # 包初始化
 ├── README.md                 # 本文件
 ├── config.py                 # 通信参数配置
-├── protocols.py              # 协议编解码核心库
+├── protocols.py              # 协议编解码核心库（含自检）
 ├── plc_simulator.py          # PLC模拟服务器（模拟真实PLC）
 ├── cab_simulator.py          # 司机台整体模拟器（PLC+网络屏+信号屏）
-├── test_signal_to_cab.py     # 测试：信号系统 → 司机台（数据下发）
-├── test_cab_to_signal.py     # 测试：司机台 → 信号系统（控制上行）
-└── test_full_loop.py         # 全链路联动测试（主入口）
+├── test_signal_to_cab.py     # 测试：信号系统 → 司机台（数据下发，6场景）
+├── test_cab_to_signal.py     # 测试：司机台 → 信号系统（控制上行，6场景）
+└── test_full_loop.py         # 全链路联动测试（10阶段驾驶循环）
 ```
 
 ## 使用方式
