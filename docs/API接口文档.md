@@ -11,6 +11,7 @@
 | 版本 | 日期 | 修订人 | 修订内容 |
 |------|------|--------|----------|
 | v1.0 | 2026-07-06 | 全体成员 | 初版发布，覆盖全部 API 接口 |
+| v1.1 | 2026-07-13 | 陈逸凡 | 新增方案管理 API 接口 |
 
 ---
 
@@ -157,6 +158,11 @@ WebSocket 地址：
 | GET | /drivercab/status | 获取司机台连接状态 | 三 |
 | POST | /drivercab/connect | 建立司机台连接（接口预留） | 三 |
 | POST | /drivercab/disconnect | 断开司机台连接（接口预留） | 三 |
+| GET | /scenarios | 获取所有方案摘要列表 | 三 |
+| POST | /scenarios | 保存当前参数+结果为方案 | 三 |
+| GET | /scenarios/{scenarioId} | 获取方案完整详情 | 三 |
+| DELETE | /scenarios/{scenarioId} | 删除方案 | 三 |
+| PUT | /scenarios/{scenarioId}/apply | 加载方案参数到引擎 | 三 |
 
 ---
 
@@ -1109,9 +1115,189 @@ GET /events?page=1&pageSize=50&severity=warning&eventType=emergency_brake
 
 ---
 
-## 8. 手动驾驶控制接口（迭代三）
+## 8. 方案管理接口（Scenario Management — 新增）
 
-### 8.1 切换手动驾驶模式
+### 8.1 获取方案列表
+
+获取所有已保存方案的摘要（不含完整 params，含结果摘要指标）。
+
+**请求**：
+
+```
+GET /scenarios
+```
+
+**响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": [
+    {
+      "id": "scenario_20260713_001",
+      "name": "ATO经济模式",
+      "description": "ATO模式+低目标速度系数，节能优先",
+      "createdAt": "2026-07-13T10:30:00Z",
+      "totalTime": 185.3,
+      "avgSpeed": 45.2,
+      "netEnergy": 24.3,
+      "tractionEnergy": 28.5
+    },
+    {
+      "id": "scenario_20260713_002",
+      "name": "三段式重载",
+      "description": "三段式+高载重",
+      "createdAt": "2026-07-13T11:00:00Z",
+      "totalTime": 210.0,
+      "avgSpeed": 38.5,
+      "netEnergy": 32.1,
+      "tractionEnergy": 35.0
+    }
+  ]
+}
+```
+
+### 8.2 保存方案
+
+将当前引擎参数 + 最新仿真结果保存为一个命名方案。
+
+**请求**：
+
+```
+POST /scenarios
+Content-Type: application/json
+```
+
+**请求体**：
+
+```json
+{
+  "name": "ATO经济模式",
+  "description": "ATO模式+低目标速度系数，节能优先"
+}
+```
+
+**响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "id": "scenario_20260713_001",
+    "name": "ATO经济模式",
+    "createdAt": "2026-07-13T10:30:00Z"
+  }
+}
+```
+
+**错误**：
+
+| code | message | 触发条件 |
+|------|---------|----------|
+| 40002 | 仿真正在运行中，请先暂停或停止 | 当前引擎状态为 running |
+| 40003 | 尚无仿真结果，请先运行一次仿真 | 引擎从未运行过或结果为空 |
+
+### 8.3 获取方案详情
+
+**请求**：
+
+```
+GET /scenarios/{scenarioId}
+```
+
+**路径参数**：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| scenarioId | string | 方案 ID，如 `scenario_20260713_001` |
+
+**响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "id": "scenario_20260713_001",
+    "name": "ATO经济模式",
+    "description": "ATO模式+低目标速度系数，节能优先",
+    "createdAt": "2026-07-13T10:30:00Z",
+    "params": {
+      "vehicle": { "emptyMass": 220000, "maxSpeed": 80, "maxTractionForce": 300000 },
+      "signal": { "mode": "ato", "targetSpeedRatio": 0.7, "dwellTime": 30 },
+      "power": { "mode": "simple_ohm", "substationCapacity": 5000 },
+      "simulation": { "trainCount": 1, "departureInterval": 120 }
+    },
+    "result": {
+      "totalTime": 185.3,
+      "totalDistance": 3200.0,
+      "avgSpeed": 45.2,
+      "maxSpeed": 64.1,
+      "tractionEnergy": 28.5,
+      "regenEnergy": 4.2,
+      "netEnergy": 24.3,
+      "minVoltage": 1380,
+      "peakPower": 3200
+    }
+  }
+}
+```
+
+### 8.4 删除方案
+
+**请求**：
+
+```
+DELETE /scenarios/{scenarioId}
+```
+
+**响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": null
+}
+```
+
+### 8.5 加载方案到引擎
+
+将方案参数应用到引擎（重置后加载），前端参数面板刷新为该方案配置。
+
+**请求**：
+
+```
+PUT /scenarios/{scenarioId}/apply
+```
+
+**响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "applied": true,
+    "config": { "...": "更新后的完整配置" }
+  }
+}
+```
+
+**错误**：
+
+| code | message | 触发条件 |
+|------|---------|----------|
+| 40002 | 仿真正在运行中，请先暂停或停止 | 当前引擎状态为 running |
+| 40004 | 方案不存在 | scenarioId 对应的文件不存在 |
+
+---
+
+## 9. 手动驾驶控制接口（迭代三）
+
+### 9.1 切换手动驾驶模式
 
 **请求**：
 ```
@@ -1136,7 +1322,7 @@ POST /control/manual/activate
 |------|---------|----------|
 | 40002 | 仿真未在运行中 | 当前仿真状态非 running |
 
-### 8.2 切回自动驾驶模式
+### 9.2 切回自动驾驶模式
 
 **请求**：
 ```
@@ -1155,7 +1341,7 @@ POST /control/manual/deactivate
 }
 ```
 
-### 8.3 设置手动牵引级位
+### 9.3 设置手动牵引级位
 
 **请求**：
 ```
@@ -1185,7 +1371,7 @@ Content-Type: application/json
 }
 ```
 
-### 8.4 设置手动制动级位
+### 9.4 设置手动制动级位
 
 **请求**：
 ```
@@ -1215,7 +1401,7 @@ Content-Type: application/json
 }
 ```
 
-### 8.5 触发手动紧急制动
+### 9.5 触发手动紧急制动
 
 **请求**：
 ```
@@ -1242,7 +1428,7 @@ Content-Type: application/json
 }
 ```
 
-### 8.6 获取手动驾驶模式状态
+### 9.6 获取手动驾驶模式状态
 
 **请求**：
 ```
@@ -1266,9 +1452,9 @@ GET /control/manual/status?trainId=TRAIN_01
 
 ---
 
-## 9. 实体司机台通信接口（迭代三，接口预留）
+## 10. 实体司机台通信接口（迭代三，接口预留）
 
-### 9.1 设计说明
+### 10.1 设计说明
 
 > 本组接口为**预留接口层**，用于未来与外部实体司机台（硬件设备）进行通信。当前阶段（迭代三）：
 > - 接口定义已固定，后续扩展时不会破坏已有接口
@@ -1276,7 +1462,7 @@ GET /control/manual/status?trainId=TRAIN_01
 > - 后端提供 Mock 实现，用于前端联调和测试
 > - 实体司机台对接将在迭代四协议确定后实施
 
-### 9.2 获取司机台连接状态
+### 10.2 获取司机台连接状态
 
 **请求**：
 ```
@@ -1297,7 +1483,7 @@ GET /drivercab/status
 }
 ```
 
-### 9.3 建立司机台连接
+### 10.3 建立司机台连接
 
 **请求**：
 ```
@@ -1333,7 +1519,7 @@ Content-Type: application/json
 }
 ```
 
-### 9.4 断开司机台连接
+### 10.4 断开司机台连接
 
 **请求**：
 ```
@@ -1353,9 +1539,9 @@ POST /drivercab/disconnect
 
 ---
 
-## 10. WebSocket 实时通信协议
+## 11. WebSocket 实时通信协议
 
-### 8.1 连接建立
+### 11.1 连接建立
 
 客户端连接：
 
@@ -1366,7 +1552,7 @@ wss://sim.example.com/ws
 
 连接成功后，服务端立即发送初始化消息 `init_state`。
 
-### 8.2 连接心跳
+### 11.2 连接心跳
 
 - 服务端每 **15 秒** 发送心跳消息
 - 客户端收到后无需回复
@@ -1379,7 +1565,7 @@ wss://sim.example.com/ws
 }
 ```
 
-### 8.3 消息类型总览
+### 11.3 消息类型总览
 
 | 方向 | 类型 | 说明 | 频率 |
 |------|------|------|------|
@@ -1396,7 +1582,7 @@ wss://sim.example.com/ws
 | C→S | `manual_control` | 手动驾驶控制指令（牵引/制动级位） | 按需（手动模式下） |
 | C→S | `drivercab_data` | 实体司机台数据透传（预留） | 按需 |
 
-### 8.4 消息格式详解
+### 11.4 消息格式详解
 
 #### 8.4.1 init_state
 
@@ -1588,7 +1774,7 @@ wss://sim.example.com/ws
 }
 ```
 
-### 8.5 客户端 → 服务端消息
+### 11.5 客户端 → 服务端消息
 
 #### 8.5.1 sim_control — 仿真控制指令
 
@@ -1663,9 +1849,9 @@ wss://sim.example.com/ws
 
 ---
 
-## 9. 数据模型定义
+## 12. 数据模型定义
 
-### 9.1 TrainState（列车实时状态）
+### 12.1 TrainState（列车实时状态）
 
 | 字段 | 类型 | 单位 | 说明 |
 |------|------|------|------|
@@ -1684,7 +1870,7 @@ wss://sim.example.com/ws
 | doorStatus | enum | — | 车门状态：`open` / `closed` / `opening` / `closing` |
 | faultAlarm | object | — | 故障告警，null 表示无故障 |
 
-### 9.2 SubstationState（变电所状态）
+### 12.2 SubstationState（变电所状态）
 
 | 字段 | 类型 | 单位 | 说明 |
 |------|------|------|------|
@@ -1694,7 +1880,7 @@ wss://sim.example.com/ws
 | outputPower | float | kW | 当前输出功率 |
 | energyAccumulated | float | kWh | 累计供能 |
 
-### 9.3 ControlCommand（信号控制指令）
+### 12.3 ControlCommand（信号控制指令）
 
 | 字段 | 类型 | 范围 | 说明 |
 |------|------|------|------|
@@ -1703,21 +1889,21 @@ wss://sim.example.com/ws
 | brakeLevel | float | [0, 1] | 制动级位 |
 | emergencyBrake | bool | — | 是否紧急制动 |
 
-### 9.4 OccupancyInfo（轨道区段占用）
+### 12.4 OccupancyInfo（轨道区段占用）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | circuitId | string | 轨道电路/计轴器 ID |
 | occupied | bool | 是否被占用 |
 
-### 9.5 SwitchState（道岔状态）
+### 12.5 SwitchState（道岔状态）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | string | 道岔 ID |
 | state | enum | `normal` / `reverse` / `transitioning` |
 
-### 9.6 SimEvent（仿真事件）
+### 12.6 SimEvent（仿真事件）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -1736,9 +1922,9 @@ wss://sim.example.com/ws
 
 ---
 
-## 10. 错误码说明
+## 13. 错误码说明
 
-### 10.1 错误码列表
+### 13.1 错误码列表
 
 | code | message | HTTP 状态码 | 说明 |
 |------|---------|-------------|------|
@@ -1753,7 +1939,7 @@ wss://sim.example.com/ws
 | 50003 | 数据库错误 | 500 | 数据库操作异常 |
 | 50004 | WebSocket 推送错误 | 500 | 消息推送失败 |
 
-### 10.2 错误码扩展规则
+### 13.2 错误码扩展规则
 
 - `400xx`：客户端请求错误
 - `401xx`：认证/授权错误（未来扩展）
@@ -1801,6 +1987,11 @@ wss://sim.example.com/ws
 | GET /drivercab/status | | | ✅ | ✅ |
 | POST /drivercab/connect | | | ✅ | ✅ |
 | POST /drivercab/disconnect | | | ✅ | ✅ |
+| GET /scenarios | | | ✅ | ✅ |
+| POST /scenarios | | | ✅ | ✅ |
+| GET /scenarios/{id} | | | ✅ | ✅ |
+| DELETE /scenarios/{id} | | | ✅ | ✅ |
+| PUT /scenarios/{id}/apply | | | ✅ | ✅ |
 | WebSocket manual_control | | | ✅ | ✅ |
 | WebSocket drivercab_data | | | ✅ | ✅ |
 
