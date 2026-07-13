@@ -27,13 +27,25 @@ logger = logging.getLogger(__name__)
 
 # ---- PLC -> 上位机 (46字节, 大端序) ----
 
-# 字节 24 位定义 (指示灯/标志)
-PLC_BIT_24 = {
+# 字节 24 位定义 — 7.1 方向 (PLC -> 上位机, 位4=预留)
+PLC_BIT_24_7_1 = {
     "reserved_24_0":   0x01,  # 预留
     "hscb":           0x02,  # 高断合指示灯状态 1=亮 0=灭
     "brake_fault":    0x04,  # 制动缓解不良指示灯状态 1=亮 0=灭
     "reserved_24_3":  0x08,  # 预留
-    "door_open_light":0x10,  # 开门灯状态 (7.2方向) / 预留 (7.1方向) 1=亮 0=灭
+    "reserved_24_4":  0x10,  # 预留（7.1方向无开门灯）
+    "door_closed":    0x20,  # 门关好指示灯状态 1=亮 0=灭
+    "net_fault":      0x40,  # 网络故障指示灯状态 1=亮 0=灭
+    "ar_available":   0x80,  # 具备自动折返模式标志 1=具备
+}
+
+# 字节 24 位定义 — 7.2 方向 (上位机 -> PLC, 位4=开门灯)
+PLC_BIT_24_7_2 = {
+    "reserved_24_0":   0x01,  # 预留
+    "hscb":           0x02,  # 高断合指示灯状态 1=亮 0=灭
+    "brake_fault":    0x04,  # 制动缓解不良指示灯状态 1=亮 0=灭
+    "reserved_24_3":  0x08,  # 预留
+    "door_open_light":0x10,  # 开门灯状态 1=亮 0=灭
     "door_closed":    0x20,  # 门关好指示灯状态 1=亮 0=灭
     "net_fault":      0x40,  # 网络故障指示灯状态 1=亮 0=灭
     "ar_available":   0x80,  # 具备自动折返模式标志 1=具备
@@ -101,7 +113,7 @@ PLC_BIT_35 = {
 
 # 所有位定义按字节分组
 PLC_BIT_GROUPS = {
-    24: PLC_BIT_24,
+    24: PLC_BIT_24_7_1,
     25: PLC_BIT_25,
     28: PLC_BIT_28,
     29: PLC_BIT_29,
@@ -244,7 +256,7 @@ def pack_plc_to_upper(
     data[24] = _encode_bits_byte(
         {"hscb": hscb, "brake_fault": brake_fault, "door_closed": door_closed,
          "net_fault": net_fault, "ar_available": ar_available},
-        PLC_BIT_24,
+        PLC_BIT_24_7_1,
     )
     data[25] = _encode_bits_byte(
         {"ato_available": ato_available, "wash_mode": wash_mode,
@@ -323,10 +335,10 @@ def parse_plc_to_upper(data: bytes) -> dict:
     verify_code = struct.unpack_from(">H", data, 22)[0]
 
     # BOOL 标志字节
-    flags_24 = _decode_bits_byte(data[24], PLC_BIT_24)
+    flags_24 = _decode_bits_byte(data[24], PLC_BIT_24_7_1)
     flags_25 = _decode_bits_byte(data[25], PLC_BIT_25)
 
-    # 车辆速度 (WORD, 小端)
+    # 车辆速度 (WORD, 大端)
     vehicle_speed = struct.unpack_from(">H", data, 26)[0]
 
     flags_28 = _decode_bits_byte(data[28], PLC_BIT_28)
@@ -449,7 +461,7 @@ def pack_upper_to_plc(
     # 校验
     verify_type: int = 0,
     verify_code: int = 0,
-    # 字节 24 标志 (指示灯，同7.1方向，但bit4=开门灯)
+    # 字节 24 标志 (指示灯，位4=开门灯)
     hscb: int = 0,
     brake_fault: int = 0,
     door_open_light: int = 0,
@@ -465,37 +477,38 @@ def pack_upper_to_plc(
     vehicle_speed: int = 0,
 ) -> bytes:
     """
-    打包 上位机 -> PLC 报文（28字节，大端序）
+    打包 上位机 -> PLC 报文（28字节，小端序）
 
-    协议定义见文档 7.2 节
+    协议定义见文档 7.2 节（PLC 使用小端序）
     """
     data = bytearray(UPPER_TO_PLC_LEN)
 
-    # 固定头
-    struct.pack_into(">I", data, 0, 0x55AA55AA)  # identify (DWORD)
-    struct.pack_into(">H", data, 4, UPPER_TO_PLC_LEN)  # total_len
-    struct.pack_into(">H", data, 6, UPPER_TO_PLC_LEN - 24)  # data_len = 4
+    # 固定头（PLC 使用小端序，见文档第4节）
+    # 文档要求字节序列 55 AA 55 AA，小端下对应 uint32 = 0xAA55AA55
+    struct.pack_into("<I", data, 0, 0xAA55AA55)  # identify (DWORD)
+    struct.pack_into("<H", data, 4, UPPER_TO_PLC_LEN)  # total_len
+    struct.pack_into("<H", data, 6, 2)  # data_len = 2（文档定义数据区=2字节）
 
     # 时间
-    struct.pack_into(">H", data, 8, year & 0xFFFF)
-    struct.pack_into(">H", data, 10, month & 0xFFFF)
-    struct.pack_into(">H", data, 12, day & 0xFFFF)
-    struct.pack_into(">H", data, 14, hour & 0xFFFF)
-    struct.pack_into(">H", data, 16, minute & 0xFFFF)
-    struct.pack_into(">H", data, 18, second & 0xFFFF)
+    struct.pack_into("<H", data, 8, year & 0xFFFF)
+    struct.pack_into("<H", data, 10, month & 0xFFFF)
+    struct.pack_into("<H", data, 12, day & 0xFFFF)
+    struct.pack_into("<H", data, 14, hour & 0xFFFF)
+    struct.pack_into("<H", data, 16, minute & 0xFFFF)
+    struct.pack_into("<H", data, 18, second & 0xFFFF)
 
     # 校验
-    struct.pack_into(">H", data, 20, verify_type & 0xFFFF)
-    struct.pack_into(">H", data, 22, verify_code & 0xFFFF)
+    struct.pack_into("<H", data, 20, verify_type & 0xFFFF)
+    struct.pack_into("<H", data, 22, verify_code & 0xFFFF)
 
     # 字节 24-25 BOOL 标志
-    # 字节24: 同7.1字节24，但bit4=开门灯
+    # 字节24: 使用7.2特定位定义（bit4=开门灯，不同于7.1的预留）
     data[24] = _encode_bits_byte(
         {"hscb": hscb, "brake_fault": brake_fault,
          "door_open_light": door_open_light,
          "door_closed": door_closed,
          "net_fault": net_fault, "ar_available": ar_available},
-        PLC_BIT_24,
+        PLC_BIT_24_7_2,
     )
     data[25] = _encode_bits_byte(
         {"ato_available": ato_available, "wash_mode": wash_mode,
@@ -503,48 +516,48 @@ def pack_upper_to_plc(
         PLC_BIT_25,
     )
 
-    # 车辆速度 (WORD)
-    struct.pack_into(">H", data, 26, vehicle_speed & 0xFFFF)
+    # 车辆速度 (WORD, 小端)
+    struct.pack_into("<H", data, 26, vehicle_speed & 0xFFFF)
 
     return bytes(data)
 
 
 def parse_upper_to_plc(data: bytes) -> dict:
     """
-    解析 上位机 -> PLC 报文（28字节，大端序）
+    解析 上位机 -> PLC 报文（28字节，小端序）
 
-    协议定义见文档 7.2 节
+    协议定义见文档 7.2 节（PLC 使用小端序）
     """
     if len(data) < UPPER_TO_PLC_LEN:
         raise ValueError(f"上位机报文长度不足: {len(data)} < {UPPER_TO_PLC_LEN}")
 
-    identify = struct.unpack_from(">I", data, 0)[0]
-    total_len = struct.unpack_from(">H", data, 4)[0]
-    data_len = struct.unpack_from(">H", data, 6)[0]
+    identify = struct.unpack_from("<I", data, 0)[0]
+    total_len = struct.unpack_from("<H", data, 4)[0]
+    data_len = struct.unpack_from("<H", data, 6)[0]
 
     # 时间
-    year = struct.unpack_from(">H", data, 8)[0]
-    month = struct.unpack_from(">H", data, 10)[0]
-    day = struct.unpack_from(">H", data, 12)[0]
-    hour = struct.unpack_from(">H", data, 14)[0]
-    minute = struct.unpack_from(">H", data, 16)[0]
-    second = struct.unpack_from(">H", data, 18)[0]
+    year = struct.unpack_from("<H", data, 8)[0]
+    month = struct.unpack_from("<H", data, 10)[0]
+    day = struct.unpack_from("<H", data, 12)[0]
+    hour = struct.unpack_from("<H", data, 14)[0]
+    minute = struct.unpack_from("<H", data, 16)[0]
+    second = struct.unpack_from("<H", data, 18)[0]
 
     # 校验
-    verify_type = struct.unpack_from(">H", data, 20)[0]
-    verify_code = struct.unpack_from(">H", data, 22)[0]
+    verify_type = struct.unpack_from("<H", data, 20)[0]
+    verify_code = struct.unpack_from("<H", data, 22)[0]
 
     # BOOL 标志字节
-    flags_24 = _decode_bits_byte(data[24], PLC_BIT_24)
+    flags_24 = _decode_bits_byte(data[24], PLC_BIT_24_7_2)
     flags_25 = _decode_bits_byte(data[25], PLC_BIT_25)
 
     # 车辆速度 (WORD, 小端)
-    vehicle_speed = struct.unpack_from(">H", data, 26)[0]
+    vehicle_speed = struct.unpack_from("<H", data, 26)[0]
 
     result = {
         # 固定头
         "identify": hex(identify),
-        "identify_ok": identify == 0x55AA55AA,
+        "identify_ok": identify == 0xAA55AA55,
         "total_len": total_len,
         "data_len": data_len,
         # 时间
