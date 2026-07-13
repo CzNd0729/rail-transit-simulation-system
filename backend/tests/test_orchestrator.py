@@ -10,19 +10,26 @@ from sim_engine.core.clock import RunState
 from sim_engine.orchestrator import Orchestrator, CONFIG_DIR
 from sim_engine.track.path_service import TrackPathService
 from sim_engine.track.config import load_track
+from tests.conftest import use_fixed_legacy_timetable
 
 TRACK_YAML = CONFIG_DIR / "track.yaml"
 
 
+def _orch() -> Orchestrator:
+    o = Orchestrator.from_config_dir()
+    use_fixed_legacy_timetable(o)
+    return o
+
+
 def test_orchestrator_from_config():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     assert orch.vehicle is not None
     assert orch.track is not None
     assert orch.clock.time_step == 0.1
 
 
 def test_single_step_advances_train():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.reset()
     snap = orch.step_once()
     assert snap is not None
@@ -32,7 +39,7 @@ def test_single_step_advances_train():
 
 
 def test_run_advances_position():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.start()
     for _ in range(100):
         orch.step_once()
@@ -41,7 +48,7 @@ def test_run_advances_position():
 
 
 def test_snapshot_has_vehicle_fields():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.start()
     snap = orch.step_once()
     train = snap["data"]["trains"][0]
@@ -50,7 +57,7 @@ def test_snapshot_has_vehicle_fields():
 
 
 def test_recorder_buffer_grows():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.start()
     for _ in range(10):
         orch.step_once()
@@ -58,7 +65,7 @@ def test_recorder_buffer_grows():
 
 
 def test_pause_and_resume():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.start()
     orch.step_once()
     orch.pause()
@@ -68,7 +75,7 @@ def test_pause_and_resume():
 
 
 def test_snapshot_callback():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     received = []
     orch.set_snapshot_callback(lambda s: received.append(s))
     orch.start()
@@ -78,7 +85,7 @@ def test_snapshot_callback():
 
 
 def test_csv_export(tmp_path):
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.start()
     for _ in range(5):
         orch.step_once()
@@ -98,7 +105,7 @@ def test_track_next_station():
 
 def test_full_run_reaches_near_terminal():
     """列车应能运行到接近终点站（不要求精确对标，集成级验证）。"""
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.sim_params.total_time = 2000  # 放宽时间上限
     orch.start()
     summary = orch.run_until(max_steps=15000)
@@ -110,7 +117,7 @@ def test_full_run_reaches_near_terminal():
 # ── 停止/重置状态 ────────────────────────────────────────────────────
 
 def test_stop_transitions_to_stopped():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.start()
     orch.step_once()
     orch.stop()
@@ -118,7 +125,7 @@ def test_stop_transitions_to_stopped():
 
 
 def test_reset_clears_state():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.sim_params.bidirectional = False
     orch.start()
     for _ in range(10):
@@ -135,7 +142,7 @@ def test_reset_clears_state():
 
 
 def test_stop_then_reset():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.start()
     orch.step_once()
     orch.stop()
@@ -147,7 +154,7 @@ def test_stop_then_reset():
 # ── 速度倍率 ────────────────────────────────────────────────────────
 
 def test_speed_multiplier_setting():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.clock.speed_multiplier = 10.0
     assert orch.clock.speed_multiplier == 10.0
 
@@ -155,7 +162,7 @@ def test_speed_multiplier_setting():
 # ── 空步进 ──────────────────────────────────────────────────────────
 
 def test_step_once_initializes_if_no_state():
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.train_state = None
     snap = orch.step_once()
     # 应自动初始化
@@ -168,7 +175,7 @@ def test_step_once_initializes_if_no_state():
 
 def test_run_until_stops_at_time_limit():
     """超时自动停止。"""
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     orch.sim_params.total_time = 1.0  # 1 秒超时
     orch.start()
     summary = orch.run_until()
@@ -180,7 +187,7 @@ def test_run_until_stops_at_time_limit():
 
 def test_multiple_runs_with_reset():
     """重置后能重新运行。"""
-    orch = Orchestrator.from_config_dir()
+    orch = _orch()
     for _ in range(3):
         orch.reset()
         orch.start()

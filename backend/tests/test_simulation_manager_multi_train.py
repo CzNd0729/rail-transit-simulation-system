@@ -6,11 +6,14 @@ import pytest
 
 from sim_engine.services.simulation_manager import SimulationManager
 from sim_engine.ws.manager import WebSocketConnectionManager
+from tests.conftest import use_fixed_legacy_timetable
 
 
 @pytest.fixture
 def manager():
-    return SimulationManager(WebSocketConnectionManager())
+    m = SimulationManager(WebSocketConnectionManager())
+    use_fixed_legacy_timetable(m.orchestrator)
+    return m
 
 
 def test_get_status_train_count(manager):
