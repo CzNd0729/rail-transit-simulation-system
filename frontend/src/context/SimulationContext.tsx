@@ -83,7 +83,7 @@ export type SimulationAction =
   | { type: 'WS_DISCONNECTED' }
   | { type: 'WS_CONNECTING' }
   | { type: 'RUNTIME_UPDATE'; payload: SimulationSnapshot }
-  | { type: 'SET_SELECTED_TRAIN'; payload: string }
+  | { type: 'SET_SELECTED_TRAIN'; payload: string | null }
   | { type: 'SET_VIEW'; payload: ViewType }
   | { type: 'SET_RUN_STATE'; payload: RunState }
   | { type: 'UPDATE_PARAMS'; payload: Partial<SimulationParams> }
@@ -112,12 +112,13 @@ export function simulationReducer(state: AppState, action: SimulationAction): Ap
 
     case 'RUNTIME_UPDATE': {
       const snapshot = action.payload;
-      const selectedStillValid =
-        state.selectedTrainId != null &&
-        snapshot.trains.some((t) => t.id === state.selectedTrainId);
-      const selectedTrainId = selectedStillValid
-        ? state.selectedTrainId
-        : snapshot.trains[0]?.id ?? null;
+      // null = 全选模式，不自动回退到首车
+      const selectedTrainId =
+        state.selectedTrainId == null
+          ? null
+          : snapshot.trains.some((t) => t.id === state.selectedTrainId)
+            ? state.selectedTrainId
+            : snapshot.trains[0]?.id ?? null;
       return {
         ...state,
         clock: snapshot.clock,
