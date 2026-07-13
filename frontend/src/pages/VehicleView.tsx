@@ -6,7 +6,7 @@
  * - UI-VHC-01: 速度-时间曲线 — 实时绘制速度随时间变化
  * - UI-VHC-02: 加速度-时间曲线 — 实时绘制加速度曲线
  * - UI-VHC-03: 工况指示器 — 当前工况（牵引/惰行/制动）彩色标识
- * - UI-VHC-04: 总阻力-时间曲线 — 迭代二降级版（四分项留迭代三）
+ * - UI-VHC-04: 总阻力-时间曲线（默认），可切换四分项堆叠
  * - UI-VHC-05: 能耗累计图 — 牵引/再生累计 kWh
  */
 import SpeedTimeCurve from '../components/views/vehicle/SpeedTimeCurve';

@@ -1,8 +1,8 @@
 /**
- * ResistanceChart — 阻力分解图（UI-VHC-04）
- * 堆叠面积图展示 Davis / 坡度 / 弯道 / 隧道四分项；无四分项时降级总阻力折线
+ * ResistanceChart — 阻力图（UI-VHC-04）
+ * 默认总阻力折线；可切换四分项堆叠（Davis / 坡度 / 弯道 / 隧道）
  */
-import { useMemo } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import type { EChartsOption } from 'echarts';
 import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
@@ -17,13 +17,15 @@ function hasBreakdownData(history: ReturnType<typeof useActiveChartHistory>): bo
     history.curveResistanceTime,
     history.tunnelResistanceTime,
   ];
-  return series.some((s) => s.some(([, v]) => v > 0));
+  return series.some((s) => s.some(([, v]) => Math.abs(v) > 0));
 }
 
 export default function ResistanceChart() {
   const { clock } = useSimulationState();
   const chartHistory = useActiveChartHistory();
-  const stacked = hasBreakdownData(chartHistory);
+  const breakdownAvailable = hasBreakdownData(chartHistory);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const stacked = showBreakdown && breakdownAvailable;
 
   const option = useMemo((): EChartsOption => {
     const xMax = chartHistory.resistanceTime.length > 0
@@ -97,10 +99,45 @@ export default function ResistanceChart() {
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div className="panel-title">📊 阻力分解</div>
+      <div style={styles.titleBar}>
+        <div className="panel-title" style={styles.title}>
+          {stacked ? '📊 阻力分解' : '📊 总阻力'}
+        </div>
+        <button
+          type="button"
+          className="btn"
+          style={styles.toggleBtn}
+          disabled={!breakdownAvailable}
+          title={breakdownAvailable ? undefined : '暂无四分项数据'}
+          onClick={() => setShowBreakdown((v) => !v)}
+        >
+          {stacked ? '总阻力' : '四分项'}
+        </button>
+      </div>
       <div key={stacked ? 'stacked' : 'total'} style={{ flex: 1, minHeight: 0 }}>
         <SimEChart option={option} style={{ height: '100%' }} />
       </div>
     </div>
   );
 }
+
+const styles: Record<string, CSSProperties> = {
+  titleBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingBottom: 6,
+    borderBottom: '1px solid var(--border-color)',
+  },
+  title: {
+    margin: 0,
+    padding: 0,
+    borderBottom: 'none',
+  },
+  toggleBtn: {
+    padding: '2px 8px',
+    fontSize: 11,
+    minWidth: 52,
+  },
+};
