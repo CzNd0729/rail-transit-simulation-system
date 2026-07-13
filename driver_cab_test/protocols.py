@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # PLC 协议编解码（文档 7.1 / 7.2 节，PLC 使用小端序）
 # ====================================================================
 
-# ---- PLC -> 上位机 (46字节, 大端序) ----
+# ---- PLC -> 上位机 (46字节, 小端序) ----
 
 # 字节 24 位定义 (指示灯/标志)
 PLC_BIT_24 = {
@@ -33,7 +33,7 @@ PLC_BIT_24 = {
     "hscb":           0x02,  # 高断合指示灯状态 1=亮 0=灭
     "brake_fault":    0x04,  # 制动缓解不良指示灯状态 1=亮 0=灭
     "reserved_24_3":  0x08,  # 预留
-    "reserved_24_4":  0x10,  # 预留
+    "door_open_light":0x10,  # 开门灯状态 (7.2方向) / 预留 (7.1方向) 1=亮 0=灭
     "door_closed":    0x20,  # 门关好指示灯状态 1=亮 0=灭
     "net_fault":      0x40,  # 网络故障指示灯状态 1=亮 0=灭
     "ar_available":   0x80,  # 具备自动折返模式标志 1=具备
@@ -439,48 +439,141 @@ def parse_plc_to_upper(data: bytes) -> dict:
 
 
 def pack_upper_to_plc(
-    header: int = 0xDCBA,
-    traction_cmd: int = 0,
-    traction_pct: int = 0,
-    brake_pct: int = 0,
-    target_speed_cm_s: int = 0,
-    door_cmd: int = 0,
-    ato_cmd: int = 0,
-    eb_reset: int = 0,
+    # 时间
+    year: int = 2025,
+    month: int = 7,
+    day: int = 16,
+    hour: int = 15,
+    minute: int = 11,
+    second: int = 3,
+    # 校验
+    verify_type: int = 0,
+    verify_code: int = 0,
+    # 字节 24 标志 (指示灯，同7.1方向，但bit4=开门灯)
+    hscb: int = 0,
+    brake_fault: int = 0,
+    door_open_light: int = 0,
+    door_closed: int = 0,
+    net_fault: int = 0,
+    ar_available: int = 0,
+    # 字节 25 标志 (模式)
+    ato_available: int = 0,
+    wash_mode: int = 0,
+    ato_active: int = 0,
+    ar_active: int = 0,
+    # 车辆速度
+    vehicle_speed: int = 0,
 ) -> bytes:
     """
-    打包 上位机 -> PLC 报文（26字节）
+    打包 上位机 -> PLC 报文（28字节，小端序）
+
+    协议定义见文档 7.2 节
     """
     data = bytearray(UPPER_TO_PLC_LEN)
-    struct.pack_into("<H", data, 0, header & 0xFFFF)
-    struct.pack_into("<H", data, 2, traction_cmd & 0xFFFF)
-    struct.pack_into("<H", data, 4, traction_pct & 0xFFFF)
-    struct.pack_into("<H", data, 6, brake_pct & 0xFFFF)
-    struct.pack_into("<H", data, 8, target_speed_cm_s & 0xFFFF)
-    struct.pack_into("<H", data, 10, (target_speed_cm_s >> 16) & 0xFFFF)
-    struct.pack_into("<H", data, 12, door_cmd & 0xFFFF)
-    struct.pack_into("<H", data, 14, ato_cmd & 0xFFFF)
-    struct.pack_into("<H", data, 16, eb_reset & 0xFFFF)
-    # 预留 8 字节 (偏移 18-25)
+
+    # 固定头
+    struct.pack_into("<I", data, 0, 0x55AA55AA)  # identify (DWORD)
+    struct.pack_into("<H", data, 4, UPPER_TO_PLC_LEN)  # total_len
+    struct.pack_into("<H", data, 6, UPPER_TO_PLC_LEN - 24)  # data_len = 4
+
+    # 时间
+    struct.pack_into("<H", data, 8, year & 0xFFFF)
+    struct.pack_into("<H", data, 10, month & 0xFFFF)
+    struct.pack_into("<H", data, 12, day & 0xFFFF)
+    struct.pack_into("<H", data, 14, hour & 0xFFFF)
+    struct.pack_into("<H", data, 16, minute & 0xFFFF)
+    struct.pack_into("<H", data, 18, second & 0xFFFF)
+
+    # 校验
+    struct.pack_into("<H", data, 20, verify_type & 0xFFFF)
+    struct.pack_into("<H", data, 22, verify_code & 0xFFFF)
+
+    # 字节 24-25 BOOL 标志
+    # 字节24: 同7.1字节24，但bit4=开门灯
+    data[24] = _encode_bits_byte(
+        {"hscb": hscb, "brake_fault": brake_fault,
+         "door_open_light": door_open_light,
+         "door_closed": door_closed,
+         "net_fault": net_fault, "ar_available": ar_available},
+        PLC_BIT_24,
+    )
+    data[25] = _encode_bits_byte(
+        {"ato_available": ato_available, "wash_mode": wash_mode,
+         "ato_active": ato_active, "ar_active": ar_active},
+        PLC_BIT_25,
+    )
+
+    # 车辆速度 (WORD)
+    struct.pack_into("<H", data, 26, vehicle_speed & 0xFFFF)
+
     return bytes(data)
 
 
 def parse_upper_to_plc(data: bytes) -> dict:
     """
-    解析 上位机 -> PLC 报文（26字节）
+    解析 上位机 -> PLC 报文（28字节，小端序）
+
+    协议定义见文档 7.2 节
     """
     if len(data) < UPPER_TO_PLC_LEN:
         raise ValueError(f"上位机报文长度不足: {len(data)} < {UPPER_TO_PLC_LEN}")
 
+    identify = struct.unpack_from("<I", data, 0)[0]
+    total_len = struct.unpack_from("<H", data, 4)[0]
+    data_len = struct.unpack_from("<H", data, 6)[0]
+
+    # 时间
+    year = struct.unpack_from("<H", data, 8)[0]
+    month = struct.unpack_from("<H", data, 10)[0]
+    day = struct.unpack_from("<H", data, 12)[0]
+    hour = struct.unpack_from("<H", data, 14)[0]
+    minute = struct.unpack_from("<H", data, 16)[0]
+    second = struct.unpack_from("<H", data, 18)[0]
+
+    # 校验
+    verify_type = struct.unpack_from("<H", data, 20)[0]
+    verify_code = struct.unpack_from("<H", data, 22)[0]
+
+    # BOOL 标志字节
+    flags_24 = _decode_bits_byte(data[24], PLC_BIT_24)
+    flags_25 = _decode_bits_byte(data[25], PLC_BIT_25)
+
+    # 车辆速度 (WORD, 小端)
+    vehicle_speed = struct.unpack_from("<H", data, 26)[0]
+
     result = {
-        "header": struct.unpack_from("<H", data, 0)[0],
-        "traction_cmd": struct.unpack_from("<H", data, 2)[0],
-        "traction_pct": struct.unpack_from("<H", data, 4)[0],
-        "brake_pct": struct.unpack_from("<H", data, 6)[0],
-        "target_speed_cm_s": struct.unpack_from("<H", data, 8)[0] | (struct.unpack_from("<H", data, 10)[0] << 16),
-        "door_cmd": struct.unpack_from("<H", data, 12)[0],
-        "ato_cmd": struct.unpack_from("<H", data, 14)[0],
-        "eb_reset": struct.unpack_from("<H", data, 16)[0],
+        # 固定头
+        "identify": hex(identify),
+        "identify_ok": identify == 0x55AA55AA,
+        "total_len": total_len,
+        "data_len": data_len,
+        # 时间
+        "year": year,
+        "month": month,
+        "day": day,
+        "hour": hour,
+        "minute": minute,
+        "second": second,
+        "timestamp_str": f"{year:04d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}",
+        # 校验
+        "verify_type": verify_type,
+        "verify_code": verify_code,
+        # 指示灯标志 (字节24)
+        "hscb": flags_24.get("hscb", False),
+        "brake_fault_indicator": flags_24.get("brake_fault", False),
+        "door_open_light": flags_24.get("door_open_light", False),
+        "door_closed_indicator": flags_24.get("door_closed", False),
+        "net_fault_indicator": flags_24.get("net_fault", False),
+        "ar_available": flags_24.get("ar_available", False),
+        # 模式标志 (字节25)
+        "ato_available": flags_25.get("ato_available", False),
+        "wash_mode": flags_25.get("wash_mode", False),
+        "ato_active": flags_25.get("ato_active", False),
+        "ar_active": flags_25.get("ar_active", False),
+        # 车辆速度
+        "vehicle_speed": vehicle_speed,
+        # 原始字节
+        "raw": data[:UPPER_TO_PLC_LEN],
     }
     return result
 
@@ -1062,12 +1155,19 @@ def self_test():
 
     # 2. 上位机 -> PLC
     print("\n[2] 上位机 -> PLC 编解码")
-    raw = pack_upper_to_plc(traction_cmd=0x55, traction_pct=80, target_speed_cm_s=5000)
+    raw = pack_upper_to_plc(year=2025, month=7, day=16,
+                            hscb=1, door_closed=1, vehicle_speed=5000)
     parsed = parse_upper_to_plc(raw)
-    assert parsed["traction_cmd"] == 0x55
-    assert parsed["traction_pct"] == 80
-    assert parsed["target_speed_cm_s"] == 5000
-    print(f"    [OK] 打包 {len(raw)}B -> 解析: cmd=0x{parsed['traction_cmd']:02x}, pct={parsed['traction_pct']}%")
+    assert parsed["identify_ok"] == True
+    assert parsed["total_len"] == UPPER_TO_PLC_LEN
+    assert parsed["hscb"] == True
+    assert parsed["door_closed_indicator"] == True
+    assert parsed["vehicle_speed"] == 5000
+    assert parsed["year"] == 2025
+    assert parsed["month"] == 7
+    assert parsed["day"] == 16
+    print(f"    [OK] 打包 {len(raw)}B -> 解析: time={parsed['timestamp_str']}, "
+          f"speed={parsed['vehicle_speed']}, hscb={parsed['hscb']}")
 
     # 3. 网络屏
     print("\n[3] 网络屏 编解码")

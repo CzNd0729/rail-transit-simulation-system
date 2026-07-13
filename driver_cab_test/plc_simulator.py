@@ -4,8 +4,8 @@ PLC 模拟服务器
 模拟真实司机驾驶模拟台 PLC，通过 TCP 协议与上位机通信。
 
 - 作为 TCP Server 监听 8001/8002/8003 端口
-- 周期（100ms）发送 46 字节数据给上位机
-- 接收上位机 26 字节控制指令
+- 周期（100ms）发送 46 字节数据给上位机（文档 7.1节）
+- 接收上位机 28 字节控制指令（文档 7.2节）
 """
 
 import socket
@@ -60,6 +60,7 @@ class PlcSimulator:
         # 指示灯 (字节24)
         self.hscb = 0
         self.brake_fault_indicator = 0
+        self.door_open_light = 0
         self.door_closed_indicator = 0
         self.net_fault_indicator = 0
         self.ar_available = 0
@@ -175,14 +176,14 @@ class PlcSimulator:
                     self.client_addr = None
                     break
                 buffer += data
-                # 解析 26 字节报文
+                # 解析 28 字节报文（文档 7.2 节）
                 while len(buffer) >= UPPER_TO_PLC_LEN:
                     pkt = buffer[:UPPER_TO_PLC_LEN]
                     buffer = buffer[UPPER_TO_PLC_LEN:]
                     try:
                         cmd = parse_upper_to_plc(pkt)
                         self.last_upper_cmd = cmd
-                        logger.debug(f"收到上位机指令: {cmd}")
+                        self._apply_upper_cmd(cmd)
                         if self.on_upper_data:
                             self.on_upper_data(cmd)
                     except Exception as e:
@@ -290,6 +291,32 @@ class PlcSimulator:
     def get_last_command(self) -> Optional[dict]:
         """获取最近一次上位机指令"""
         return self.last_upper_cmd
+
+    def _apply_upper_cmd(self, cmd: dict):
+        """将上位机 7.2 控制指令应用到模拟器状态，7.1 报文中会体现出来"""
+        # 车辆速度
+        speed = cmd.get("vehicle_speed", 0)
+        if speed is not None:
+            self.vehicle_speed = speed
+        # 时间同步
+        if cmd.get("year"):
+            self.year = cmd["year"]
+            self.month = cmd["month"]
+            self.day = cmd["day"]
+            self.hour = cmd["hour"]
+            self.minute = cmd["minute"]
+            self.second = cmd["second"]
+        # 指示灯 (字节24)
+        self.hscb = 1 if cmd.get("hscb") else 0
+        self.brake_fault_indicator = 1 if cmd.get("brake_fault_indicator") else 0
+        self.door_closed_indicator = 1 if cmd.get("door_closed_indicator") else 0
+        self.net_fault_indicator = 1 if cmd.get("net_fault_indicator") else 0
+        self.ar_available = 1 if cmd.get("ar_available") else 0
+        # 模式标志 (字节25)
+        self.ato_available = 1 if cmd.get("ato_available") else 0
+        self.wash_mode = 1 if cmd.get("wash_mode") else 0
+        self.ato_active = 1 if cmd.get("ato_active") else 0
+        self.ar_active = 1 if cmd.get("ar_active") else 0
 
 
 def run_plc_simulator(port: int = PLC_PORT_A, local_only: bool = False, interactive: bool = True):
