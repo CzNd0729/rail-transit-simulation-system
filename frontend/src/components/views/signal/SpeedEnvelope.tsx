@@ -9,7 +9,7 @@ import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
 import { axisTooltip } from '../../../utils/format';
-import { resolveAtpSpeedLimit } from '../../../utils/signalSelectors';
+import { resolveAtpSpeedLimit, resolvePermanentSpeedLimit } from '../../../utils/signalSelectors';
 import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import type { ProfileSegment } from '../../../data/mvpLineLayout';
 
@@ -33,22 +33,33 @@ export default function SpeedEnvelope() {
   const segments = profileSegments ?? [];
   const ratio = params.signal.target_speed_ratio ?? 0.85;
   const defaultLimit = segments.length > 0 ? segments[0].speed_limit : 80;
+  const trainId = train?.id ?? 'TRAIN_01';
+  const hasBackendLimits = signaling.speed_limits.length > 0;
+  const permanentLimitKmh = resolvePermanentSpeedLimit(
+    signaling.speed_limits,
+    trainId,
+    defaultLimit,
+  );
   const atpLimitKmh = resolveAtpSpeedLimit(
     signaling.speed_limits,
-    train?.id ?? 'TRAIN_01',
+    trainId,
     defaultLimit,
   );
 
-  const speedLimitData = segments.length > 0
-    ? toStepData(segments, 'speed_limit')
-    : ([[0, 80], [maxPos, 80]] as [number, number][]);
+  const speedLimitData = hasBackendLimits
+    ? ([[0, permanentLimitKmh], [maxPos, permanentLimitKmh]] as [number, number][])
+    : segments.length > 0
+      ? toStepData(segments, 'speed_limit')
+      : ([[0, 80], [maxPos, 80]] as [number, number][]);
 
-  const targetSpeedData = segments.length > 0
-    ? segments.flatMap((seg) => [
-        [seg.start_chainage, seg.speed_limit * ratio],
-        [seg.end_chainage, seg.speed_limit * ratio],
-      ] as [number, number][])
-    : ([[0, 80 * ratio], [maxPos, 80 * ratio]] as [number, number][]);
+  const targetSpeedData = hasBackendLimits
+    ? ([[0, permanentLimitKmh * ratio], [maxPos, permanentLimitKmh * ratio]] as [number, number][])
+    : segments.length > 0
+      ? segments.flatMap((seg) => [
+          [seg.start_chainage, seg.speed_limit * ratio],
+          [seg.end_chainage, seg.speed_limit * ratio],
+        ] as [number, number][])
+      : ([[0, 80 * ratio], [maxPos, 80 * ratio]] as [number, number][]);
 
   const atpLimitData = segments.length > 0
     ? segments.flatMap((seg) => [

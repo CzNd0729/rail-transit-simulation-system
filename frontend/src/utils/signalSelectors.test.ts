@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveMaEnvelope,
   resolveAtpSpeedLimit,
+  resolvePermanentSpeedLimit,
   resolveLatestDeviation,
   resolveTrainInterval,
 } from './signalSelectors';
@@ -38,6 +39,19 @@ describe('resolveAtpSpeedLimit', () => {
 
   it('returns fallback when no match', () => {
     expect(resolveAtpSpeedLimit([], 'T1', 80)).toBe(80);
+  });
+});
+
+describe('resolvePermanentSpeedLimit', () => {
+  it('returns backend permanent_limit when present', () => {
+    const limits: SpeedLimitEntry[] = [
+      { train_id: 'TRAIN_01', permanent_limit: 72, atp_limit: 68 },
+    ];
+    expect(resolvePermanentSpeedLimit(limits, 'TRAIN_01', 80)).toBe(72);
+  });
+
+  it('falls back when train not found', () => {
+    expect(resolvePermanentSpeedLimit([], 'TRAIN_01', 80)).toBe(80);
   });
 });
 

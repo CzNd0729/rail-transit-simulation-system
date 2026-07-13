@@ -37,6 +37,15 @@ export function resolveAtpSpeedLimit(
   return entry?.atp_limit ?? fallbackLimit;
 }
 
+export function resolvePermanentSpeedLimit(
+  speedLimits: SpeedLimitEntry[],
+  trainId: string,
+  fallbackLimit: number,
+): number {
+  const entry = speedLimits.find((s) => s.train_id === trainId);
+  return entry?.permanent_limit ?? fallbackLimit;
+}
+
 export function resolveLatestDeviation(
   deviations: TimetableDeviationEntry[],
   trainId: string,
