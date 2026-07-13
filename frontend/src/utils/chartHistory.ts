@@ -6,6 +6,7 @@ export const EMPTY_TRAIN_CHART_HISTORY: TrainChartHistory = {
   jerkTime: [],
   speedPosition: [],
   positionTime: [],
+  voltagePosition: [],
 };
 
 export const EMPTY_CHART_HISTORY: ChartHistory = {
@@ -24,6 +25,7 @@ function trimHistory(history: TrainChartHistory): TrainChartHistory {
     jerkTime: history.jerkTime.slice(-MAX_POINTS),
     speedPosition: history.speedPosition.slice(-MAX_POINTS),
     positionTime: history.positionTime.slice(-MAX_POINTS),
+    voltagePosition: history.voltagePosition.slice(-MAX_POINTS),
   };
 }
 
@@ -53,6 +55,7 @@ export function appendChartHistory(
       jerkTime: [...prev.jerkTime, [t, train.jerk]],
       speedPosition: [...prev.speedPosition, [train.position, train.speed]],
       positionTime: [...prev.positionTime, [t, train.position]],
+      voltagePosition: [...prev.voltagePosition, [train.position, train.pantograph_voltage]],
     });
   }
 

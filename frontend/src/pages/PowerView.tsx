@@ -34,11 +34,13 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
   },
   chartSection: {
-    flex: 1,
+    flex: 2,
     minHeight: '300px',
+    overflow: 'hidden',
   },
   panelSection: {
     flex: 1,
+    minHeight: '150px',
     overflow: 'auto',
   },
 };

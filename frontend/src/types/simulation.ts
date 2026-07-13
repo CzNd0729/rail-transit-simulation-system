@@ -326,6 +326,7 @@ export interface TrainChartHistory {
   jerkTime: [number, number][];        // [时间s, 冲击率m/s³]
   speedPosition: [number, number][];   // [位置m, 速度km/h]
   positionTime: [number, number][];    // [时间s, 位置m] — UI-SIG-03 运行图
+  voltagePosition: [number, number][]; // [位置m, 网压V] — UI-PWR-01 电压分布
 }
 
 /** 实时曲线历史数据（按列车 ID 分桶，供多车视图与选中车详情） */
