@@ -36,6 +36,51 @@ class Timetable:
                 return e.planned_arrival
         return None
 
+    def with_absolute_times(self, base_elapsed: float) -> Timetable:
+        """将 leg 内相对时刻平移为仿真绝对时刻。"""
+        return Timetable(
+            train_id=self.train_id,
+            entries=[
+                TimetableEntry(
+                    station_id=e.station_id,
+                    planned_arrival=e.planned_arrival + base_elapsed,
+                    planned_departure=e.planned_departure + base_elapsed,
+                )
+                for e in self.entries
+            ],
+        )
+
+
+@dataclass(frozen=True)
+class TimetableLegTemplate:
+    name: str
+    direction: str
+    terminal_station: str
+    entries: list[TimetableEntry]
+
+
+@dataclass(frozen=True)
+class DispatchConfig:
+    mode: str = "continuous"
+    origin_station: str = "ST01"
+    initial_direction: str = "down"
+    first_departure_s: float = 0.0
+    headway_s: float = 150.0
+    headway_pattern_s: tuple[float, ...] = ()
+    max_active_trains: int = 40
+    min_origin_clearance_m: float = 500.0
+
+
+@dataclass(frozen=True)
+class ServiceTimetable:
+    line_name: str
+    turnback_time_s: float
+    turnback_switch_down: str
+    turnback_switch_up: str
+    dispatch: DispatchConfig
+    leg_templates: dict[str, TimetableLegTemplate]
+    trip_leg_names: tuple[str, ...] = ("down", "up")
+
 
 @dataclass(frozen=True)
 class TimetableDeviation:
