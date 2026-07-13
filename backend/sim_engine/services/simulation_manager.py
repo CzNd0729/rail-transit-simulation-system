@@ -28,12 +28,42 @@ class SimulationManager:
         self.ws_manager = ws_manager
         self.orchestrator = Orchestrator.from_config_dir()
         self._loop_task: asyncio.Task | None = None
+        # 追踪最近一次仿真的聚合数据（供方案保存 API 使用）
+        self._last_snapshot: dict | None = None
+        self._last_summary: dict | None = None
+        self._min_voltage: float = 1500.0
+        self._peak_power: float = 0.0  # kW
 
     # ==================== 仿真控制 ====================
+
+    def _reset_tracking(self) -> None:
+        """每次新仿真前重置聚合追踪器。"""
+        self._last_snapshot = None
+        self._last_summary = None
+        self._min_voltage = 1500.0
+        self._peak_power = 0.0
+
+    def _update_tracking(self, snapshot: dict) -> None:
+        """从单步 snapshot 更新 min_voltage / peak_power / last_snapshot。"""
+        self._last_snapshot = snapshot
+        power_data = snapshot.get("data", {}).get("power", {})
+        # 网压最低值
+        vp = power_data.get("voltageProfile", [])
+        for item in vp:
+            v = item.get("voltage", 1500.0)
+            if v < self._min_voltage:
+                self._min_voltage = v
+        # 变电所峰值功率 (W → kW)
+        subs = power_data.get("substations", [])
+        for s in subs:
+            p_kw = s.get("outputPower", 0) / 1000.0
+            if p_kw > self._peak_power:
+                self._peak_power = p_kw
 
     def start(self, passenger_load: float = 0.6) -> dict:
         if self.orchestrator.run_state not in (RunState.IDLE, RunState.STOPPED):
             return {"code": 40002, "message": "操作冲突", "detail": "仿真已在运行中"}
+        self._reset_tracking()
         self.orchestrator.start(passenger_load=passenger_load)
         self.start_loop()
         return {
@@ -79,6 +109,7 @@ class SimulationManager:
         self.stop_loop()
         orch = self.orchestrator
         summary = orch.recorder.summary()
+        self._last_summary = summary
         ended_time = orch.clock.elapsed
         passenger_load = orch.train_state.passenger_load if orch.train_state else 0.6
 
@@ -111,6 +142,7 @@ class SimulationManager:
         self.stop_loop()
         self.orchestrator = Orchestrator.from_config_dir()
         self.orchestrator.reset()
+        self._reset_tracking()
         return {
             "runState": self.orchestrator.run_state.value,
             "simulationTime": self.orchestrator.clock.elapsed,
@@ -118,6 +150,8 @@ class SimulationManager:
 
     def step(self) -> dict | None:
         snapshot = self.orchestrator.step_once()
+        if snapshot:
+            self._update_tracking(snapshot)
         return snapshot
 
     def set_speed(self, multiplier: float) -> dict:
@@ -139,6 +173,21 @@ class SimulationManager:
             "totalTime": orch.sim_params.total_time,
             "speedMultiplier": orch.clock.speed_multiplier,
             "trainCount": orch.sim_params.total_train_count(),
+        }
+
+    def get_last_snapshot(self) -> dict | None:
+        """返回最近一次仿真的最终 snapshot（供方案保存 API 调用）。"""
+        return self._last_snapshot
+
+    def get_run_stats(self) -> dict:
+        """返回本次仿真运行的聚合统计数据。
+
+        返回值包含 min_voltage / peak_power 等跨步追踪值，
+        供方案保存 API 拼装 result 字段。
+        """
+        return {
+            "minVoltage": self._min_voltage,
+            "peakPower": self._peak_power,
         }
 
     # ==================== 配置读取 ====================
@@ -401,6 +450,7 @@ class SimulationManager:
         while orch.run_state == RunState.RUNNING:
             snapshot = orch.step_once()
             if snapshot:
+                self._update_tracking(snapshot)
                 # 广播快照
                 await self.ws_manager.broadcast(snapshot)
                 # 广播状态变更
@@ -426,8 +476,10 @@ class SimulationManager:
                 or self._all_trains_finished(orch)
                 or line_end
             ):
-                # 先记录结束时刻的摘要
-                summary = orch.recorder.summary()
+                # 先记录结束时刻的摘要，保存最终 snapshot/summary
+                self._last_summary = orch.recorder.summary()
+                if snapshot:
+                    self._last_snapshot = snapshot
                 ended_time = orch.clock.elapsed
                 passenger_load = orch.train_state.passenger_load if orch.train_state else 0.6
 
@@ -440,7 +492,7 @@ class SimulationManager:
                     "data": {
                         "runId": 1,
                         "simulationTime": ended_time,
-                        "summary": summary,
+                        "summary": self._last_summary,
                     },
                 })
                 await self.ws_manager.broadcast({

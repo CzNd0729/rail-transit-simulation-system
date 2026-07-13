@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from sim_engine.api import config, health, params, simulation
+from sim_engine.api import config, health, params, scenarios, simulation
 from sim_engine.services.simulation_manager import SimulationManager
 from sim_engine.ws.manager import WebSocketConnectionManager
 
@@ -78,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(config.router)
     app.include_router(params.router)
     app.include_router(simulation.router)
+    app.include_router(scenarios.router)
 
     # WebSocket 端点
     @app.websocket("/ws")
