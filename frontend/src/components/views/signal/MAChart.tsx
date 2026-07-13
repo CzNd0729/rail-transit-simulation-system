@@ -8,7 +8,7 @@ import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import { mockLineData } from '../../../data/mockLineData';
 import { MA_ENVELOPE_LENGTH } from '../../../utils/constants';
 import { getSignalPhaseLabel, resolveSignalPhase } from '../../../utils/format';
-import { resolveMaEnvelope } from '../../../utils/signalSelectors';
+import { resolveMaEnvelope, resolveTrainInterval } from '../../../utils/signalSelectors';
 
 function pct(chainage: number, totalLength: number): string {
   if (totalLength <= 0) return '0%';
@@ -16,7 +16,7 @@ function pct(chainage: number, totalLength: number): string {
 }
 
 export default function MAChart() {
-  const { signaling, lineLayout } = useSimulationState();
+  const { signaling, lineLayout, trains } = useSimulationState();
   const train = useSelectedTrain();
   const stations = lineLayout?.stations ?? mockLineData.stations;
   const totalLength = lineLayout?.total_length ?? mockLineData.total_length;
@@ -57,6 +57,16 @@ export default function MAChart() {
 
   const startStation = stations[0];
   const targetChainage = targetStation?.chainage ?? totalLength;
+  const interval = resolveTrainInterval(signaling.train_intervals, train?.id ?? '');
+  const leadingTrain = interval
+    ? trains.find((t) => t.id === interval.leading_train_id)
+    : undefined;
+  const intervalFrontPos = interval
+    ? (leadingTrain?.position ?? position + interval.interval_m)
+    : null;
+  const intervalSpan = interval && intervalFrontPos != null
+    ? Math.max(intervalFrontPos - position, 0)
+    : 0;
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -71,6 +81,21 @@ export default function MAChart() {
               width: pct(envelopeWidth, totalLength),
             }}
           />
+
+          {interval && intervalSpan > 0 && (
+            <div
+              style={{
+                ...styles.intervalBar,
+                left: pct(position, totalLength),
+                width: pct(intervalSpan, totalLength),
+                background: interval.safe
+                  ? 'rgba(82, 196, 26, 0.35)'
+                  : 'rgba(255, 77, 79, 0.35)',
+                borderColor: interval.safe ? '#52c41a' : '#ff4d4f',
+              }}
+              title={`追踪间隔 ${interval.interval_m.toFixed(0)} m`}
+            />
+          )}
 
           {stations.map((st) => (
             <div
@@ -115,6 +140,15 @@ export default function MAChart() {
         {' · '}
         安全包络: {safetyDistance.toFixed(0)} m
         {maEntry ? ' · 后端 MA' : ' · 固定包络'}
+        {interval && (
+          <>
+            {' · '}
+            追踪间隔 {interval.interval_m.toFixed(0)} m
+            {' / '}
+            ≥{interval.min_interval_m.toFixed(0)} m
+            {interval.safe ? '' : ' ⚠'}
+          </>
+        )}
       </div>
     </div>
   );
@@ -145,6 +179,15 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px dashed #1890ff',
     borderRadius: 4,
     pointerEvents: 'none',
+  },
+  intervalBar: {
+    position: 'absolute',
+    top: 14,
+    height: 6,
+    border: '1px solid',
+    borderRadius: 2,
+    pointerEvents: 'none',
+    zIndex: 1,
   },
   stationTick: {
     position: 'absolute',

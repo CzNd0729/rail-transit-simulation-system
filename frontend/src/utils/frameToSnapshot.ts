@@ -96,7 +96,15 @@ export function frameToSnapshot(
         running_phase: runningPhase,
       }],
       emergency_brake: [],
-      train_intervals: [],
+      train_intervals: frame.position > 400
+        ? [{
+            train_id: DEFAULT_TRAIN_ID,
+            leading_train_id: 'TRAIN_02',
+            interval_m: 520,
+            min_interval_m: 500,
+            safe: true,
+          }]
+        : [],
       ma_profiles: [{
         train_id: DEFAULT_TRAIN_ID,
         ma_end_chainage: resolveMaEndChainage(frame),
