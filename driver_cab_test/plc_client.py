@@ -306,13 +306,8 @@ def run_plc_client(host: str = PLC_SERVER_IP, port: int = PLC_PORT_A,
     if initial_speed:
         client.set_vehicle_speed(initial_speed)
 
-    # 回调：收到 PLC 数据时打印摘要
-    def on_data(parsed: dict):
-        speed = parsed.get("vehicle_speed", 0)
-        ts = parsed.get("timestamp_str", "")
-        logger.info(f"← 7.1 速度={speed} 时间={ts}")
-
-    client.on_plc_data = on_data
+    # 收到 PLC 数据时不打印日志，避免干扰命令行输入
+    # 需要查看时用 status 命令
 
     if not client.connect():
         print(f"✗ 连接 PLC {host}:{port} 失败")
