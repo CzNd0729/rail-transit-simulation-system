@@ -14,9 +14,17 @@ def manager():
 
 
 def test_get_status_train_count(manager):
+    manager.orchestrator.sim_params.bidirectional = False
     manager.orchestrator.sim_params.train_count = 3
     status = manager.get_status()
     assert status["trainCount"] == 3
+
+
+def test_get_status_bidirectional_train_count(manager):
+    manager.orchestrator.sim_params.bidirectional = True
+    manager.orchestrator.sim_params.train_count = 3
+    status = manager.get_status()
+    assert status["trainCount"] == 6
 
 
 def test_get_params_departure_interval(manager):
@@ -27,6 +35,7 @@ def test_get_params_departure_interval(manager):
 
 def test_all_trains_finished_requires_full_fleet(manager):
     orch = manager.orchestrator
+    orch.sim_params.bidirectional = False
     orch.sim_params.train_count = 2
     orch.reset()
     assert SimulationManager._all_trains_finished(orch) is False

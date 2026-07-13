@@ -23,7 +23,7 @@ from sim_engine.signaling.manual_drive import ManualDriveController
 from sim_engine.signaling.models import MaProfile, SafetyStatus, Timetable, TimetableEntry
 from sim_engine.signaling.three_stage import ThreeStageController
 from sim_engine.signaling.timetable_loader import load_timetable
-from sim_engine.signaling.train_following import is_interval_safe
+from sim_engine.signaling.train_following import is_interval_safe, tracking_gap
 from sim_engine.track.config import load_track
 from sim_engine.track.occupancy import OccupancyDetector
 from sim_engine.track.switch import SwitchManager
@@ -33,6 +33,37 @@ from sim_engine.vehicle.dynamics import VehicleSystem, effective_speed_limit_kmh
 from sim_engine.vehicle.models import ControlCommands, StepResult, TrainState
 
 CONFIG_DIR = Path(__file__).resolve().parent / "config"
+
+
+def _start_chainage(direction: str, total_length: float) -> float:
+    """方向对应的线路起点 chainage。"""
+    return total_length if direction == "up" else 0.0
+
+
+def _fleet_directions(sim_params: SimulationParams, vehicle_direction: str) -> list[tuple[str, str]]:
+    """返回 (direction, id_prefix) 列表。prefix 为空时沿用 TRAIN_01 编号。"""
+    if sim_params.bidirectional:
+        return [("down", "D"), ("up", "U")]
+    return [(vehicle_direction, "")]
+
+
+def _format_train_id(prefix: str, index: int) -> str:
+    if prefix:
+        return f"TRAIN_{prefix}{index + 1:02d}"
+    return f"TRAIN_{index + 1:02d}"
+
+
+def _leading_chainage(
+    sorted_runs: list["TrainRun"], index: int, direction: str
+) -> float | None:
+    """同向队列中指定列车的前方列车 chainage。"""
+    if direction == "down":
+        if index + 1 < len(sorted_runs):
+            return sorted_runs[index + 1].state.position
+        return None
+    if index > 0:
+        return sorted_runs[index - 1].state.position
+    return None
 
 
 @dataclass
@@ -148,46 +179,51 @@ class Orchestrator:
         return orch
 
     def _init_trains(self, passenger_load: float = 0.6) -> None:
-        """按 train_count / departure_interval 创建各列车运行单元。"""
+        """按 train_count / departure_interval / bidirectional 创建各列车运行单元。"""
         base_tt = load_timetable(self._timetable_path)
         interval = self.sim_params.departure_interval
-        direction = self.vehicle.params.direction
-        start_pos = self.track.track.total_length if direction == "up" else 0.0
+        total_length = self.track.track.total_length
         self.trains = []
-        for i in range(self.sim_params.train_count):
-            train_id = f"TRAIN_{i + 1:02d}"
-            spawn_time = i * interval
-            timetable = Timetable(
-                train_id=train_id,
-                entries=[
-                    TimetableEntry(
-                        station_id=e.station_id,
-                        planned_arrival=e.planned_arrival + spawn_time,
-                        planned_departure=e.planned_departure + spawn_time,
-                    )
-                    for e in base_tt.entries
-                ],
-            )
-            ats = ATSController(self.sim_params.signal.ats, timetable)
-            signaling = ThreeStageController(
-                self.track, self.vehicle.params, self.sim_params, ats=ats
-            )
-            signaling.reset(direction=direction)
-            self.trains.append(
-                TrainRun(
+
+        for direction, id_prefix in _fleet_directions(
+            self.sim_params, self.vehicle.params.direction
+        ):
+            start_pos = _start_chainage(direction, total_length)
+            for i in range(self.sim_params.train_count):
+                train_id = _format_train_id(id_prefix, i)
+                spawn_time = i * interval
+                timetable = Timetable(
                     train_id=train_id,
-                    state=self.vehicle.create_initial_state(
-                        position=start_pos, passenger_load=passenger_load,
-                        direction=direction,
-                    ),
-                    signaling=signaling,
-                    ats=ats,
-                    manual_driver=ManualDriveController(),
-                    spawn_time=spawn_time,
-                    active=(i == 0),
-                    direction="up",
+                    entries=[
+                        TimetableEntry(
+                            station_id=e.station_id,
+                            planned_arrival=e.planned_arrival + spawn_time,
+                            planned_departure=e.planned_departure + spawn_time,
+                        )
+                        for e in base_tt.entries
+                    ],
                 )
-            )
+                ats = ATSController(self.sim_params.signal.ats, timetable)
+                signaling = ThreeStageController(
+                    self.track, self.vehicle.params, self.sim_params, ats=ats
+                )
+                signaling.reset(direction=direction)
+                self.trains.append(
+                    TrainRun(
+                        train_id=train_id,
+                        state=self.vehicle.create_initial_state(
+                            position=start_pos,
+                            passenger_load=passenger_load,
+                            direction=direction,
+                        ),
+                        signaling=signaling,
+                        ats=ats,
+                        manual_driver=ManualDriveController(),
+                        spawn_time=spawn_time,
+                        active=(i == 0),
+                        direction=direction,
+                    )
+                )
 
     def set_snapshot_callback(self, callback: Callable[[dict], None]) -> None:
         """注册每步快照回调（供 WebSocket 推送层使用）。"""
@@ -229,14 +265,18 @@ class Orchestrator:
 
     def _spawn_trains(self, elapsed: float) -> None:
         """按发车间隔激活尚未发车的列车。"""
+        total_length = self.track.track.total_length
         for run in self.trains:
             if run.active or elapsed < run.spawn_time:
                 continue
             passenger_load = run.state.passenger_load
+            start_pos = _start_chainage(run.direction, total_length)
             run.state = self.vehicle.create_initial_state(
-                position=0.0, passenger_load=passenger_load
+                position=start_pos,
+                passenger_load=passenger_load,
+                direction=run.direction,
             )
-            run.signaling.reset()
+            run.signaling.reset(direction=run.direction)
             run.active = True
 
     def _step_train(
@@ -245,6 +285,7 @@ class Orchestrator:
         dt: float,
         elapsed: float,
         leading_pos: float | None = None,
+        direction: str = "down",
     ) -> tuple[StepResult, ControlCommands, float, MaProfile, list[dict], float]:
         """步进单列车，返回动力学结果与 signaling 快照片段。"""
         track_params = self.track.query_at(run.state.position)
@@ -260,7 +301,9 @@ class Orchestrator:
         min_interval = self.sim_params.signal.following_min_interval
         if (
             leading_pos is not None
-            and not is_interval_safe(leading_pos, run.state.position, min_interval)
+            and not is_interval_safe(
+                leading_pos, run.state.position, min_interval, direction=direction
+            )
         ):
             cmd = ControlCommands(
                 traction_level=0.0,
@@ -333,18 +376,19 @@ class Orchestrator:
         step_outputs: list[
             tuple[TrainRun, StepResult, ControlCommands, float, MaProfile, list[dict], float]
         ] = []
-        sorted_runs = sorted(active_runs, key=lambda r: r.state.position)
         min_interval = self.sim_params.signal.following_min_interval
-        for i, run in enumerate(sorted_runs):
-            leading_pos = (
-                sorted_runs[i + 1].state.position if i + 1 < len(sorted_runs) else None
-            )
-            result, cmd, speed_limit, ma, timetable_dev, power_demand = self._step_train(
-                run, dt, elapsed, leading_pos=leading_pos
-            )
-            step_outputs.append(
-                (run, result, cmd, speed_limit, ma, timetable_dev, power_demand)
-            )
+        directions = sorted({r.direction for r in active_runs})
+        for direction in directions:
+            dir_runs = [r for r in active_runs if r.direction == direction]
+            sorted_runs = sorted(dir_runs, key=lambda r: r.state.position)
+            for i, run in enumerate(sorted_runs):
+                leading_pos = _leading_chainage(sorted_runs, i, direction)
+                result, cmd, speed_limit, ma, timetable_dev, power_demand = self._step_train(
+                    run, dt, elapsed, leading_pos=leading_pos, direction=direction
+                )
+                step_outputs.append(
+                    (run, result, cmd, speed_limit, ma, timetable_dev, power_demand)
+                )
 
         self.clock.tick()
 
@@ -406,7 +450,7 @@ class Orchestrator:
                     forces=result.forces,
                     pantograph_voltage=pantograph_voltage,
                     power_demand=train_power,
-                    direction=run.direction,
+                    direction=run.state.direction,
                 )
             )
             control_commands.append({
@@ -429,19 +473,33 @@ class Orchestrator:
             timetable_deviations.extend(timetable_dev)
 
         train_intervals: list[dict] = []
-        if len(sorted_runs) >= 2:
-            post_sorted = sorted(active_runs, key=lambda r: r.state.position)
-            for i in range(len(post_sorted) - 1):
-                rear = post_sorted[i]
-                front = post_sorted[i + 1]
-                interval_m = front.state.position - rear.state.position
+        for direction in directions:
+            dir_runs = [r for r in active_runs if r.direction == direction]
+            if len(dir_runs) < 2:
+                continue
+            post_sorted = sorted(dir_runs, key=lambda r: r.state.position)
+            if direction == "down":
+                pairs = [
+                    (post_sorted[i], post_sorted[i + 1])
+                    for i in range(len(post_sorted) - 1)
+                ]
+            else:
+                pairs = [
+                    (post_sorted[i + 1], post_sorted[i])
+                    for i in range(len(post_sorted) - 1)
+                ]
+            for rear, front in pairs:
+                interval_m = tracking_gap(front.state.position, rear.state.position, direction)
                 train_intervals.append({
                     "trainId": rear.train_id,
                     "leadingTrainId": front.train_id,
                     "intervalM": interval_m,
                     "minIntervalM": min_interval,
                     "safe": is_interval_safe(
-                        front.state.position, rear.state.position, min_interval
+                        front.state.position,
+                        rear.state.position,
+                        min_interval,
+                        direction=direction,
                     ),
                 })
 

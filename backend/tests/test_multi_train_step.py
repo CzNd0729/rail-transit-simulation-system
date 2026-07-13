@@ -7,6 +7,7 @@ from sim_engine.orchestrator import Orchestrator
 
 def test_delayed_spawn_adds_second_train_to_snapshot():
     orch = Orchestrator.from_config_dir()
+    orch.sim_params.bidirectional = False
     orch.sim_params.train_count = 2
     orch.sim_params.departure_interval = 2.0
     orch.reset()
@@ -23,6 +24,7 @@ def test_delayed_spawn_adds_second_train_to_snapshot():
 
 def test_multi_train_timetable_offset_by_spawn():
     orch = Orchestrator.from_config_dir()
+    orch.sim_params.bidirectional = False
     orch.sim_params.train_count = 3
     orch.sim_params.departure_interval = 120.0
     orch.reset()
@@ -32,6 +34,7 @@ def test_multi_train_timetable_offset_by_spawn():
 def test_multi_train_third_train_progresses_past_st02():
     """TRAIN_03 不应因 ATS 全局时刻表误判而在 ST02 长期停站。"""
     orch = Orchestrator.from_config_dir()
+    orch.sim_params.bidirectional = False
     orch.sim_params.train_count = 3
     orch.sim_params.departure_interval = 120.0
     orch.reset()
@@ -43,6 +46,7 @@ def test_multi_train_third_train_progresses_past_st02():
 
 def test_snapshot_includes_train_direction():
     orch = Orchestrator.from_config_dir()
+    orch.sim_params.bidirectional = False
     orch.reset()
     orch.start()
     snap = orch.step_once()

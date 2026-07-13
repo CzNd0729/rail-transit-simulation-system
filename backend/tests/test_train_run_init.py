@@ -7,6 +7,7 @@ from sim_engine.orchestrator import Orchestrator
 
 def test_orchestrator_creates_multiple_train_runs():
     orch = Orchestrator.from_config_dir()
+    orch.sim_params.bidirectional = False
     orch.sim_params.train_count = 3
     orch.reset()
     assert len(orch.trains) == 3

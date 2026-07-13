@@ -91,22 +91,33 @@ export default function OccupancyDisplay() {
             />
           ))}
 
-          {/* 列车标记 */}
-          {trains.map((t) => (
-            <g key={t.id}>
-              <rect
-                x={t.position - 8} y={trackY - 10}
-                width={16} height={trackH + 8}
-                rx={3} fill="#ff4d4f" opacity={0.85}
-              />
-              <text
-                x={t.position} y={trackY + 10}
-                textAnchor="middle" fontSize={10} fill="#fff"
-              >
-                🚇
-              </text>
-            </g>
-          ))}
+          {/* 列车标记（按方向分轨） */}
+          {trains.map((t) => {
+            const isUp = t.direction === 'up';
+            const y = isUp ? upY : trackY;
+            return (
+              <g key={t.id}>
+                <rect
+                  x={t.position - 8}
+                  y={y - 10}
+                  width={16}
+                  height={trackH + 8}
+                  rx={3}
+                  fill={isUp ? '#1890ff' : '#ff4d4f'}
+                  opacity={0.85}
+                />
+                <text
+                  x={t.position}
+                  y={y + 10}
+                  textAnchor="middle"
+                  fontSize={10}
+                  fill="#fff"
+                >
+                  🚇
+                </text>
+              </g>
+            );
+          })}
         </svg>
       </div>
 

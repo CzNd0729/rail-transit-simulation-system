@@ -16,6 +16,7 @@ def test_load_train_count_from_yaml(tmp_path):
 simulation:
   train_count: 3
   departure_interval: 90.0
+  bidirectional: true
   time_step: 0.1
 """
     p = tmp_path / "simulation.yaml"
@@ -23,3 +24,5 @@ simulation:
     params = load_simulation_params(p)
     assert params.train_count == 3
     assert params.departure_interval == 90.0
+    assert params.bidirectional is True
+    assert params.total_train_count() == 6

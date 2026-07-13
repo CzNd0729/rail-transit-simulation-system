@@ -138,7 +138,7 @@ class SimulationManager:
             "simulationTime": orch.clock.elapsed,
             "totalTime": orch.sim_params.total_time,
             "speedMultiplier": orch.clock.speed_multiplier,
-            "trainCount": orch.sim_params.train_count,
+            "trainCount": orch.sim_params.total_train_count(),
         }
 
     # ==================== 配置读取 ====================
@@ -205,6 +205,7 @@ class SimulationManager:
                 "targetSpeedRatio": "target_speed_ratio",
                 "stationStopTolerance": "station_stop_tolerance",
                 "trainCount": "train_count",
+                "bidirectional": "bidirectional",
                 "departureInterval": "departure_interval",
             }
             for camel_key, snake_key in field_map.items():
@@ -380,7 +381,7 @@ class SimulationManager:
     def _all_trains_finished(orch: Orchestrator) -> bool:
         """全部列车已 spawn 且均到终点停稳（按各车 direction 判断）。"""
         active = [t for t in orch.trains if t.active]
-        if len(active) < orch.sim_params.train_count:
+        if len(active) < orch.sim_params.total_train_count():
             return False
         total = orch.track.track.total_length
         for run in active:

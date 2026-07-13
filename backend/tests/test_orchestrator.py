@@ -119,6 +119,7 @@ def test_stop_transitions_to_stopped():
 
 def test_reset_clears_state():
     orch = Orchestrator.from_config_dir()
+    orch.sim_params.bidirectional = False
     orch.start()
     for _ in range(10):
         orch.step_once()

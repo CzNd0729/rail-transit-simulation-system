@@ -7,6 +7,8 @@ from sim_engine.orchestrator import Orchestrator
 
 def test_interval_violation_triggers_eb_on_following_train():
     orch = Orchestrator.from_config_dir()
+    orch.sim_params.bidirectional = False
+    orch.vehicle.params.direction = "down"
     orch.sim_params.train_count = 2
     orch.sim_params.departure_interval = 0.0
     orch.sim_params.signal.following_min_interval = 500.0

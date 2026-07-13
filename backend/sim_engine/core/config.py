@@ -95,12 +95,18 @@ class SimulationParams:
     station_stop_tolerance: float = 1.0
     coasting_min_speed: float = 30.0
     train_count: int = 1
-    """同方向仿真列车数。"""
+    """每个运行方向上的列车数（双向时上下行各 train_count 列）。"""
     departure_interval: float = 120.0
     """同方向发车间隔 (s)。"""
+    bidirectional: bool = False
+    """True 时同时仿真上行与下行各 train_count 列车。"""
     pid: PidParams = field(default_factory=PidParams)
     power: PowerConfig = field(default_factory=PowerConfig)
     signal: SignalConfig = field(default_factory=SignalConfig)
+
+    def total_train_count(self) -> int:
+        """编排器应创建的列车总数。"""
+        return self.train_count * (2 if self.bidirectional else 1)
 
 
 # ── 子模块配置文件加载器 ────────────────────────────────────────────
@@ -231,6 +237,7 @@ def load_simulation_params(path: str | Path) -> SimulationParams:
         coasting_min_speed=float(data.get("coasting_min_speed", 30.0)),
         train_count=int(data.get("train_count", 1)),
         departure_interval=float(data.get("departure_interval", 120.0)),
+        bidirectional=bool(data.get("bidirectional", False)),
         pid=pid,
         power=power,
         signal=signal,
