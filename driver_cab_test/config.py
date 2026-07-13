@@ -20,8 +20,8 @@ PLC_PORT_C = 8003  # 连接3：备用/辅助数据通道
 # PLC 发送给上位机（周期100ms，46字节）
 PLC_TO_UPPER_LEN = 46
 
-# 上位机发送给 PLC（无固定周期，26字节）
-UPPER_TO_PLC_LEN = 26
+# 上位机发送给 PLC（无固定周期，28字节，帧头24+数据区2+车辆速度2）
+UPPER_TO_PLC_LEN = 28
 
 # ============================================================
 # 网络屏协议（司机驾驶模拟台网络屏）
@@ -85,17 +85,21 @@ PLC_OFFSET = {
     "reserved": 26,         # 20字节 预留
 }
 
-# 上位机 → PLC (26字节)
+# 上位机 → PLC (28字节，文档7.2节，帧头24+数据区4)
 UPPER_OFFSET = {
-    "header": 0,            # 2字节 报文头
-    "traction_cmd": 2,      # 2字节 牵引制动命令
-    "traction_pct": 4,      # 2字节 牵引百分比 (%)
-    "brake_pct": 6,         # 2字节 制动百分比 (%)
-    "target_speed": 8,      # 4字节 目标速度 (cm/s)
-    "door_cmd": 12,         # 2字节 门控命令
-    "ato_cmd": 14,          # 2字节 ATO命令
-    "eb_reset": 16,         # 2字节 紧急制动复位
-    "reserved": 18,         # 8字节 预留
+    "identify": 0,          # 4字节 DWORD 固定数据 55 AA 55 AA
+    "total_len": 4,         # 2字节 WORD 报文总大小
+    "data_len": 6,          # 2字节 WORD 数据区总大小
+    "year": 8,              # 2字节 WORD 年
+    "month": 10,            # 2字节 WORD 月
+    "day": 12,              # 2字节 WORD 日
+    "hour": 14,             # 2字节 WORD 时
+    "minute": 16,           # 2字节 WORD 分
+    "second": 18,           # 2字节 WORD 秒
+    "verify_type": 20,      # 2字节 WORD 校验类型
+    "verify_code": 22,      # 2字节 WORD 校验值
+    "flags": 24,            # 2字节 BOOL 标志（同7.1字节24-25, 但bit4=开门灯）
+    "vehicle_speed": 26,    # 2字节 WORD 车辆速度
 }
 
 # ============================================================
