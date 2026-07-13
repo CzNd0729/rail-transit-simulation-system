@@ -116,7 +116,12 @@ function TractionCurveTable({
 
   return (
     <div style={styles.curveSection}>
-      <div style={styles.curveTitle}>牵引特性曲线</div>
+      <div style={styles.curveTitle}>
+        牵引特性曲线
+        {!USE_MOCK && (
+          <span style={styles.liveTag}>仅本地，Live 模式后端暂不支持同步</span>
+        )}
+      </div>
       <table style={styles.table}>
         <thead>
           <tr><th style={styles.th}>速度 (km/h)</th><th style={styles.th}>牵引力 %</th></tr>
@@ -178,6 +183,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     color: 'var(--text-secondary)',
     marginBottom: '4px',
+  },
+  liveTag: {
+    fontSize: 10,
+    color: 'var(--text-secondary)',
+    marginLeft: 8,
   },
   table: {
     width: '100%',
