@@ -16,15 +16,22 @@ if TYPE_CHECKING:
 class TurnbackController:
     service: ServiceTimetable
 
-    def terminal_station(self, run: TrainRun) -> str | None:
-        if not run.legs or run.leg_index >= len(run.legs):
+    def _leg_name(self, run: TrainRun) -> str | None:
+        names = getattr(run, "trip_leg_names", ()) or self.service.trip_leg_names
+        if run.leg_index >= len(names):
             return None
-        leg_name = self.service.trip_leg_names[run.leg_index]
+        return names[run.leg_index]
+
+    def terminal_station(self, run: TrainRun) -> str | None:
+        leg_name = self._leg_name(run)
+        if leg_name is None:
+            return None
         template = self.service.leg_templates.get(leg_name)
         return template.terminal_station if template else None
 
     def switch_for_leg(self, run: TrainRun) -> str:
-        leg_name = self.service.trip_leg_names[run.leg_index]
+        leg_name = self._leg_name(run)
+        assert leg_name is not None
         template = self.service.leg_templates[leg_name]
         if template.direction == "down":
             return self.service.turnback_switch_down
