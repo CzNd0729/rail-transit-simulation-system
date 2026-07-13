@@ -12,10 +12,17 @@ from typing import Optional
 from .config import (
     PLC_OFFSET, UPPER_OFFSET,
     PLC_TO_UPPER_LEN, UPPER_TO_PLC_LEN,
-    NETWORK_SCREEN_LEN, SIGNAL_SCREEN_LEN,
+    NETWORK_SCREEN_LEN, NETWORK_SCREEN_REQUEST_LEN,
+    NETWORK_SCREEN_OFFSET, NETWORK_SCREEN_REQUEST_OFFSET,
+    SIGNAL_SCREEN_LEN,
     ATP_SAFE_INPUT, ATP_NONSAFE_INPUT, ATO_NONSAFE_INPUT,
     ATP_SAFE_OUTPUT, ATP_NONSAFE_OUTPUT, ATO_NONSAFE_OUTPUT,
     TRACTION_BRAKE, TRAIN_DIRECTION,
+    LEVEL_POS, RUN_DIR, CAB_STATE, DOOR_STATE, BRAKE_PARKING_STATE,
+    FIRE_STATE, SLIP_STATE, PASSENGER_ALARM_STATE,
+    RUN_MODE_MANUAL_ATO, DOOR_MODE_MM_AM_AA,
+    BREAKER_STATE, DEVICE_WORK_STATE,
+    AIR_COND_CTRL_MODE, AIR_COND_MODE,
 )
 
 logger = logging.getLogger(__name__)
@@ -592,112 +599,583 @@ def parse_upper_to_plc(data: bytes) -> dict:
 
 
 # ====================================================================
-# 网络屏协议编解码（572字节）
+# 网络屏协议编解码
 # ====================================================================
+# 文档定义：
+#   - 上位机→网络屏：572字节（本文档 1.1 节）
+#   - 网络屏→上位机：26字节（本文档"牵引切换请求"节）
+# 字节序：文档未显式声明，采用小端序（与系统其他协议保持一致）
+
+# ------------------- 内部辅助：6车数组读写 -------------------
+
+_CAR_COUNT = 6  # 6节编组
+
+
+def _pack_car_bytes(data: bytearray, offset: int, values: list, count: int):
+    """将 count 个 BYTE 值写入 data[offset:offset+count]"""
+    for i in range(min(len(values), count)):
+        data[offset + i] = values[i] & 0xFF
+
+
+def _pack_car_words(data: bytearray, offset: int, values: list, count: int):
+    """将 count 个 WORD 值（小端）写入 data"""
+    for i in range(min(len(values), count)):
+        struct.pack_into("<H", data, offset + 2 * i, values[i] & 0xFFFF)
+
+
+def _pack_car_dwords(data: bytearray, offset: int, values: list, count: int):
+    """将 count 个 DWORD 值（小端）写入 data"""
+    for i in range(min(len(values), count)):
+        struct.pack_into("<I", data, offset + 4 * i, values[i] & 0xFFFFFFFF)
+
+
+def _pack_car_floats(data: bytearray, offset: int, values: list, count: int):
+    """将 count 个 FLOAT 值（小端）写入 data"""
+    for i in range(min(len(values), count)):
+        struct.pack_into("<f", data, offset + 4 * i, float(values[i]))
+
+
+def _parse_car_bytes(data: bytes, offset: int, count: int) -> list:
+    return [data[offset + i] for i in range(count)]
+
+
+def _parse_car_words(data: bytes, offset: int, count: int) -> list:
+    return [struct.unpack_from("<H", data, offset + 2 * i)[0] for i in range(count)]
+
+
+def _parse_car_dwords(data: bytes, offset: int, count: int) -> list:
+    return [struct.unpack_from("<I", data, offset + 4 * i)[0] for i in range(count)]
+
+
+def _parse_car_floats(data: bytes, offset: int, count: int) -> list:
+    return [struct.unpack_from("<f", data, offset + 4 * i)[0] for i in range(count)]
+
+
+def _ensure_list(val, count: int, default=0):
+    """确保 val 是长度为 count 的列表，不足用 default 填充"""
+    if val is None:
+        return [default] * count
+    if len(val) >= count:
+        return list(val)[:count]
+    return list(val) + [default] * (count - len(val))
+
+
+# ------------------- 上位机 → 网络屏 (572字节) -------------------
 
 def pack_network_screen(
-    train_id: int = 1,
-    speed_km_h: float = 0.0,
-    target_speed_km_h: float = 0.0,
-    limit_speed_km_h: float = 80.0,
-    next_station: str = "车站A",
-    door_status: str = "关",
-    mode_name: str = "RM",
-    voltage: float = 1500.0,
-    current: float = 0.0,
-    pressure: float = 0.0,
-    is_ato: bool = False,
-    fault_info: str = "",
+    # -- 报文头 --
+    timestamp_ms: int = 0,
+    verify_type: int = 0,
+    verify_code: int = 0,
+    protocol_id: int = 0,
+    msg_id: int = 0,
+    # -- 时间 --
+    year: int = 2025,
+    month: int = 1,
+    day: int = 1,
+    hour: int = 0,
+    minute: int = 0,
+    second: int = 0,
+    # -- 基础运行信息 --
+    curr_station_id: int = 0,
+    next_station_id: int = 0,
+    end_station_id: int = 0,
+    power_state: int = 0,       # 车间电源供电: 有(1)/无(0)
+    speed: float = 0.0,         # FLOAT 速度
+    acceleration: float = 0.0,  # FLOAT 加速度
+    power_pull: int = 0,        # WORD 总牵引力
+    net_pressure: int = 1500,   # WORD 网压（默认1500V）
+    speed_limit: int = 0,       # WORD 限速
+    level_pos: int = 0,         # BYTE 级位: 惰行(0)/牵引(1)/制动(2)/紧急(3)
+    run_mode: int = 0,          # BYTE 低4位=手动/ATO, 高4位=门模式
+    master_v: int = 0,          # WORD 母线电压
+    run_dir: int = 0,           # BYTE 运行方向
+    driver_room_state: int = 0, # BYTE 司机室状态 低4=tc1+高4=tc2
+    # -- 6节车 数组字段 --
+    door_state: list = None,           # DWORD[6]
+    stop_pos_state: list = None,       # BYTE[6]
+    fire_empty_run: list = None,       # BYTE[6]
+    warm_empty_state1: list = None,    # BYTE[6]
+    warm_empty_state2: list = None,    # BYTE[6]
+    pull_switch: list = None,          # BYTE[6]
+    charge: list = None,               # BYTE[6]
+    assist_high_switch: list = None,   # BYTE[6]
+    breaker_master: list = None,       # BYTE[6]
+    elect_stop: list = None,           # WORD[6]
+    wind_press: list = None,           # WORD[6]
+    brake_pressure: list = None,       # WORD[6]
+    usage_rate: list = None,           # BYTE[6]
+    line_net: list = None,             # BYTE[6]
+    temp: list = None,                 # FLOAT[6]
+    pull_stream: list = None,          # BYTE[6]
+    stop_im: list = None,              # BYTE[10]
+    side_info: list = None,            # BYTE[6]
+    braker_state: list = None,         # BYTE[11]
+    line_and_elect_stop: list = None,  # BYTE[6]
+    line_v: list = None,               # WORD[6]
+    stop_state: list = None,           # BYTE[6]
+    air_stop: list = None,             # WORD[6]
+    empty_press1: list = None,         # WORD[6]
+    empty_press2: list = None,         # WORD[6]
+    b05_and_b19: list = None,          # BYTE[6]
+    kma_and_elect_power: list = None,  # BYTE[6]
+    ni_bian_input_v: list = None,      # WORD[6]
+    ni_bian_output_v: list = None,     # WORD[6]
+    charge_output_v: list = None,      # WORD[6]
+    ni_bian_input_a: list = None,      # BYTE[6]
+    ni_bian_output_a: list = None,     # BYTE[6]
+    charge_output_a: list = None,      # BYTE[6]
+    # -- 接触器/KM --
+    tc1_km1: int = 0,       # BYTE
+    tc1_km3: int = 0,
+    tc1_km5: int = 0,
+    tc2_km1: int = 0,
+    tc2_km3: int = 0,
+    tc2_km5: int = 0,
+    # -- 蓄电池 TC1 --
+    tc1_battle_remain: int = 0,     # WORD
+    tc1_battle_v: int = 0,
+    tc1_battle_charge_a: int = 0,
+    tc1_battle_output_a: int = 0,
+    tc1_battle_temp: int = 0,
+    tc1_hi_v: int = 0,
+    tc1_li_v: int = 0,
+    tc1_hi_pos: int = 0,            # BYTE
+    tc1_li_pos: int = 0,
+    tc1_temp: int = 0,              # WORD
+    tc2_temp: int = 0,
+    tc1_temp_pos: int = 0,          # BYTE
+    tc2_temp_pos: int = 0,
+    # -- 蓄电池 TC2 --
+    tc2_battle_remain: int = 0,
+    tc2_battle_v: int = 0,
+    tc2_battle_charge_a: int = 0,
+    tc2_battle_output_a: int = 0,
+    tc2_battle_temp: int = 0,
+    tc2_hi_v: int = 0,
+    tc2_li_v: int = 0,
+    tc2_hi_pos: int = 0,
+    tc2_li_pos: int = 0,
+    # -- 烟火/空调 --
+    smoke_temp: list = None,         # DWORD[6]
+    out_temp: list = None,           # FLOAT[6]
+    inside_temp: list = None,        # FLOAT[6]
+    air_cond_mode: list = None,      # BYTE[6]
+    cold_wind: list = None,          # BYTE[6]
+    wind_fan: list = None,           # BYTE[6]
+    press_machine: list = None,      # WORD[6]
+    big_wind: list = None,           # BYTE[6]
+    machine11: list = None,          # BYTE[6]
+    machine12: list = None,          # BYTE[6]
+    machine21: list = None,          # BYTE[6]
+    machine22: list = None,          # BYTE[6]
+    # -- 网络设备 --
+    tc1_net: list = None,            # WORD[2]
+    tc2_net: list = None,            # WORD[2]
+    tc3_net: list = None,            # BYTE[2]
+    tc4_net: list = None,            # BYTE[2]
+    tc5_net: list = None,            # BYTE[2]
+    tc6_net: list = None,            # BYTE[2]
+    conn_ab: int = 0,                # BYTE
+    tc1_devs_state: int = 0,         # WORD
+    tc2_devs_state: int = 0,
+    tc3_devs_state: int = 0,         # BYTE
+    tc4_devs_state: int = 0,
+    tc5_devs_state: int = 0,
+    tc6_devs_state: int = 0,
+    econn_dev_state: int = 0,        # BYTE
+    econn_dev_state2: int = 0,
+    fault_code: int = 0,             # WORD
+    train_no: int = 1,               # WORD 列车号
 ) -> bytes:
     """
-    打包网络屏显示数据（572字节）
+    打包 上位机 → 网络屏 显示数据（572字节）
 
-    注意：这是简化实现，实际协议需根据文档完整定义
+    协议定义见文档「司机驾驶模拟台网络屏协议」1.1 节
+    所有字段采用小端字节序
     """
+    off = NETWORK_SCREEN_OFFSET
     data = bytearray(NETWORK_SCREEN_LEN)
 
-    # 前4字节：报文头
-    struct.pack_into("<I", data, 0, 0xAA55AA55)
+    # -- 报文头 (24字节) --
+    struct.pack_into("<I", data, off["identify"], 0x55AA55AA)
+    struct.pack_into("<H", data, off["total_len"], NETWORK_SCREEN_LEN)
+    struct.pack_into("<H", data, off["data_len"], NETWORK_SCREEN_LEN - 24)
+    struct.pack_into("<Q", data, off["timestamp"], timestamp_ms & 0xFFFFFFFFFFFFFFFF)
+    struct.pack_into("<H", data, off["verify_type"], verify_type & 0xFFFF)
+    struct.pack_into("<H", data, off["verify_code"], verify_code & 0xFFFF)
+    struct.pack_into("<H", data, off["protocol_id"], protocol_id & 0xFFFF)
+    struct.pack_into("<H", data, off["msg_id"], msg_id & 0xFFFF)
 
-    # 4-7: 列车ID
-    struct.pack_into("<I", data, 4, train_id & 0xFFFFFFFF)
+    # -- 时间 --
+    struct.pack_into("<H", data, off["year"], year & 0xFFFF)
+    struct.pack_into("<H", data, off["month"], month & 0xFFFF)
+    struct.pack_into("<H", data, off["day"], day & 0xFFFF)
+    struct.pack_into("<H", data, off["hour"], hour & 0xFFFF)
+    struct.pack_into("<H", data, off["minute"], minute & 0xFFFF)
+    struct.pack_into("<H", data, off["second"], second & 0xFFFF)
 
-    # 8-11: 当前速度 (km/h * 100)
-    struct.pack_into("<I", data, 8, int(speed_km_h * 100) & 0xFFFFFFFF)
+    # -- 基础运行信息 --
+    data[off["curr_station_id"]] = curr_station_id & 0xFF
+    data[off["next_station_id"]] = next_station_id & 0xFF
+    data[off["end_station_id"]] = end_station_id & 0xFF
+    data[off["power_state"]] = power_state & 0xFF
+    struct.pack_into("<f", data, off["speed"], float(speed))
+    struct.pack_into("<f", data, off["acceleration"], float(acceleration))
+    struct.pack_into("<H", data, off["power_pull"], power_pull & 0xFFFF)
+    struct.pack_into("<H", data, off["net_pressure"], net_pressure & 0xFFFF)
+    struct.pack_into("<H", data, off["speed_limit"], speed_limit & 0xFFFF)
+    data[off["level_pos"]] = level_pos & 0xFF
+    data[off["run_mode"]] = run_mode & 0xFF
+    struct.pack_into("<H", data, off["master_v"], master_v & 0xFFFF)
+    data[off["run_dir"]] = run_dir & 0xFF
+    data[off["driver_room_state"]] = driver_room_state & 0xFF
 
-    # 12-15: 目标速度
-    struct.pack_into("<I", data, 12, int(target_speed_km_h * 100) & 0xFFFFFFFF)
+    # -- 6节车 BYTE[6] 数组 --
+    _pack_car_dwords(data, off["door_state"], _ensure_list(door_state, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["stop_pos_state"], _ensure_list(stop_pos_state, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["fire_empty_run"], _ensure_list(fire_empty_run, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["warm_empty_state1"], _ensure_list(warm_empty_state1, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["warm_empty_state2"], _ensure_list(warm_empty_state2, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["pull_switch"], _ensure_list(pull_switch, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["charge"], _ensure_list(charge, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["assist_high_switch"], _ensure_list(assist_high_switch, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["breaker_master"], _ensure_list(breaker_master, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_words(data, off["elect_stop"], _ensure_list(elect_stop, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_words(data, off["wind_press"], _ensure_list(wind_press, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_words(data, off["brake_pressure"], _ensure_list(brake_pressure, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["usage_rate"], _ensure_list(usage_rate, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["line_net"], _ensure_list(line_net, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_floats(data, off["temp"], _ensure_list(temp, _CAR_COUNT, 0.0), _CAR_COUNT)
 
-    # 16-19: 限速
-    struct.pack_into("<I", data, 16, int(limit_speed_km_h * 100) & 0xFFFFFFFF)
+    _pack_car_bytes(data, off["pull_stream"], _ensure_list(pull_stream, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["stop_im"], _ensure_list(stop_im, 10), 10)
+    _pack_car_bytes(data, off["side_info"], _ensure_list(side_info, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["braker_state"], _ensure_list(braker_state, 11), 11)
+    _pack_car_bytes(data, off["line_and_elect_stop"], _ensure_list(line_and_elect_stop, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_words(data, off["line_v"], _ensure_list(line_v, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["stop_state"], _ensure_list(stop_state, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_words(data, off["air_stop"], _ensure_list(air_stop, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_words(data, off["empty_press1"], _ensure_list(empty_press1, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_words(data, off["empty_press2"], _ensure_list(empty_press2, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["b05_and_b19"], _ensure_list(b05_and_b19, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["kma_and_elect_power"], _ensure_list(kma_and_elect_power, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_words(data, off["ni_bian_input_v"], _ensure_list(ni_bian_input_v, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_words(data, off["ni_bian_output_v"], _ensure_list(ni_bian_output_v, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_words(data, off["charge_output_v"], _ensure_list(charge_output_v, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["ni_bian_input_a"], _ensure_list(ni_bian_input_a, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["ni_bian_output_a"], _ensure_list(ni_bian_output_a, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["charge_output_a"], _ensure_list(charge_output_a, _CAR_COUNT), _CAR_COUNT)
 
-    # 20-23: 网压
-    struct.pack_into("<I", data, 20, int(voltage * 10) & 0xFFFFFFFF)
+    # -- 接触器/KM --
+    data[off["tc1_km1"]] = tc1_km1 & 0xFF
+    data[off["tc1_km3"]] = tc1_km3 & 0xFF
+    data[off["tc1_km5"]] = tc1_km5 & 0xFF
+    data[off["tc2_km1"]] = tc2_km1 & 0xFF
+    data[off["tc2_km3"]] = tc2_km3 & 0xFF
+    data[off["tc2_km5"]] = tc2_km5 & 0xFF
 
-    # 24-27: 网流
-    struct.pack_into("<I", data, 24, int(current * 10) & 0xFFFFFFFF)
+    # -- 蓄电池 TC1 --
+    struct.pack_into("<H", data, off["tc1_battle_remain"], tc1_battle_remain & 0xFFFF)
+    struct.pack_into("<H", data, off["tc1_battle_v"], tc1_battle_v & 0xFFFF)
+    struct.pack_into("<H", data, off["tc1_battle_charge_a"], tc1_battle_charge_a & 0xFFFF)
+    struct.pack_into("<H", data, off["tc1_battle_output_a"], tc1_battle_output_a & 0xFFFF)
+    struct.pack_into("<H", data, off["tc1_battle_temp"], tc1_battle_temp & 0xFFFF)
+    struct.pack_into("<H", data, off["tc1_hi_v"], tc1_hi_v & 0xFFFF)
+    struct.pack_into("<H", data, off["tc1_li_v"], tc1_li_v & 0xFFFF)
+    data[off["tc1_hi_pos"]] = tc1_hi_pos & 0xFF
+    data[off["tc1_li_pos"]] = tc1_li_pos & 0xFF
+    struct.pack_into("<H", data, off["tc1_temp"], tc1_temp & 0xFFFF)
+    struct.pack_into("<H", data, off["tc2_temp"], tc2_temp & 0xFFFF)
+    data[off["tc1_temp_pos"]] = tc1_temp_pos & 0xFF
+    data[off["tc2_temp_pos"]] = tc2_temp_pos & 0xFF
 
-    # 28-31: 制动缸压力
-    struct.pack_into("<I", data, 28, int(pressure * 10) & 0xFFFFFFFF)
+    # -- 蓄电池 TC2 --
+    struct.pack_into("<H", data, off["tc2_battle_remain"], tc2_battle_remain & 0xFFFF)
+    struct.pack_into("<H", data, off["tc2_battle_v"], tc2_battle_v & 0xFFFF)
+    struct.pack_into("<H", data, off["tc2_battle_charge_a"], tc2_battle_charge_a & 0xFFFF)
+    struct.pack_into("<H", data, off["tc2_battle_output_a"], tc2_battle_output_a & 0xFFFF)
+    struct.pack_into("<H", data, off["tc2_battle_temp"], tc2_battle_temp & 0xFFFF)
+    struct.pack_into("<H", data, off["tc2_hi_v"], tc2_hi_v & 0xFFFF)
+    struct.pack_into("<H", data, off["tc2_li_v"], tc2_li_v & 0xFFFF)
+    data[off["tc2_hi_pos"]] = tc2_hi_pos & 0xFF
+    data[off["tc2_li_pos"]] = tc2_li_pos & 0xFF
 
-    # 32-33: 门状态 (0=关, 1=开)
-    door_val = 1 if door_status == "开" else 0
-    struct.pack_into("<H", data, 32, door_val & 0xFFFF)
+    # -- 烟火/空调 --
+    _pack_car_dwords(data, off["smoke_temp"], _ensure_list(smoke_temp, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_floats(data, off["out_temp"], _ensure_list(out_temp, _CAR_COUNT, 0.0), _CAR_COUNT)
+    _pack_car_floats(data, off["inside_temp"], _ensure_list(inside_temp, _CAR_COUNT, 0.0), _CAR_COUNT)
+    _pack_car_bytes(data, off["air_cond_mode"], _ensure_list(air_cond_mode, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["cold_wind"], _ensure_list(cold_wind, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["wind_fan"], _ensure_list(wind_fan, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_words(data, off["press_machine"], _ensure_list(press_machine, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["big_wind"], _ensure_list(big_wind, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["machine11"], _ensure_list(machine11, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["machine12"], _ensure_list(machine12, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["machine21"], _ensure_list(machine21, _CAR_COUNT), _CAR_COUNT)
+    _pack_car_bytes(data, off["machine22"], _ensure_list(machine22, _CAR_COUNT), _CAR_COUNT)
 
-    # 34-35: 驾驶模式
-    mode_map = {"INIT": 0, "RD": 2, "RM": 3, "CM": 4, "AM": 5,
-                "AR": 6, "EUM": 7, "CAM": 8, "FAM": 9}
-    mode_val = mode_map.get(mode_name, 0)
-    struct.pack_into("<H", data, 34, mode_val & 0xFFFF)
+    # -- 网络设备 --
+    _pack_car_words(data, off["tc1_net"], _ensure_list(tc1_net, 2), 2)
+    _pack_car_words(data, off["tc2_net"], _ensure_list(tc2_net, 2), 2)
+    _pack_car_bytes(data, off["tc3_net"], _ensure_list(tc3_net, 2), 2)
+    _pack_car_bytes(data, off["tc4_net"], _ensure_list(tc4_net, 2), 2)
+    _pack_car_bytes(data, off["tc5_net"], _ensure_list(tc5_net, 2), 2)
+    _pack_car_bytes(data, off["tc6_net"], _ensure_list(tc6_net, 2), 2)
+    data[off["conn_ab"]] = conn_ab & 0xFF
+    struct.pack_into("<H", data, off["tc1_devs_state"], tc1_devs_state & 0xFFFF)
+    struct.pack_into("<H", data, off["tc2_devs_state"], tc2_devs_state & 0xFFFF)
+    data[off["tc3_devs_state"]] = tc3_devs_state & 0xFF
+    data[off["tc4_devs_state"]] = tc4_devs_state & 0xFF
+    data[off["tc5_devs_state"]] = tc5_devs_state & 0xFF
+    data[off["tc6_devs_state"]] = tc6_devs_state & 0xFF
+    data[off["econn_dev_state"]] = econn_dev_state & 0xFF
+    data[off["econn_dev_state2"]] = econn_dev_state2 & 0xFF
+    struct.pack_into("<H", data, off["fault_code"], fault_code & 0xFFFF)
+    struct.pack_into("<H", data, off["train_no"], train_no & 0xFFFF)
 
-    # 36-37: ATO状态
-    struct.pack_into("<H", data, 36, 1 if is_ato else 0)
-
-    # 38-201: 下一站名 (UTF-8, 最多164字节)
-    station_bytes = next_station.encode("utf-8")[:164]
-    data[38:38 + len(station_bytes)] = station_bytes
-
-    # 202-365: 故障信息
-    fault_bytes = fault_info.encode("utf-8")[:164]
-    data[202:202 + len(fault_bytes)] = fault_bytes
-
-    # 366-571: 预留
     return bytes(data)
 
 
 def parse_network_screen(data: bytes) -> dict:
     """
-    解析网络屏数据（572字节）
+    解析 上位机 → 网络屏 显示数据（572字节）
+
+    协议定义见文档「司机驾驶模拟台网络屏协议」1.1 节
     """
     if len(data) < NETWORK_SCREEN_LEN:
         raise ValueError(f"网络屏报文长度不足: {len(data)} < {NETWORK_SCREEN_LEN}")
 
-    header = struct.unpack_from("<I", data, 0)[0]
-    train_id = struct.unpack_from("<I", data, 4)[0]
-    speed_raw = struct.unpack_from("<I", data, 8)[0]
-    target_raw = struct.unpack_from("<I", data, 12)[0]
-    limit_raw = struct.unpack_from("<I", data, 16)[0]
+    off = NETWORK_SCREEN_OFFSET
 
-    # 解析站名（空字符截断）
-    station_raw = data[38:202]
-    null_pos = station_raw.find(b"\x00")
-    if null_pos >= 0:
-        station_raw = station_raw[:null_pos]
-    next_station = station_raw.decode("utf-8", errors="replace")
+    identify = struct.unpack_from("<I", data, off["identify"])[0]
+    total_len = struct.unpack_from("<H", data, off["total_len"])[0]
+    data_len = struct.unpack_from("<H", data, off["data_len"])[0]
 
-    mode_val = struct.unpack_from("<H", data, 34)[0]
-    mode_map_rev = {0: "INIT", 2: "RD", 3: "RM", 4: "CM", 5: "AM",
-                    6: "AR", 7: "EUM", 8: "CAM", 9: "FAM"}
+    result = {
+        # 报文头
+        "identify": f"0x{identify:08X}",
+        "identify_ok": identify == 0x55AA55AA,
+        "total_len": total_len,
+        "data_len": data_len,
+        "timestamp_ms": struct.unpack_from("<Q", data, off["timestamp"])[0],
+        "verify_type": struct.unpack_from("<H", data, off["verify_type"])[0],
+        "verify_code": struct.unpack_from("<H", data, off["verify_code"])[0],
+        "protocol_id": struct.unpack_from("<H", data, off["protocol_id"])[0],
+        "msg_id": struct.unpack_from("<H", data, off["msg_id"])[0],
+        # 时间
+        "year": struct.unpack_from("<H", data, off["year"])[0],
+        "month": struct.unpack_from("<H", data, off["month"])[0],
+        "day": struct.unpack_from("<H", data, off["day"])[0],
+        "hour": struct.unpack_from("<H", data, off["hour"])[0],
+        "minute": struct.unpack_from("<H", data, off["minute"])[0],
+        "second": struct.unpack_from("<H", data, off["second"])[0],
+        "timestamp_str": (
+            f"{struct.unpack_from('<H', data, off['year'])[0]:04d}-"
+            f"{struct.unpack_from('<H', data, off['month'])[0]:02d}-"
+            f"{struct.unpack_from('<H', data, off['day'])[0]:02d} "
+            f"{struct.unpack_from('<H', data, off['hour'])[0]:02d}:"
+            f"{struct.unpack_from('<H', data, off['minute'])[0]:02d}:"
+            f"{struct.unpack_from('<H', data, off['second'])[0]:02d}"
+        ),
+        # 基础运行信息
+        "curr_station_id": data[off["curr_station_id"]],
+        "next_station_id": data[off["next_station_id"]],
+        "end_station_id": data[off["end_station_id"]],
+        "power_state": data[off["power_state"]],
+        "speed": struct.unpack_from("<f", data, off["speed"])[0],
+        "acceleration": struct.unpack_from("<f", data, off["acceleration"])[0],
+        "power_pull": struct.unpack_from("<H", data, off["power_pull"])[0],
+        "net_pressure": struct.unpack_from("<H", data, off["net_pressure"])[0],
+        "speed_limit": struct.unpack_from("<H", data, off["speed_limit"])[0],
+        "level_pos": data[off["level_pos"]],
+        "level_pos_str": {0: "惰行", 1: "牵引", 2: "制动", 3: "紧急制动"}.get(
+            data[off["level_pos"]], f"未知({data[off['level_pos']]})"),
+        "run_mode": data[off["run_mode"]],
+        "run_mode_manual_ato": "ATO" if (data[off["run_mode"]] & 0x0F) == 1 else "手动",
+        "run_mode_door": {0: "MM", 1: "AM", 2: "AA"}.get(
+            (data[off["run_mode"]] >> 4) & 0x0F, "未知"),
+        "master_v": struct.unpack_from("<H", data, off["master_v"])[0],
+        "run_dir": data[off["run_dir"]],
+        "run_dir_str": {0: "无", 1: "左", 2: "右", 0xff: "未知"}.get(
+            data[off["run_dir"]], f"未知({data[off['run_dir']]})"),
+        "driver_room_state": data[off["driver_room_state"]],
+        "driver_room_tc1": "激活" if (data[off["driver_room_state"]] & 0x0F) == 1 else "未激活",
+        "driver_room_tc2": "激活" if ((data[off["driver_room_state"]] >> 4) & 0x0F) == 1 else "未激活",
+        # 6节车数据
+        "door_state": _parse_car_dwords(data, off["door_state"], _CAR_COUNT),
+        "stop_pos_state": _parse_car_bytes(data, off["stop_pos_state"], _CAR_COUNT),
+        "fire_empty_run": _parse_car_bytes(data, off["fire_empty_run"], _CAR_COUNT),
+        "warm_empty_state1": _parse_car_bytes(data, off["warm_empty_state1"], _CAR_COUNT),
+        "warm_empty_state2": _parse_car_bytes(data, off["warm_empty_state2"], _CAR_COUNT),
+        "pull_switch": _parse_car_bytes(data, off["pull_switch"], _CAR_COUNT),
+        "charge": _parse_car_bytes(data, off["charge"], _CAR_COUNT),
+        "assist_high_switch": _parse_car_bytes(data, off["assist_high_switch"], _CAR_COUNT),
+        "breaker_master": _parse_car_bytes(data, off["breaker_master"], _CAR_COUNT),
+        "elect_stop": _parse_car_words(data, off["elect_stop"], _CAR_COUNT),
+        "wind_press": _parse_car_words(data, off["wind_press"], _CAR_COUNT),
+        "brake_pressure": _parse_car_words(data, off["brake_pressure"], _CAR_COUNT),
+        "usage_rate": _parse_car_bytes(data, off["usage_rate"], _CAR_COUNT),
+        "line_net": _parse_car_bytes(data, off["line_net"], _CAR_COUNT),
+        "temp": [round(v, 1) for v in _parse_car_floats(data, off["temp"], _CAR_COUNT)],
+        "pull_stream": _parse_car_bytes(data, off["pull_stream"], _CAR_COUNT),
+        "stop_im": _parse_car_bytes(data, off["stop_im"], 10),
+        "side_info": _parse_car_bytes(data, off["side_info"], _CAR_COUNT),
+        "braker_state": _parse_car_bytes(data, off["braker_state"], 11),
+        "line_and_elect_stop": _parse_car_bytes(data, off["line_and_elect_stop"], _CAR_COUNT),
+        "line_v": _parse_car_words(data, off["line_v"], _CAR_COUNT),
+        "stop_state": _parse_car_bytes(data, off["stop_state"], _CAR_COUNT),
+        "air_stop": _parse_car_words(data, off["air_stop"], _CAR_COUNT),
+        "empty_press1": _parse_car_words(data, off["empty_press1"], _CAR_COUNT),
+        "empty_press2": _parse_car_words(data, off["empty_press2"], _CAR_COUNT),
+        "b05_and_b19": _parse_car_bytes(data, off["b05_and_b19"], _CAR_COUNT),
+        "kma_and_elect_power": _parse_car_bytes(data, off["kma_and_elect_power"], _CAR_COUNT),
+        "ni_bian_input_v": _parse_car_words(data, off["ni_bian_input_v"], _CAR_COUNT),
+        "ni_bian_output_v": _parse_car_words(data, off["ni_bian_output_v"], _CAR_COUNT),
+        "charge_output_v": _parse_car_words(data, off["charge_output_v"], _CAR_COUNT),
+        "ni_bian_input_a": _parse_car_bytes(data, off["ni_bian_input_a"], _CAR_COUNT),
+        "ni_bian_output_a": _parse_car_bytes(data, off["ni_bian_output_a"], _CAR_COUNT),
+        "charge_output_a": _parse_car_bytes(data, off["charge_output_a"], _CAR_COUNT),
+        # 接触器/KM
+        "tc1_km1": data[off["tc1_km1"]],
+        "tc1_km3": data[off["tc1_km3"]],
+        "tc1_km5": data[off["tc1_km5"]],
+        "tc2_km1": data[off["tc2_km1"]],
+        "tc2_km3": data[off["tc2_km3"]],
+        "tc2_km5": data[off["tc2_km5"]],
+        # 蓄电池 TC1
+        "tc1_battle_remain": struct.unpack_from("<H", data, off["tc1_battle_remain"])[0],
+        "tc1_battle_v": struct.unpack_from("<H", data, off["tc1_battle_v"])[0],
+        "tc1_battle_charge_a": struct.unpack_from("<H", data, off["tc1_battle_charge_a"])[0],
+        "tc1_battle_output_a": struct.unpack_from("<H", data, off["tc1_battle_output_a"])[0],
+        "tc1_battle_temp": struct.unpack_from("<H", data, off["tc1_battle_temp"])[0],
+        "tc1_hi_v": struct.unpack_from("<H", data, off["tc1_hi_v"])[0],
+        "tc1_li_v": struct.unpack_from("<H", data, off["tc1_li_v"])[0],
+        "tc1_hi_pos": data[off["tc1_hi_pos"]],
+        "tc1_li_pos": data[off["tc1_li_pos"]],
+        "tc1_temp": struct.unpack_from("<H", data, off["tc1_temp"])[0],
+        "tc2_temp": struct.unpack_from("<H", data, off["tc2_temp"])[0],
+        "tc1_temp_pos": data[off["tc1_temp_pos"]],
+        "tc2_temp_pos": data[off["tc2_temp_pos"]],
+        # 蓄电池 TC2
+        "tc2_battle_remain": struct.unpack_from("<H", data, off["tc2_battle_remain"])[0],
+        "tc2_battle_v": struct.unpack_from("<H", data, off["tc2_battle_v"])[0],
+        "tc2_battle_charge_a": struct.unpack_from("<H", data, off["tc2_battle_charge_a"])[0],
+        "tc2_battle_output_a": struct.unpack_from("<H", data, off["tc2_battle_output_a"])[0],
+        "tc2_battle_temp": struct.unpack_from("<H", data, off["tc2_battle_temp"])[0],
+        "tc2_hi_v": struct.unpack_from("<H", data, off["tc2_hi_v"])[0],
+        "tc2_li_v": struct.unpack_from("<H", data, off["tc2_li_v"])[0],
+        "tc2_hi_pos": data[off["tc2_hi_pos"]],
+        "tc2_li_pos": data[off["tc2_li_pos"]],
+        # 烟火/空调
+        "smoke_temp": _parse_car_dwords(data, off["smoke_temp"], _CAR_COUNT),
+        "out_temp": [round(v, 1) for v in _parse_car_floats(data, off["out_temp"], _CAR_COUNT)],
+        "inside_temp": [round(v, 1) for v in _parse_car_floats(data, off["inside_temp"], _CAR_COUNT)],
+        "air_cond_mode": _parse_car_bytes(data, off["air_cond_mode"], _CAR_COUNT),
+        "cold_wind": _parse_car_bytes(data, off["cold_wind"], _CAR_COUNT),
+        "wind_fan": _parse_car_bytes(data, off["wind_fan"], _CAR_COUNT),
+        "press_machine": _parse_car_words(data, off["press_machine"], _CAR_COUNT),
+        "big_wind": _parse_car_bytes(data, off["big_wind"], _CAR_COUNT),
+        "machine11": _parse_car_bytes(data, off["machine11"], _CAR_COUNT),
+        "machine12": _parse_car_bytes(data, off["machine12"], _CAR_COUNT),
+        "machine21": _parse_car_bytes(data, off["machine21"], _CAR_COUNT),
+        "machine22": _parse_car_bytes(data, off["machine22"], _CAR_COUNT),
+        # 网络设备
+        "tc1_net": _parse_car_words(data, off["tc1_net"], 2),
+        "tc2_net": _parse_car_words(data, off["tc2_net"], 2),
+        "tc3_net": _parse_car_bytes(data, off["tc3_net"], 2),
+        "tc4_net": _parse_car_bytes(data, off["tc4_net"], 2),
+        "tc5_net": _parse_car_bytes(data, off["tc5_net"], 2),
+        "tc6_net": _parse_car_bytes(data, off["tc6_net"], 2),
+        "conn_ab": data[off["conn_ab"]],
+        "tc1_devs_state": struct.unpack_from("<H", data, off["tc1_devs_state"])[0],
+        "tc2_devs_state": struct.unpack_from("<H", data, off["tc2_devs_state"])[0],
+        "tc3_devs_state": data[off["tc3_devs_state"]],
+        "tc4_devs_state": data[off["tc4_devs_state"]],
+        "tc5_devs_state": data[off["tc5_devs_state"]],
+        "tc6_devs_state": data[off["tc6_devs_state"]],
+        "econn_dev_state": data[off["econn_dev_state"]],
+        "econn_dev_state2": data[off["econn_dev_state2"]],
+        "fault_code": struct.unpack_from("<H", data, off["fault_code"])[0],
+        "train_no": struct.unpack_from("<H", data, off["train_no"])[0],
+        # 原始字节
+        "raw": data[:NETWORK_SCREEN_LEN],
+    }
+    return result
+
+
+# ------------------- 网络屏 → 上位机 (26字节, 牵引切除请求) -------------------
+
+def parse_network_screen_request(data: bytes) -> dict:
+    """
+    解析 网络屏 → 上位机 牵引切除请求报文（26字节）
+
+    协议定义见文档「司机驾驶模拟台网络屏协议」第二节
+    """
+    if len(data) < NETWORK_SCREEN_REQUEST_LEN:
+        raise ValueError(
+            f"网络屏请求报文长度不足: {len(data)} < {NETWORK_SCREEN_REQUEST_LEN}"
+        )
+
+    off = NETWORK_SCREEN_REQUEST_OFFSET
+
+    identify = struct.unpack_from("<I", data, off["identify"])[0]
+    total_len = struct.unpack_from("<H", data, off["total_len"])[0]
+    data_len = struct.unpack_from("<H", data, off["data_len"])[0]
+    timestamp_ms = struct.unpack_from("<Q", data, off["timestamp"])[0]
+
+    pull_ctrl = data[off["pull_ctrl"]]
+
+    # 解析 Bit0-Bit5 分别对应 1-6 车的牵引切除
+    pull_cut = {}
+    for car in range(6):
+        pull_cut[f"car_{car + 1}"] = (pull_ctrl >> car) & 1 == 1
 
     return {
-        "header": hex(header),
-        "train_id": train_id,
-        "speed_km_h": speed_raw / 100.0,
-        "target_speed_km_h": target_raw / 100.0,
-        "limit_speed_km_h": limit_raw / 100.0,
-        "next_station": next_station,
-        "mode_name": mode_map_rev.get(mode_val, "UNKNOWN"),
+        "identify": f"0x{identify:08X}",
+        "identify_ok": identify == 0x55AA55AA,
+        "total_len": total_len,
+        "data_len": data_len,
+        "timestamp_ms": timestamp_ms,
+        "verify_type": struct.unpack_from("<H", data, off["verify_type"])[0],
+        "verify_code": struct.unpack_from("<H", data, off["verify_code"])[0],
+        "protocol_id": struct.unpack_from("<H", data, off["protocol_id"])[0],
+        "msg_id": struct.unpack_from("<H", data, off["msg_id"])[0],
+        "pull_ctrl": pull_ctrl,
+        "pull_cut": pull_cut,
+        "reserve": data[off["reserve"]],
+        "raw": data[:NETWORK_SCREEN_REQUEST_LEN],
     }
+
+
+def pack_network_screen_response(
+    # 复用 572字节 下行报文作为反馈（或使用简化确认包）
+    # 文档未单独定义反馈格式，实际反馈通过上位机→网络屏 572B 报文中的牵引切除状态体现
+    # 此函数保留占位，具体反馈方式待与硬件方确认
+    success: bool = True,
+    pull_cut_state: int = 0,
+) -> bytes:
+    """
+    打包 上位机 → 网络屏 牵引切除反馈（暂用26字节确认包）
+
+    注意：文档未明确定义牵引切除反馈的报文格式。
+    此实现发送一个简化确认包，实际格式待硬件联调确认。
+    """
+    off = NETWORK_SCREEN_REQUEST_OFFSET
+    data = bytearray(NETWORK_SCREEN_REQUEST_LEN)
+
+    struct.pack_into("<I", data, off["identify"], 0x55AA55AA)
+    struct.pack_into("<H", data, off["total_len"], NETWORK_SCREEN_REQUEST_LEN)
+    struct.pack_into("<H", data, off["data_len"], 2)
+    struct.pack_into("<Q", data, off["timestamp"], 0)
+    struct.pack_into("<H", data, off["verify_type"], 0)
+    struct.pack_into("<H", data, off["verify_code"], 0)
+    struct.pack_into("<H", data, off["protocol_id"], 0)
+    struct.pack_into("<H", data, off["msg_id"], 0)
+    data[off["pull_ctrl"]] = pull_cut_state & 0xFF
+    data[off["reserve"]] = 0
+
+    return bytes(data)
 
 
 # ====================================================================
@@ -1183,12 +1661,100 @@ def self_test():
           f"speed={parsed['vehicle_speed']}, hscb={parsed['hscb']}")
 
     # 3. 网络屏
-    print("\n[3] 网络屏 编解码")
-    raw = pack_network_screen(speed_km_h=60.0, next_station="人民广场", mode_name="CM")
+    print("\n[3] 网络屏 编解码 (572字节)")
+    raw = pack_network_screen(
+        year=2025, month=7, day=16, hour=15, minute=30, second=0,
+        speed=60.0,
+        acceleration=0.5,
+        power_pull=2000,
+        net_pressure=1500,
+        speed_limit=80,
+        level_pos=LEVEL_POS["TRACTION"],
+        run_mode=(DOOR_MODE_MM_AM_AA["AM"] << 4) | RUN_MODE_MANUAL_ATO["MANUAL"],
+        master_v=750,
+        run_dir=RUN_DIR["RIGHT"],
+        driver_room_state=(CAB_STATE["ACTIVE"] << 0) | (CAB_STATE["INACTIVE"] << 4),
+        curr_station_id=3,
+        next_station_id=4,
+        end_station_id=16,
+        power_state=1,
+        # 6车数组
+        door_state=[0x00000000, 0x00000000, 0x00000000,
+                    0x00000000, 0x00000000, 0x00000000],
+        brake_pressure=[50, 55, 60, 55, 50, 45],
+        temp=[22.5, 23.0, 23.5, 23.0, 22.8, 22.0],
+        inside_temp=[25.0, 25.5, 26.0, 25.5, 25.0, 24.8],
+        # 蓄电池 TC1
+        tc1_battle_remain=85,
+        tc1_battle_v=110,
+        tc1_hi_v=4200,
+        tc1_li_v=3800,
+        tc1_temp=28,
+        tc1_hi_pos=5,
+        tc1_li_pos=12,
+        # 列车号
+        train_no=1,
+        fault_code=0,
+    )
     parsed = parse_network_screen(raw)
-    assert abs(parsed["speed_km_h"] - 60.0) < 0.01
-    assert parsed["next_station"] == "人民广场"
-    print(f"    [OK] 打包 {len(raw)}B -> 解析: speed={parsed['speed_km_h']}km/h, station={parsed['next_station']}")
+    assert parsed["identify_ok"] == True
+    assert parsed["total_len"] == NETWORK_SCREEN_LEN
+    assert abs(parsed["speed"] - 60.0) < 0.01
+    assert abs(parsed["acceleration"] - 0.5) < 0.01
+    assert parsed["power_pull"] == 2000
+    assert parsed["net_pressure"] == 1500
+    assert parsed["speed_limit"] == 80
+    assert parsed["level_pos_str"] == "牵引"
+    assert parsed["run_dir_str"] == "右"
+    assert parsed["driver_room_tc1"] == "激活"
+    assert parsed["driver_room_tc2"] == "未激活"
+    assert parsed["curr_station_id"] == 3
+    assert parsed["next_station_id"] == 4
+    assert parsed["power_state"] == 1
+    assert parsed["brake_pressure"] == [50, 55, 60, 55, 50, 45]
+    assert parsed["temp"] == [22.5, 23.0, 23.5, 23.0, 22.8, 22.0]
+    assert parsed["tc1_battle_remain"] == 85
+    assert parsed["tc1_battle_v"] == 110
+    assert parsed["tc1_hi_v"] == 4200
+    assert parsed["tc1_li_v"] == 3800
+    assert parsed["tc1_temp"] == 28
+    assert parsed["tc1_hi_pos"] == 5
+    assert parsed["tc1_li_pos"] == 12
+    assert parsed["train_no"] == 1
+    assert parsed["fault_code"] == 0
+    print(f"    [OK] 打包 {len(raw)}B -> 解析: speed={parsed['speed']}, "
+          f"level={parsed['level_pos_str']}, dir={parsed['run_dir_str']}, "
+          f"brake_pressure={parsed['brake_pressure']}, "
+          f"battery_tc1={{remain={parsed['tc1_battle_remain']}%, "
+          f"v={parsed['tc1_battle_v']}V, hi={parsed['tc1_hi_v']}mV, "
+          f"li={parsed['tc1_li_v']}mV, temp={parsed['tc1_temp']}°C}}")
+
+    # 3b. 网络屏 → 上位机 牵引切除请求 (26字节)
+    print("\n[3b] 网络屏 → 上位机 牵引切除请求 (26字节)")
+    req_data = bytearray(NETWORK_SCREEN_REQUEST_LEN)
+    struct.pack_into("<I", req_data, 0, 0x55AA55AA)
+    struct.pack_into("<H", req_data, 4, NETWORK_SCREEN_REQUEST_LEN)
+    struct.pack_into("<H", req_data, 6, 2)
+    # 模拟：第3车牵引切除
+    req_data[24] = 0x04  # Bit2 = 1 (第3车)
+    parsed_req = parse_network_screen_request(bytes(req_data))
+    assert parsed_req["identify_ok"] == True
+    assert parsed_req["pull_cut"]["car_3"] == True
+    assert parsed_req["pull_cut"]["car_1"] == False
+    assert parsed_req["pull_cut"]["car_6"] == False
+    print(f"    [OK] 解析 {len(req_data)}B: pull_ctrl=0b{parsed_req['pull_ctrl']:06b}, "
+          f"car_3_cut={parsed_req['pull_cut']['car_3']}")
+
+    # 3c. 网络屏 空报文默认值
+    print("\n[3c] 网络屏 空报文默认值")
+    raw_default = pack_network_screen()
+    parsed_default = parse_network_screen(raw_default)
+    assert parsed_default["identify_ok"] == True
+    assert parsed_default["speed"] == 0.0
+    assert parsed_default["net_pressure"] == 1500  # 文档默认值
+    assert parsed_default["level_pos_str"] == "惰行"
+    assert parsed_default["brake_pressure"] == [0] * 6
+    print(f"    [OK] 默认值: speed=0, net_pressure=1500V, level=惰行")
 
     # 4. 信号屏
     print("\n[4] 信号屏(DMI) 编解码")

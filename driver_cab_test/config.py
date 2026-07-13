@@ -28,7 +28,275 @@ UPPER_TO_PLC_LEN = 28
 # ============================================================
 NETWORK_SCREEN_IP = "192.168.100.122"
 NETWORK_SCREEN_PORT = 8888
-NETWORK_SCREEN_LEN = 572  # 总长572字节
+NETWORK_SCREEN_LEN = 572  # 总长572字节（上位机→网络屏）
+NETWORK_SCREEN_REQUEST_LEN = 26  # 总长26字节（网络屏→上位机，牵引切除请求）
+
+# 网络屏报文偏移量定义（上位机→网络屏，572字节）
+NETWORK_SCREEN_OFFSET = {
+    # 报文头（24字节）
+    "identify": 0,          # 4B DWORD  固定 0x55AA55AA
+    "total_len": 4,         # 2B WORD   报文总大小
+    "data_len": 6,          # 2B WORD   数据长度
+    "timestamp": 8,         # 8B DDWORD 毫秒级时间戳
+    "verify_type": 16,      # 2B WORD   校验方式（备用）
+    "verify_code": 18,      # 2B WORD   校验码（备用）
+    "protocol_id": 20,      # 2B WORD   协议ID（备用）
+    "msg_id": 22,           # 2B WORD   消息ID
+    # 时间
+    "year": 24,             # 2B WORD
+    "month": 26,            # 2B WORD
+    "day": 28,              # 2B WORD
+    "hour": 30,             # 2B WORD
+    "minute": 32,           # 2B WORD
+    "second": 34,           # 2B WORD
+    # 基础运行信息
+    "curr_station_id": 36,  # 1B BYTE   当前站ID (0-16)
+    "next_station_id": 37,  # 1B BYTE   下一站ID (0-16)
+    "end_station_id": 38,   # 1B BYTE   终点站ID (0-16)
+    "power_state": 39,      # 1B BYTE   车间电源供电 有(1)/无(0)
+    "speed": 40,            # 4B FLOAT  速度
+    "acceleration": 44,     # 4B FLOAT  加速度
+    "power_pull": 48,       # 2B WORD   总牵引力
+    "net_pressure": 50,     # 2B WORD   网压
+    "speed_limit": 52,      # 2B WORD   限速
+    "level_pos": 54,        # 1B BYTE   级位: 惰行(0)/牵引(1)/制动(2)/紧急(3)
+    "run_mode": 55,         # 1B BYTE   模式: 低4位=手动(0)/ATO(1), 高4位=MM(0)/AM(1)/AA(2)
+    "master_v": 56,         # 2B WORD   母线电压值
+    "run_dir": 58,          # 1B BYTE   运行方向: 无(0)/左(1)/右(2)/未知(0xff)
+    "driver_room_state": 59,# 1B BYTE   司机室: 激活(1)/未激活(0), 低4=tc1+高4=tc2
+    # 6节车 × 多字段（BYTE-6 / WORD-6 / DWORD-6 / FLOAT-6 / BYTE-10 / BYTE-11）
+    "door_state": 60,       # 24B DWORD[6]  门状态
+    "stop_pos_state": 84,   # 6B  BYTE[6]   制动(低4)+停放(高4)
+    "fire_empty_run": 90,   # 6B  BYTE[6]   火警(低4)+空转(高4)
+    "warm_empty_state1": 96,# 6B  BYTE[6]   乘客报警1(低4)+乘客报警2(高4)
+    "warm_empty_state2": 102,# 6B BYTE[6]   同上
+    "pull_switch": 108,     # 6B  BYTE[6]   牵引状态(低4)+空压机(高4)
+    "charge": 114,          # 6B  BYTE[6]   充电机1(低4)+充电机2(高4)
+    "assist_high_switch": 120,# 6B BYTE[6]  辅逆(低4)+开关车间电压(高4)
+    "breaker_master": 126,  # 6B  BYTE[6]   断路器(低4)+母线高速断路器(高4)
+    "elect_stop": 132,      # 12B WORD[6]   牵引/电制动力
+    "wind_press": 144,      # 12B WORD[6]   主风缸压力
+    "brake_pressure": 156,  # 12B WORD[6]   制动缸压力
+    "usage_rate": 168,      # 6B  BYTE[6]   载客率
+    "line_net": 174,        # 6B  BYTE[6]   线网电流
+    "temp": 180,            # 24B FLOAT[6]  温度
+    "pull_stream": 204,     # 6B  BYTE[6]   牵引无流
+    "stop_im": 210,         # 10B BYTE[10]  紧急制动
+    "side_info": 220,       # 6B  BYTE[6]   旁路信息
+    "braker_state": 226,    # 11B BYTE[11]  断路器状态
+    "line_and_elect_stop": 237,# 6B BYTE[6] KIC(低4)+电制动(高4)
+    "line_v": 244,          # 12B WORD[6]   线电压
+    "stop_state": 256,      # 6B  BYTE[6]   紧急制动(低4)+保持制动(高4)
+    "air_stop": 262,        # 12B WORD[6]   空气制动力
+    "empty_press1": 274,    # 12B WORD[6]   空簧压力
+    "empty_press2": 286,    # 12B WORD[6]   空簧压力2
+    "b05_and_b19": 298,     # 6B  BYTE[6]   B05(bit0-1)+B19(1)(bit2-3)+B19(2)(bit4-5)
+    "kma_and_elect_power": 304,# 6B BYTE[6] KMA(低4)+扩展供电(高4)
+    "ni_bian_input_v": 310, # 12B WORD[6]   逆变器输入电压
+    "ni_bian_output_v": 322,# 12B WORD[6]   逆变器输出线电压
+    "charge_output_v": 334, # 12B WORD[6]   充电机输出电压
+    "ni_bian_input_a": 346, # 6B  BYTE[6]   逆变器输入电流
+    "ni_bian_output_a": 352,# 6B  BYTE[6]   逆变器输出电流
+    "charge_output_a": 358, # 6B  BYTE[6]   充电机输出电流
+    # 接触器/KM 状态
+    "tc1_km1": 364,         # 1B BYTE  闭合(0)/断开(1)/故障(2)/未知(0xff)
+    "tc1_km3": 365,         # 1B BYTE
+    "tc1_km5": 366,         # 1B BYTE
+    "tc2_km1": 367,         # 1B BYTE
+    "tc2_km3": 368,         # 1B BYTE
+    "tc2_km5": 369,         # 1B BYTE
+    # 蓄电池 TC1
+    "tc1_battle_remain": 370,   # 2B WORD  蓄电池剩余容量
+    "tc1_battle_v": 372,        # 2B WORD  蓄电池电压
+    "tc1_battle_charge_a": 374, # 2B WORD  蓄电池充电电流
+    "tc1_battle_output_a": 376, # 2B WORD  蓄电池放电电流
+    "tc1_battle_temp": 378,     # 2B WORD  蓄电池箱温度
+    "tc1_hi_v": 380,            # 2B WORD  最高单体电压
+    "tc1_li_v": 382,            # 2B WORD  最低单体电压
+    "tc1_hi_pos": 384,          # 1B BYTE  最高单体位置
+    "tc1_li_pos": 385,          # 1B BYTE  最低单体位置
+    "tc1_temp": 386,            # 2B WORD  最高单体温度
+    "tc2_temp": 388,            # 2B WORD
+    "tc1_temp_pos": 390,        # 1B BYTE  最高单体位置
+    "tc2_temp_pos": 391,        # 1B BYTE
+    # 蓄电池 TC2
+    "tc2_battle_remain": 392,   # 2B WORD
+    "tc2_battle_v": 394,        # 2B WORD
+    "tc2_battle_charge_a": 396, # 2B WORD
+    "tc2_battle_output_a": 398, # 2B WORD
+    "tc2_battle_temp": 400,     # 2B WORD
+    "tc2_hi_v": 402,            # 2B WORD
+    "tc2_li_v": 404,            # 2B WORD
+    "tc2_hi_pos": 406,          # 1B BYTE
+    "tc2_li_pos": 407,          # 1B BYTE
+    # 烟火/空调
+    "smoke_temp": 408,      # 24B DWORD[6]  烟火温度
+    "out_temp": 432,        # 24B FLOAT[6]  室外温度
+    "inside_temp": 456,     # 24B FLOAT[6]  室内温度
+    "air_cond_mode": 480,   # 6B  BYTE[6]   空调控制模式
+    "cold_wind": 486,       # 6B  BYTE[6]   冷凝风机
+    "wind_fan": 492,        # 6B  BYTE[6]   风机
+    "press_machine": 498,   # 12B WORD[6]   压缩机
+    "big_wind": 510,        # 6B  BYTE[6]   强风状态 打开(1)/关闭(0)
+    "machine11": 516,       # 6B  BYTE[6]   机组1-1新风阀开度
+    "machine12": 522,       # 6B  BYTE[6]   机组1-2新风阀开度
+    "machine21": 528,       # 6B  BYTE[6]   机组2-1新风阀开度
+    "machine22": 534,       # 6B  BYTE[6]   机组2-2新风阀开度
+    # 网络设备状态
+    "tc1_net": 540,         # 4B  WORD[2]   TC1 A/B网设备
+    "tc2_net": 544,         # 4B  WORD[2]   TC2 A/B网设备
+    "tc3_net": 548,         # 2B  BYTE[2]   TC3 设备
+    "tc4_net": 550,         # 2B  BYTE[2]   TC4 设备
+    "tc5_net": 552,         # 2B  BYTE[2]   TC5 设备
+    "tc6_net": 554,         # 2B  BYTE[2]   TC6 设备
+    "conn_ab": 556,         # 1B  BYTE     bit0:A→B, bit1:B→A
+    "tc1_devs_state": 558,  # 2B  WORD     TC1设备状态
+    "tc2_devs_state": 560,  # 2B  WORD     TC2设备状态
+    "tc3_devs_state": 562,  # 1B  BYTE     TC3设备状态
+    "tc4_devs_state": 563,  # 1B  BYTE     TC4设备状态
+    "tc5_devs_state": 564,  # 1B  BYTE     TC5设备状态
+    "tc6_devs_state": 565,  # 1B  BYTE     TC6设备状态
+    "econn_dev_state": 566, # 1B  BYTE     A网络设备状态
+    "econn_dev_state2": 567,# 1B  BYTE     B网络设备状态
+    "fault_code": 568,      # 2B  WORD     故障码
+    "train_no": 570,        # 2B  WORD     列车号
+}
+
+# 网络屏→上位机 牵引切除请求 偏移量（26字节）
+NETWORK_SCREEN_REQUEST_OFFSET = {
+    "identify": 0,          # 4B DWORD  固定 0x55AA55AA
+    "total_len": 4,         # 2B WORD   报文总大小
+    "data_len": 6,          # 2B WORD   数据长度
+    "timestamp": 8,         # 8B DDWORD 毫秒级时间戳
+    "verify_type": 16,      # 2B WORD   校验方式（备用）
+    "verify_code": 18,      # 2B WORD   校验码（备用）
+    "protocol_id": 20,      # 2B WORD   协议ID（备用）
+    "msg_id": 22,           # 2B WORD   消息ID
+    "pull_ctrl": 24,        # 1B BYTE   牵引切除 Bit0-Bit5（1-6车）
+    "reserve": 25,          # 1B BYTE   保留
+}
+
+# ============================================================
+# 网络屏 枚举定义
+# ============================================================
+
+# 级位
+LEVEL_POS = {
+    "COAST": 0,       # 惰行
+    "TRACTION": 1,    # 牵引
+    "BRAKE": 2,       # 制动
+    "EMERGENCY": 3,   # 紧急制动
+}
+
+# 运行方向
+RUN_DIR = {
+    "NONE": 0,        # 无
+    "LEFT": 1,        # 左
+    "RIGHT": 2,       # 右
+    "UNKNOWN": 0xff,  # 未知
+}
+
+# 司机室状态
+CAB_STATE = {
+    "INACTIVE": 0,    # 未激活
+    "ACTIVE": 1,      # 激活
+    "UNKNOWN": 0xf,   # 未知
+}
+
+# 门状态
+DOOR_STATE = {
+    "CLOSED": 0,           # 关到位
+    "OPEN": 1,             # 门开
+    "FAULT": 2,            # 故障
+    "OBSTACLE": 3,         # 检测到障碍物
+    "ISOLATED": 4,         # 隔离
+    "EMERGENCY_UNLOCK": 5, # 紧急解锁
+    "UNKNOWN": 0xf,        # 未知
+}
+
+# 制动/停放状态
+BRAKE_PARKING_STATE = {
+    "APPLIED": 0,     # 施加
+    "RELEASED": 1,    # 缓解
+    "FAULT": 2,       # 故障
+    "CUT_OFF": 3,     # 切除
+    "UNKNOWN": 0xf,   # 未知
+}
+
+# 火警状态
+FIRE_STATE = {
+    "INACTIVE": 0,    # 未激活
+    "ACTIVE": 1,      # 激活
+    "UNKNOWN": 0xff,  # 未知
+}
+
+# 空转滑行状态
+SLIP_STATE = {
+    "NORMAL": 0,      # 正常
+    "SLIP": 1,        # 空转
+    "SKID": 2,        # 滑行
+    "UNKNOWN": 0xf,   # 未知
+}
+
+# 乘客报警状态
+PASSENGER_ALARM_STATE = {
+    "NORMAL": 0,      # 正常
+    "TALK_DRIVER": 1, # 与司机通话
+    "TALK_OCC": 2,    # 与OCC通话
+    "CALL": 3,        # 呼叫
+    "UNKNOWN": 0xf,   # 未知
+}
+
+# 运行模式（低4位）
+RUN_MODE_MANUAL_ATO = {
+    "MANUAL": 0,      # 手动
+    "ATO": 1,         # ATO
+}
+
+# 门模式（高4位）
+DOOR_MODE_MM_AM_AA = {
+    "MM": 0,          # MM
+    "AM": 1,          # AM
+    "AA": 2,          # AA
+    "UNKNOWN": 0xf,   # 未知
+}
+
+# 断路器/接触器状态
+BREAKER_STATE = {
+    "CLOSED": 0,      # 闭合
+    "OPEN": 1,        # 断开
+    "FAULT": 2,       # 故障
+    "UNKNOWN": 0xff,  # 未知
+}
+
+# 设备工作状态（牵引/辅逆/充电机等）
+DEVICE_WORK_STATE = {
+    "WORKING": 0,     # 工作
+    "STANDBY": 1,     # 待机
+    "FAULT": 2,       # 故障
+    "CUT_OFF": 3,     # 切除
+    "BYPASS": 0,      # 旁路
+    "NOT_BYPASS": 1,  # 未旁路
+    "UNKNOWN": 0xf,   # 未知
+}
+
+# 空调控制模式
+AIR_COND_CTRL_MODE = {
+    "CENTRAL": 1,     # 集控
+    "LOCAL": 2,       # 本控
+}
+
+# 空调运行模式
+AIR_COND_MODE = {
+    "COOL": 0,        # 制冷
+    "HEAT": 1,        # 制暖
+    "PRE_COOL": 2,    # 预冷
+    "PRE_HEAT": 3,    # 预热
+    "AUTO": 4,        # 自动
+    "VENT": 5,        # 通风
+    "STOP": 6,        # 停机
+    "EMERGENCY_VENT": 7, # 紧急通风
+}
 
 # ============================================================
 # 信号屏协议（司机驾驶模拟台信号屏）
