@@ -1,3 +1,25 @@
+external_interface:
+  enabled: false
+  network_screen:
+    deploy_ip: 192.168.200.102
+    device_ip: 192.168.100.121
+    port: 8888
+  plc:
+    deploy_ip: 192.168.200.102
+    device_ip: 192.168.100.123
+    port: 8001
+    port_b: 8002
+    port_c: 8003
+  signal_screen:
+    deploy_ip: 192.168.200.102
+    device_ip: 192.168.100.122
+    port: 9999
+  udp:
+    platform_ip: 192.168.200.102
+    platform_port: 23002
+    vehicle_model_ip: 192.168.200.110
+    vehicle_model_port: 23001
+  use_real_hardware: false
 simulation:
   bidirectional: true
   coasting_min_speed: 30.0

@@ -87,6 +87,35 @@ class SignalConfig:
 
 
 @dataclass
+class ExternalInterfaceConfig:
+    """外部系统接口配置。"""
+
+    enabled: bool = False
+    """是否启用外部接口（迭代一默认关闭）。"""
+    use_real_hardware: bool = False
+    """True=连接真实硬件, False=使用内置模拟数据。"""
+
+    plc_device_ip: str = "192.168.100.123"
+    plc_deploy_ip: str = "192.168.200.102"
+    plc_port: int = 8001
+    plc_port_b: int = 8002
+    plc_port_c: int = 8003
+
+    network_screen_device_ip: str = "192.168.100.121"
+    network_screen_deploy_ip: str = "192.168.200.102"
+    network_screen_port: int = 8888
+
+    signal_screen_device_ip: str = "192.168.100.122"
+    signal_screen_deploy_ip: str = "192.168.200.102"
+    signal_screen_port: int = 9999
+
+    udp_vehicle_model_ip: str = "192.168.200.110"
+    udp_vehicle_model_port: int = 23001
+    udp_platform_ip: str = "192.168.200.102"
+    udp_platform_port: int = 23002
+
+
+@dataclass
 class SimulationParams:
     time_step: float = 0.1
     total_time: float = 600.0
@@ -105,6 +134,7 @@ class SimulationParams:
     pid: PidParams = field(default_factory=PidParams)
     power: PowerConfig = field(default_factory=PowerConfig)
     signal: SignalConfig = field(default_factory=SignalConfig)
+    external: ExternalInterfaceConfig = field(default_factory=ExternalInterfaceConfig)
 
     def total_train_count(self) -> int:
         """编排器应创建的列车总数。"""
@@ -230,6 +260,28 @@ def load_simulation_params(path: str | Path) -> SimulationParams:
     power = load_power_params(config_dir)
     signal = load_signal_params(config_dir)
 
+    # 加载外部接口配置
+    ext = data.get("external_interface", {}) or {}
+    external = ExternalInterfaceConfig(
+        enabled=bool(ext.get("enabled", False)),
+        use_real_hardware=bool(ext.get("use_real_hardware", False)),
+        plc_device_ip=str(ext.get("plc", {}).get("device_ip", "192.168.100.123")),
+        plc_deploy_ip=str(ext.get("plc", {}).get("deploy_ip", "192.168.200.102")),
+        plc_port=int(ext.get("plc", {}).get("port", 8001)),
+        plc_port_b=int(ext.get("plc", {}).get("port_b", 8002)),
+        plc_port_c=int(ext.get("plc", {}).get("port_c", 8003)),
+        network_screen_device_ip=str(ext.get("network_screen", {}).get("device_ip", "192.168.100.121")),
+        network_screen_deploy_ip=str(ext.get("network_screen", {}).get("deploy_ip", "192.168.200.102")),
+        network_screen_port=int(ext.get("network_screen", {}).get("port", 8888)),
+        signal_screen_device_ip=str(ext.get("signal_screen", {}).get("device_ip", "192.168.100.122")),
+        signal_screen_deploy_ip=str(ext.get("signal_screen", {}).get("deploy_ip", "192.168.200.102")),
+        signal_screen_port=int(ext.get("signal_screen", {}).get("port", 9999)),
+        udp_vehicle_model_ip=str(ext.get("udp", {}).get("vehicle_model_ip", "192.168.200.110")),
+        udp_vehicle_model_port=int(ext.get("udp", {}).get("vehicle_model_port", 23001)),
+        udp_platform_ip=str(ext.get("udp", {}).get("platform_ip", "192.168.200.102")),
+        udp_platform_port=int(ext.get("udp", {}).get("platform_port", 23002)),
+    )
+
     return SimulationParams(
         time_step=float(data.get("time_step", 0.1)),
         total_time=float(data.get("total_time", 600.0)),
@@ -243,4 +295,5 @@ def load_simulation_params(path: str | Path) -> SimulationParams:
         pid=pid,
         power=power,
         signal=signal,
+        external=external,
     )
