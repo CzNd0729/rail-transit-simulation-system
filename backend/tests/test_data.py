@@ -287,6 +287,25 @@ def test_snapshot_passenger_count():
     assert snap["data"]["trains"][0]["passengerCount"] == 1200
 
 
+def test_serialize_train_includes_resistance_breakdown():
+    clock = SimulationClock()
+    sim_params = SimulationParams()
+    state = TrainState(mass=260000.0)
+    forces = ForceBreakdown(
+        davis=12000.0,
+        gradient=5000.0,
+        curve=2000.0,
+        tunnel=800.0,
+        resistance_total=19800.0,
+    )
+    snap = build_simulation_snapshot(clock, sim_params, _entry("T1", state, forces))
+    train = snap["data"]["trains"][0]
+    assert train["davisResistance"] == pytest.approx(12000.0)
+    assert train["gradientResistance"] == pytest.approx(5000.0)
+    assert train["curveResistance"] == pytest.approx(2000.0)
+    assert train["tunnelResistance"] == pytest.approx(800.0)
+
+
 def test_snapshot_signaling_extended_fields():
     clock = SimulationClock()
     sim_params = SimulationParams()
