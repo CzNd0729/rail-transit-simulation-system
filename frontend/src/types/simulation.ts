@@ -12,7 +12,7 @@ export type RunState = 'idle' | 'running' | 'paused' | 'stopped';
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected';
 
 /** 视图类型 */
-export type ViewType = 'overview' | 'power' | 'signal' | 'vehicle' | 'track';
+export type ViewType = 'overview' | 'power' | 'signal' | 'vehicle' | 'track' | 'scenario';
 
 /** 列车工况 */
 export type TrainMode = 'traction' | 'coasting' | 'braking' | 'stopped';
@@ -599,4 +599,65 @@ export interface LineLayout {
   stations: StationLayout[];
   segments: InterStationSegment[];
   total_length: number;
+}
+
+// ==================== 方案对比 ====================
+
+/** 方案仿真结果指标 */
+export interface ScenarioResult {
+  totalTime: number;
+  totalDistance: number;
+  avgSpeed: number;
+  maxSpeed: number;
+  tractionEnergy: number;
+  regenEnergy: number;
+  netEnergy: number;
+  minVoltage: number;
+  peakPower: number;
+}
+
+/** 完整方案数据 */
+export interface Scenario {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  params: {
+    vehicle: Partial<VehicleParams>;
+    signal: Record<string, unknown>;
+    power: Record<string, unknown>;
+    simulation: Record<string, unknown>;
+  };
+  result: ScenarioResult;
+}
+
+/** 方案列表摘要 */
+export interface ScenarioSummary {
+  id: string;
+  name: string;
+  createdAt: string;
+  totalTime: number;
+  netEnergy: number;
+  avgSpeed: number;
+}
+
+/** API 响应 — 方案列表 */
+export interface ScenarioListResponse {
+  scenarios: ScenarioSummary[];
+}
+
+/** API 响应 — 保存方案 */
+export interface ScenarioSaveResponse {
+  id: string;
+  name: string;
+}
+
+/** API 响应 — 方案详情 */
+export interface ScenarioDetailResponse {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  params: Scenario['params'];
+  result: ScenarioResult;
 }

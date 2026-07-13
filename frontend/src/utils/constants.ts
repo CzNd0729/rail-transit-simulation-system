@@ -33,6 +33,7 @@ export const VIEW_CONFIG = {
   signal: { label: '信号视图', icon: '🚦' },
   vehicle: { label: '车辆视图', icon: '🚇' },
   track: { label: '轨道视图', icon: '🛤️' },
+  scenario: { label: '方案对比', icon: '📊' },
 } as const;
 
 /** 多车标识配色：红 / 黄 / 蓝（高对比，按 TRAIN_01 起顺序） */

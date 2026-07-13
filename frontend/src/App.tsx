@@ -23,6 +23,7 @@ import PowerView from './pages/PowerView';
 import SignalView from './pages/SignalView';
 import VehicleView from './pages/VehicleView';
 import TrackView from './pages/TrackView';
+import ScenarioComparePage from './pages/ScenarioComparePage';
 
 // 侧边栏面板
 import ControlPanel from './components/control/ControlPanel';
@@ -52,13 +53,15 @@ function AppContent() {
         return <VehicleView />;
       case 'track':
         return <TrackView />;
+      case 'scenario':
+        return <ScenarioComparePage />;
       default:
         return <OverviewView />;
     }
   };
 
-  // 右侧边栏内容
-  const sidebar = (
+  // 右侧边栏内容（方案对比页面为全屏布局，不显示侧边栏）
+  const sidebar = activeView === 'scenario' ? null : (
     <>
       <ControlPanel send={send} />
       <ParamPanel send={send} />

@@ -20,7 +20,7 @@ import StatusBar from './StatusBar';
 
 interface MainLayoutProps {
   children: ReactNode;          // 主视图区域内容
-  sidebar: ReactNode;           // 右侧控制面板
+  sidebar: ReactNode | null;    // 右侧控制面板（null 时全屏显示主视图）
 }
 
 export default function MainLayout({ children, sidebar }: MainLayoutProps) {
@@ -34,9 +34,11 @@ export default function MainLayout({ children, sidebar }: MainLayoutProps) {
         <div style={styles.mainView}>
           {children}
         </div>
-        <aside style={styles.sidebar}>
-          {sidebar}
-        </aside>
+        {sidebar && (
+          <aside style={styles.sidebar}>
+            {sidebar}
+          </aside>
+        )}
       </div>
 
       {/* 底部状态栏 */}

@@ -9,6 +9,9 @@ import type {
   ParameterPreset,
   SimulationParams,
   SpeedMultiplier,
+  ScenarioSummary,
+  ScenarioSaveResponse,
+  ScenarioDetailResponse,
 } from '../types/simulation';
 
 const BASE = `${API_BASE_URL}/api/v1`;
@@ -143,6 +146,36 @@ export async function saveParameterPreset(preset: Omit<ParameterPreset, 'id' | '
 /** 删除参数预设方案 */
 export async function deleteParameterPreset(id: number) {
   return request(`/params/presets/${id}`, { method: 'DELETE' });
+}
+
+// ==================== 方案管理 ====================
+
+/** 获取所有方案摘要列表 */
+export async function getScenarios(): Promise<ScenarioSummary[]> {
+  return request<ScenarioSummary[]>('/scenarios');
+}
+
+/** 获取方案完整详情 */
+export async function getScenario(id: string): Promise<ScenarioDetailResponse> {
+  return request<ScenarioDetailResponse>(`/scenarios/${id}`);
+}
+
+/** 保存当前参数+结果为方案 */
+export async function saveScenario(name: string, description?: string): Promise<ScenarioSaveResponse> {
+  return request<ScenarioSaveResponse>('/scenarios', {
+    method: 'POST',
+    body: JSON.stringify({ name, description }),
+  });
+}
+
+/** 删除方案 */
+export async function deleteScenario(id: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/scenarios/${id}`, { method: 'DELETE' });
+}
+
+/** 加载方案参数到引擎 */
+export async function applyScenario(id: string): Promise<{ config: Record<string, unknown> }> {
+  return request<{ config: Record<string, unknown> }>(`/scenarios/${id}/apply`, { method: 'PUT' });
 }
 
 // ==================== 事件记录 ====================
