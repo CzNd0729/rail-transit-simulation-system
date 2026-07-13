@@ -5,7 +5,8 @@
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
-import { axisTooltip } from '../../../utils/format';
+import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
+import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS } from '../../../utils/vehicleChart';
 
 export default function EnergyChart() {
   const { clock } = useSimulationState();
@@ -13,7 +14,7 @@ export default function EnergyChart() {
 
   const option = {
     backgroundColor: 'transparent',
-    tooltip: { trigger: 'axis' as const, formatter: axisTooltip(2) },
+    tooltip: { trigger: 'axis' as const, formatter: axisTooltip(VEHICLE_CHART_DECIMALS) },
     legend: {
       data: ['牵引能耗', '再生电量'],
       textStyle: { color: '#a0a0a0', fontSize: 11 },
@@ -24,17 +25,17 @@ export default function EnergyChart() {
       type: 'value' as const,
       name: '时间 (s)',
       max: chartHistory.tractionEnergyTime.length > 0
-        ? Math.max(clock.elapsed + 10, chartHistory.tractionEnergyTime.at(-1)?.[0] ?? 0 + 10)
+        ? stableVehicleTimeMax(clock.elapsed, chartHistory.tractionEnergyTime.at(-1)?.[0])
         : 600,
       nameTextStyle: { color: '#a0a0a0' },
-      axisLabel: { color: '#a0a0a0' },
+      axisLabel: vehicleTimeAxisLabel(),
       axisLine: { lineStyle: { color: '#2a2a4a' } },
     },
     yAxis: {
       type: 'value' as const,
       name: '能量 (kWh)',
       nameTextStyle: { color: '#a0a0a0' },
-      axisLabel: { color: '#a0a0a0' },
+      axisLabel: vehicleValueAxisLabel(),
       axisLine: { lineStyle: { color: '#2a2a4a' } },
     },
     series: [

@@ -6,7 +6,8 @@
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
-import { axisTooltip } from '../../../utils/format';
+import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
+import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS } from '../../../utils/vehicleChart';
 
 export default function AccelTimeCurve() {
   const { clock } = useSimulationState();
@@ -14,26 +15,23 @@ export default function AccelTimeCurve() {
 
   const option = {
     backgroundColor: 'transparent',
-    tooltip: { trigger: 'axis' as const, formatter: axisTooltip(2) },
+    tooltip: { trigger: 'axis' as const, formatter: axisTooltip(VEHICLE_CHART_DECIMALS) },
     grid: { left: 50, right: 20, top: 20, bottom: 40 },
     xAxis: {
       type: 'value' as const,
       name: '时间 (s)',
       max: chartHistory.accelTime.length > 0
-        ? Math.max(clock.elapsed + 10, chartHistory.accelTime[chartHistory.accelTime.length - 1][0] + 10)
+        ? stableVehicleTimeMax(clock.elapsed, chartHistory.accelTime.at(-1)?.[0])
         : 600,
       nameTextStyle: { color: '#a0a0a0' },
-      axisLabel: {
-        color: '#a0a0a0',
-        formatter: (value: number) => value.toFixed(2),
-      },
+      axisLabel: vehicleTimeAxisLabel(),
       axisLine: { lineStyle: { color: '#2a2a4a' } },
     },
     yAxis: {
       type: 'value' as const,
       name: '加速度 (m/s²)',
       nameTextStyle: { color: '#a0a0a0' },
-      axisLabel: { color: '#a0a0a0' },
+      axisLabel: vehicleValueAxisLabel(),
       axisLine: { lineStyle: { color: '#2a2a4a' } },
     },
     series: [

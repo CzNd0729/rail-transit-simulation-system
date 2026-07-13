@@ -5,7 +5,7 @@
  */
 import { useSimulationState } from '../../../context/SimulationContext';
 import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
-import { getModeLabel, getModeColor, getDisplayMode } from '../../../utils/format';
+import { getModeLabel, getModeColor, getDisplayMode, VEHICLE_CHART_DECIMALS } from '../../../utils/format';
 
 export default function ModeIndicator() {
   const { signaling } = useSimulationState();
@@ -46,10 +46,10 @@ export default function ModeIndicator() {
               速度: {train.speed.toFixed(1)} km/h
             </span>
             <span style={styles.detail}>
-              加速度: {train.acceleration.toFixed(2)} m/s²
+              加速度: {train.acceleration.toFixed(VEHICLE_CHART_DECIMALS)} m/s²
             </span>
             <span style={styles.detail}>
-              冲击率: {train.jerk.toFixed(2)} m/s³
+              冲击率: {train.jerk.toFixed(VEHICLE_CHART_DECIMALS)} m/s³
             </span>
           </div>
         )}

@@ -10,6 +10,27 @@ export function formatNum(value: number, decimals = 2): string {
   return value.toFixed(decimals);
 }
 
+/** 车辆视图图表轴 / tooltip 默认小数位（十分位） */
+export const VEHICLE_CHART_DECIMALS = 1;
+
+/** ECharts 轴标签格式化，默认车辆视图十分位 */
+export function formatAxisLabel(
+  value: number,
+  decimals = VEHICLE_CHART_DECIMALS,
+): string {
+  return value.toFixed(decimals);
+}
+
+/** 时间轴 max 取整到十分位，避免浮点噪声轴标签 */
+export function stableVehicleTimeMax(
+  elapsed: number,
+  lastTime?: number,
+  minMax = 600,
+): number {
+  const raw = Math.max(elapsed + 10, (lastTime ?? 0) + 10, minMax);
+  return Math.round(raw * 10) / 10;
+}
+
 /**
  * ECharts axis-trigger tooltip formatter：将所有数值格式化为指定位数小数
  * 适用于 trigger: 'axis' 的折线图
@@ -18,7 +39,10 @@ export function formatNum(value: number, decimals = 2): string {
 export function axisTooltip(decimals = 2) {
   return (params: any) => {
     const list = Array.isArray(params) ? params : [params];
-    const axisVal = list[0]?.axisValueLabel ?? '';
+    const rawAxis = list[0]?.axisValue;
+    const axisVal = typeof rawAxis === 'number'
+      ? formatNum(rawAxis, decimals)
+      : (list[0]?.axisValueLabel ?? '');
     const body = list
       .map((p: any) => {
         const yVal = Array.isArray(p.value) ? p.value[1] : p.value;
