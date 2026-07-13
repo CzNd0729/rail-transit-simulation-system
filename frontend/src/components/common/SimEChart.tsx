@@ -45,7 +45,10 @@ export default function SimEChart({ option, style, className }: SimEChartProps) 
 
     let frameId = 0;
     frameId = requestAnimationFrame(() => {
-      chart.setOption(optionRef.current, { lazyUpdate: true });
+      chart.setOption(optionRef.current, {
+        lazyUpdate: true,
+        replaceMerge: ['series', 'legend'],
+      });
     });
 
     return () => {

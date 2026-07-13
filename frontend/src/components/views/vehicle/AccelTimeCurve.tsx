@@ -3,7 +3,9 @@
  * 基于《需求文档》UI-VHC-02
  * 实时绘制加速度曲线
  */
-import ReactECharts from 'echarts-for-react';
+import { useMemo } from 'react';
+import type { EChartsOption } from 'echarts';
+import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
@@ -13,8 +15,9 @@ export default function AccelTimeCurve() {
   const { clock } = useSimulationState();
   const chartHistory = useActiveChartHistory();
 
-  const option = {
+  const option = useMemo((): EChartsOption => ({
     backgroundColor: 'transparent',
+    animation: false,
     tooltip: { trigger: 'axis' as const, formatter: axisTooltip(VEHICLE_CHART_DECIMALS) },
     grid: { left: 50, right: 20, top: 20, bottom: 40 },
     xAxis: {
@@ -45,16 +48,14 @@ export default function AccelTimeCurve() {
         areaStyle: { color: 'rgba(82, 196, 26, 0.08)' },
       },
     ],
-  };
+  }), [chartHistory.accelTime, clock.elapsed]);
 
   return (
-    <div className="panel" style={{ height: '100%' }}>
+    <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="panel-title">📉 加速度-时间曲线</div>
-      <ReactECharts
-        option={option}
-        style={{ height: 'calc(100% - 30px)' }}
-        notMerge
-      />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <SimEChart option={option} style={{ height: '100%' }} />
+      </div>
     </div>
   );
 }

@@ -2,7 +2,9 @@
  * EnergyChart — 能耗累计图（UI-VHC-05）
  * 牵引能耗 / 再生制动电量累计曲线（kWh）
  */
-import ReactECharts from 'echarts-for-react';
+import { useMemo } from 'react';
+import type { EChartsOption } from 'echarts';
+import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
@@ -12,8 +14,9 @@ export default function EnergyChart() {
   const { clock } = useSimulationState();
   const chartHistory = useActiveChartHistory();
 
-  const option = {
+  const option = useMemo((): EChartsOption => ({
     backgroundColor: 'transparent',
+    animation: false,
     tooltip: { trigger: 'axis' as const, formatter: axisTooltip(VEHICLE_CHART_DECIMALS) },
     legend: {
       data: ['牵引能耗', '再生电量'],
@@ -56,12 +59,14 @@ export default function EnergyChart() {
         itemStyle: { color: '#52c41a' },
       },
     ],
-  };
+  }), [chartHistory.tractionEnergyTime, chartHistory.regenEnergyTime, clock.elapsed]);
 
   return (
-    <div className="panel" style={{ height: '100%' }}>
+    <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="panel-title">🔋 能耗累计</div>
-      <ReactECharts option={option} style={{ height: 'calc(100% - 30px)' }} notMerge />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <SimEChart option={option} style={{ height: '100%' }} />
+      </div>
     </div>
   );
 }
