@@ -165,14 +165,23 @@ class SimulationManager:
 
     # ==================== 状态查询 ====================
 
+    @staticmethod
+    def _is_continuous_dispatch(orch: Orchestrator) -> bool:
+        st = orch._service_timetable
+        return st is not None and st.dispatch.mode == "continuous"
+
     def get_status(self) -> dict:
         orch = self.orchestrator
+        if self._is_continuous_dispatch(orch):
+            train_count = len(orch.trains)
+        else:
+            train_count = orch.sim_params.total_train_count()
         return {
             "runState": orch.run_state.value,
             "simulationTime": orch.clock.elapsed,
             "totalTime": orch.sim_params.total_time,
             "speedMultiplier": orch.clock.speed_multiplier,
-            "trainCount": orch.sim_params.total_train_count(),
+            "trainCount": train_count,
         }
 
     def get_last_snapshot(self) -> dict | None:
@@ -474,18 +483,21 @@ class SimulationManager:
                 })
             # 终点停稳判断
             line_end = (
-                orch.train_state is not None
+                not self._is_continuous_dispatch(orch)
+                and orch.train_state is not None
                 and orch.train_state.speed < 0.1
                 and (
                     (orch.train_state.direction == "up" and orch.train_state.position <= 1.0)
                     or (orch.train_state.direction != "up" and orch.train_state.position >= orch.track.track.total_length - 1.0)
                 )
             )
-            if (
-                orch.clock.elapsed >= orch.sim_params.total_time
-                or self._all_trains_finished(orch)
-                or line_end
-            ):
+            if orch.clock.elapsed >= orch.sim_params.total_time:
+                should_complete = True
+            elif self._is_continuous_dispatch(orch):
+                should_complete = False
+            else:
+                should_complete = self._all_trains_finished(orch) or line_end
+            if should_complete:
                 # 先记录结束时刻的摘要，保存最终 snapshot/summary
                 self._last_summary = orch.recorder.summary()
                 if snapshot:
