@@ -80,6 +80,7 @@ class TrainRun:
     spawn_time: float = 0.0
     active: bool = False
     direction: str = "up"
+    trip_leg_names: tuple[str, ...] = ()
     last_step: StepResult | None = None
     legs: list[Timetable] = field(default_factory=list)
     leg_index: int = 0
@@ -184,9 +185,14 @@ class Orchestrator:
             switch_manager=switch_manager,
             _timetable_path=config_dir / "timetable.yaml",
         )
-        orch._service_timetable = load_service_timetable(orch._timetable_path)
+        station_chainages = {s.id: s.chainage for s in track.track.stations}
+        orch._service_timetable = load_service_timetable(
+            orch._timetable_path, station_chainages
+        )
         if orch._is_continuous():
-            orch._fleet_scheduler = FleetScheduler(orch._service_timetable)
+            orch._fleet_scheduler = FleetScheduler(
+                orch._service_timetable, station_chainages
+            )
             orch._turnback = TurnbackController(orch._service_timetable)
         orch._init_trains()
         return orch
@@ -254,13 +260,22 @@ class Orchestrator:
                     )
                 )
 
-    def _create_train_run(self, train_id: str, spawn_time: float) -> TrainRun:
-        """continuous 模式动态创建列车（down→up 交路）。"""
+    def _create_train_run(
+        self,
+        train_id: str,
+        spawn_time: float,
+        direction: str,
+        trip_leg_names: tuple[str, ...],
+        start_pos: float | None = None,
+    ) -> TrainRun:
+        """continuous 模式动态创建列车（按派车端交路）。"""
         assert self._service_timetable is not None
-        legs = materialize_trip_timetables(self._service_timetable, train_id)
-        direction = self._service_timetable.dispatch.initial_direction
+        legs = materialize_trip_timetables(
+            self._service_timetable, train_id, trip_leg_names
+        )
         total_length = self.track.track.total_length
-        start_pos = _start_chainage(direction, total_length)
+        if start_pos is None:
+            start_pos = _start_chainage(direction, total_length)
         abs_tt = legs[0].with_absolute_times(spawn_time)
         ats = ATSController(self.sim_params.signal.ats, abs_tt)
         signaling = ThreeStageController(
@@ -282,13 +297,24 @@ class Orchestrator:
             direction=direction,
             legs=legs,
             leg_index=0,
+            trip_leg_names=trip_leg_names,
         )
 
     def _tick_continuous_dispatch(self, elapsed: float) -> None:
         assert self._fleet_scheduler is not None
 
-        def create_run(train_id: str, spawn_time: float) -> None:
-            self.trains.append(self._create_train_run(train_id, spawn_time))
+        def create_run(
+            train_id: str,
+            spawn_time: float,
+            direction: str,
+            trip_leg_names: tuple[str, ...],
+            start_pos: float,
+        ) -> None:
+            self.trains.append(
+                self._create_train_run(
+                    train_id, spawn_time, direction, trip_leg_names, start_pos
+                )
+            )
 
         active = [r for r in self.trains if r.active]
         self._fleet_scheduler.tick(elapsed, active, create_run)
@@ -434,9 +460,16 @@ class Orchestrator:
     def step_once(self) -> dict | None:
         """推进一个仿真步（ENG-06 单步调试）。暂停/空闲时也可强制调用。"""
         if self._service_timetable is None:
-            self._service_timetable = load_service_timetable(self._timetable_path)
+            station_chainages = {
+                s.id: s.chainage for s in self.track.track.stations
+            }
+            self._service_timetable = load_service_timetable(
+                self._timetable_path, station_chainages
+            )
             if self._is_continuous():
-                self._fleet_scheduler = FleetScheduler(self._service_timetable)
+                self._fleet_scheduler = FleetScheduler(
+                    self._service_timetable, station_chainages
+                )
                 self._turnback = TurnbackController(self._service_timetable)
 
         dt = self.clock.time_step
@@ -482,7 +515,13 @@ class Orchestrator:
 
         self.clock.tick()
 
-        leading = max(active_runs, key=lambda r: r.state.position)
+        leading = max(
+            (r for r in active_runs if r.last_step is not None),
+            key=lambda r: r.state.position,
+            default=None,
+        )
+        if leading is None:
+            return None
         lead_result = leading.last_step
         assert lead_result is not None
         self.recorder.record(

@@ -32,9 +32,12 @@ def test_timetable_absolute_offset():
 def test_load_peak_service_timetable():
     from sim_engine.signaling.timetable_loader import load_service_timetable
 
-    svc = load_service_timetable(CONFIG / "timetable.yaml")
+    chainages = {"ST01": 0.0, "ST24": 18600.0}
+    svc = load_service_timetable(CONFIG / "timetable.yaml", chainages)
     assert svc.dispatch.mode == "continuous"
-    assert svc.dispatch.headway_s == 150.0
+    assert len(svc.dispatch.origins) == 2
+    assert svc.dispatch.origins[0].train_id_prefix == "D"
+    assert svc.dispatch.origins[1].origin_station == "ST24"
     assert "down" in svc.leg_templates
     assert len(svc.leg_templates["down"].entries) == 24
 

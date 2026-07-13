@@ -10,12 +10,21 @@ timetable:
 
   dispatch:
     mode: continuous
-    origin_station: ST01
-    initial_direction: down
-    first_departure_s: 0
-    headway_s: 270
     max_active_trains: 40
     min_origin_clearance_m: 500
+    origins:
+      - origin_station: ST01
+        initial_direction: down
+        trip_legs: [down, up]
+        train_id_prefix: D
+        first_departure_s: 0
+        headway_s: 270
+      - origin_station: ST24
+        initial_direction: up
+        trip_legs: [up, down]
+        train_id_prefix: U
+        first_departure_s: 0
+        headway_s: 270
 
   leg_templates:
     trip_legs: [down, up]

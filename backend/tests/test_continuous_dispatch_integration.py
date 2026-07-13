@@ -19,14 +19,18 @@ def _as_fixed(orch: Orchestrator) -> None:
     orch.reset()
 
 
-def test_continuous_first_train_at_zero():
+def test_continuous_both_directions_at_start():
     orch = Orchestrator.from_config_dir()
     orch.reset()
     orch.start()
     snap = orch.step_once()
     assert snap is not None
-    assert snap["data"]["trains"][0]["id"] == "TRAIN_01"
-    assert snap["data"]["trains"][0]["direction"] == "down"
+    trains = snap["data"]["trains"]
+    ids = {t["id"] for t in trains}
+    dirs = {t["direction"] for t in trains}
+    assert "TRAIN_D01" in ids
+    assert "TRAIN_U01" in ids
+    assert dirs == {"down", "up"}
 
 
 def test_continuous_second_train_held_then_dispatched():
@@ -34,17 +38,17 @@ def test_continuous_second_train_held_then_dispatched():
     orch = Orchestrator.from_config_dir()
     orch.reset()
     orch.start()
-    train02 = None
+    train_d02 = None
     for _ in range(20000):
         orch.step_once()
         for run in orch.trains:
-            if run.train_id == "TRAIN_02":
-                train02 = run
+            if run.train_id == "TRAIN_D02":
+                train_d02 = run
                 break
-        if train02 is not None:
+        if train_d02 is not None:
             break
-    assert train02 is not None
-    assert train02.spawn_time == 150.0
+    assert train_d02 is not None
+    assert train_d02.spawn_time == 150.0
 
 
 def test_continuous_dispatch_count_grows():

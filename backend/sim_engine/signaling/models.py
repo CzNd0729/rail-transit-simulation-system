@@ -60,6 +60,20 @@ class TimetableLegTemplate:
 
 
 @dataclass(frozen=True)
+class DispatchOrigin:
+    """单端持续派车配置。"""
+
+    origin_station: str
+    origin_chainage: float
+    initial_direction: str
+    trip_leg_names: tuple[str, ...]
+    train_id_prefix: str = ""
+    first_departure_s: float = 0.0
+    headway_s: float = 150.0
+    headway_pattern_s: tuple[float, ...] = ()
+
+
+@dataclass(frozen=True)
 class DispatchConfig:
     mode: str = "continuous"
     origin_station: str = "ST01"
@@ -69,6 +83,7 @@ class DispatchConfig:
     headway_pattern_s: tuple[float, ...] = ()
     max_active_trains: int = 40
     min_origin_clearance_m: float = 500.0
+    origins: tuple[DispatchOrigin, ...] = ()
 
 
 @dataclass(frozen=True)
