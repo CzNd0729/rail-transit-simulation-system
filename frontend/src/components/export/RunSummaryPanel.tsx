@@ -3,13 +3,20 @@ import { formatEnergy, formatSimTime } from '../../utils/format';
 
 export default function RunSummaryPanel() {
   const { runState, stats } = useSimulationState();
-
-  if (runState !== 'stopped' || stats.trip_time <= 0) {
-    return null;
-  }
+  const visible = runState === 'stopped' && stats.trip_time > 0;
 
   return (
-    <div className="panel" style={styles.panel}>
+    <div
+      className="panel"
+      style={{
+        ...styles.panel,
+        visibility: visible ? 'visible' : 'hidden',
+        height: visible ? 'auto' : 0,
+        marginBottom: visible ? 8 : 0,
+        overflow: 'hidden',
+      }}
+      aria-hidden={!visible}
+    >
       <div className="panel-title">📊 运行摘要</div>
       <div style={styles.row}>
         <span style={styles.label}>总时长</span>
@@ -23,18 +30,32 @@ export default function RunSummaryPanel() {
         <span style={styles.label}>最高速度</span>
         <span style={styles.value}>{stats.max_speed.toFixed(1)} km/h</span>
       </div>
-      {stats.total_energy_consumption > 0 && (
-        <div style={styles.row}>
-          <span style={styles.label}>牵引能耗</span>
-          <span style={styles.value}>{formatEnergy(stats.total_energy_consumption)}</span>
-        </div>
-      )}
-      {stats.total_regeneration > 0 && (
-        <div style={styles.row}>
-          <span style={styles.label}>再生电量</span>
-          <span style={styles.value}>{formatEnergy(stats.total_regeneration)}</span>
-        </div>
-      )}
+      <div
+        style={{
+          ...styles.row,
+          visibility: stats.total_energy_consumption > 0 ? 'visible' : 'hidden',
+        }}
+      >
+        <span style={styles.label}>牵引能耗</span>
+        <span style={styles.value}>
+          {stats.total_energy_consumption > 0
+            ? formatEnergy(stats.total_energy_consumption)
+            : '--'}
+        </span>
+      </div>
+      <div
+        style={{
+          ...styles.row,
+          visibility: stats.total_regeneration > 0 ? 'visible' : 'hidden',
+        }}
+      >
+        <span style={styles.label}>再生电量</span>
+        <span style={styles.value}>
+          {stats.total_regeneration > 0
+            ? formatEnergy(stats.total_regeneration)
+            : '--'}
+        </span>
+      </div>
     </div>
   );
 }

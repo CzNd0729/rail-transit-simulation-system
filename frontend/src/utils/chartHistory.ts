@@ -16,9 +16,11 @@ export const EMPTY_CHART_HISTORY: ChartHistory = {
   byTrain: {},
 };
 
-const MAX_POINTS = 10_000;
+/** 每列车每序列最大缓存点数（0.1s 步长约 5000s 全程） */
+export const CHART_HISTORY_MAX_POINTS = 50_000;
 
 function trimHistory(history: TrainChartHistory): TrainChartHistory {
+  const MAX_POINTS = CHART_HISTORY_MAX_POINTS;
   if (history.speedTime.length <= MAX_POINTS) {
     return history;
   }
@@ -75,4 +77,9 @@ export function appendChartHistory(
 
 export function clearChartHistory(): ChartHistory {
   return { ...EMPTY_CHART_HISTORY };
+}
+
+/** @internal 供单元测试验证截断逻辑 */
+export function trimChartHistoryForTest(history: TrainChartHistory): TrainChartHistory {
+  return trimHistory(history);
 }

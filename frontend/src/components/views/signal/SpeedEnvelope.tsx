@@ -3,7 +3,9 @@
  * 基于《迭代二需求文档》UI-SIG-02（单列车简化版）
  * ATP 紧急制动曲线留待迭代三
  */
-import ReactECharts from 'echarts-for-react';
+import { useMemo } from 'react';
+import type { EChartsOption } from 'echarts';
+import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
 import { axisTooltip } from '../../../utils/format';
@@ -55,8 +57,9 @@ export default function SpeedEnvelope() {
       ] as [number, number][])
     : ([[0, atpLimitKmh], [maxPos, atpLimitKmh]] as [number, number][]);
 
-  const option = {
+  const option = useMemo((): EChartsOption => ({
     backgroundColor: 'transparent',
+    animation: false,
     tooltip: { trigger: 'axis' as const, formatter: axisTooltip(1) },
     legend: {
       data: ['区段限速', 'ATP 限速', '目标速度', '实际速度'],
@@ -115,16 +118,20 @@ export default function SpeedEnvelope() {
         showSymbol: false,
       },
     ],
-  };
+  }), [
+    speedLimitData,
+    atpLimitData,
+    targetSpeedData,
+    chartHistory.speedPosition,
+    maxPos,
+  ]);
 
   return (
-    <div className="panel" style={{ height: '100%' }}>
+    <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="panel-title">📉 速度包络线</div>
-      <ReactECharts
-        option={option}
-        style={{ height: 'calc(100% - 30px)' }}
-        notMerge
-      />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <SimEChart option={option} style={{ height: '100%' }} />
+      </div>
     </div>
   );
 }

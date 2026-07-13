@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
+  CHART_HISTORY_MAX_POINTS,
   EMPTY_CHART_HISTORY,
+  EMPTY_TRAIN_CHART_HISTORY,
   appendChartHistory,
   clearChartHistory,
   getTrainChartHistory,
+  trimChartHistoryForTest,
 } from './chartHistory';
 import type { SimulationSnapshot } from '../types/simulation';
 import { EMPTY_SIGNAL_STATE } from '../types/simulation';
@@ -72,13 +75,26 @@ describe('appendChartHistory', () => {
     expect(h.regenEnergyTime).toEqual([[1.0, 0.3]]);
   });
 
-  it('truncates positionTime when exceeding MAX_POINTS', () => {
-    let h = EMPTY_CHART_HISTORY;
-    for (let i = 0; i < 10_001; i++) {
-      h = appendChartHistory(h, makeSnapshot(i * 0.1, 50, 0, i));
-    }
-    expect(getTrainChartHistory(h, 'TRAIN_01').positionTime).toHaveLength(10_000);
-    expect(getTrainChartHistory(h, 'TRAIN_01').positionTime[0]).toEqual([0.1, 1]);
+  it('truncates positionTime when exceeding CHART_HISTORY_MAX_POINTS', () => {
+    const overLimit = CHART_HISTORY_MAX_POINTS + 1;
+    const positionTime: [number, number][] = Array.from(
+      { length: overLimit },
+      (_, i) => [i * 0.1, i],
+    );
+    const trimmed = trimChartHistoryForTest({
+      ...EMPTY_TRAIN_CHART_HISTORY,
+      speedTime: positionTime.map(([t]) => [t, 50]),
+      accelTime: positionTime.map(([t]) => [t, 0]),
+      jerkTime: positionTime.map(([t]) => [t, 0]),
+      speedPosition: positionTime.map(([, p]) => [p, 50]),
+      positionTime,
+      voltagePosition: positionTime.map(([, p]) => [p, 1500]),
+      resistanceTime: positionTime.map(([t]) => [t, 0]),
+      tractionEnergyTime: positionTime.map(([t]) => [t, 0]),
+      regenEnergyTime: positionTime.map(([t]) => [t, 0]),
+    });
+    expect(trimmed.positionTime).toHaveLength(CHART_HISTORY_MAX_POINTS);
+    expect(trimmed.positionTime[0]).toEqual([0.1, 1]);
   });
 
   it('records jerk from train state', () => {

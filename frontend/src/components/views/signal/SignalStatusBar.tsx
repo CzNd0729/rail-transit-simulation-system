@@ -31,21 +31,34 @@ export default function SignalStatusBar() {
       <span style={{ color: ebActive ? '#ff4d4f' : '#52c41a' }}>
         {ebActive ? '⚠ 紧急制动' : '● 正常'}
       </span>
-      {deviation && (
-        <span>
-          ATS 偏差: {deviation.delay_arrival >= 0 ? '+' : ''}
-          {deviation.delay_arrival.toFixed(1)} s
-          {' · '}站停 {deviation.adjusted_dwell.toFixed(0)} s
-        </span>
-      )}
-      {interval && (
-        <span style={{ color: interval.safe ? 'var(--text-secondary)' : '#ff4d4f' }}>
-          追踪间隔: {interval.interval_m.toFixed(0)} m
-          {' / '}≥{interval.min_interval_m.toFixed(0)} m
-          {' · '}前车 {interval.leading_train_id}
-          {' · '}{interval.safe ? '安全' : '不足'}
-        </span>
-      )}
+      <span style={{ visibility: deviation ? 'visible' : 'hidden' }}>
+        {deviation
+          ? (
+            <>
+              ATS 偏差: {deviation.delay_arrival >= 0 ? '+' : ''}
+              {deviation.delay_arrival.toFixed(1)} s
+              {' · '}站停 {deviation.adjusted_dwell.toFixed(0)} s
+            </>
+          )
+          : '\u00a0'}
+      </span>
+      <span
+        style={{
+          color: interval && !interval.safe ? '#ff4d4f' : 'var(--text-secondary)',
+          visibility: interval ? 'visible' : 'hidden',
+        }}
+      >
+        {interval
+          ? (
+            <>
+              追踪间隔: {interval.interval_m.toFixed(0)} m
+              {' / '}≥{interval.min_interval_m.toFixed(0)} m
+              {' · '}前车 {interval.leading_train_id}
+              {' · '}{interval.safe ? '安全' : '不足'}
+            </>
+          )
+          : '\u00a0'}
+      </span>
     </div>
   );
 }

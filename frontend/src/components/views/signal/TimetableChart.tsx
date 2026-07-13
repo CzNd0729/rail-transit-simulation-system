@@ -3,7 +3,8 @@
  * 基于《迭代二需求文档》UI-SIG-03（单列车简化版）
  */
 import { useMemo } from 'react';
-import ReactECharts from 'echarts-for-react';
+import type { EChartsOption } from 'echarts';
+import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory, useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import { mockLineData } from '../../../data/mockLineData';
@@ -126,7 +127,7 @@ export default function TimetableChart() {
   }, [stations, maxPos]);
 
   const option = useMemo(
-    () => ({
+    (): EChartsOption => ({
       backgroundColor: 'transparent',
       animation: false,
       tooltip: { trigger: 'axis' as const, formatter: axisTooltip(1) },
@@ -169,20 +170,30 @@ export default function TimetableChart() {
     [chartHistory.positionTime, xMax, maxPos, stationMarkLines],
   );
 
+  const deviationText = deviation
+    ? `最近到站偏差 ${deviation.delay_arrival >= 0 ? '+' : ''}${deviation.delay_arrival.toFixed(1)} s（${deviation.station_id}）`
+    : '';
+
   return (
-    <div className="panel" style={{ height: '100%' }}>
+    <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="panel-title">📅 运行图</div>
-      {deviation && (
-        <div style={{ fontSize: 11, color: '#fa8c16', padding: '0 8px 4px' }}>
-          最近到站偏差 {deviation.delay_arrival >= 0 ? '+' : ''}
-          {deviation.delay_arrival.toFixed(1)} s（{deviation.station_id}）
-        </div>
-      )}
-      <ReactECharts
-        option={option}
-        style={{ height: 'calc(100% - 30px)' }}
-        notMerge
-      />
+      {/* 固定占位，避免 ATS 偏差出现时插入新节点导致 ECharts DOM 与 React 不同步 */}
+      <div
+        style={{
+          fontSize: 11,
+          color: '#fa8c16',
+          padding: '0 8px 4px',
+          minHeight: 20,
+          flexShrink: 0,
+          visibility: deviation ? 'visible' : 'hidden',
+        }}
+        aria-hidden={!deviation}
+      >
+        {deviationText || '\u00a0'}
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <SimEChart option={option} style={{ height: '100%' }} />
+      </div>
     </div>
   );
 }
