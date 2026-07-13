@@ -92,6 +92,23 @@ describe('generateMockTrajectory', () => {
     expect(Math.max(...accels)).toBeLessThan(0.05);
     expect(Math.min(...accels)).toBeGreaterThan(-0.05);
   });
+
+  it('includes mock ATP/MA and speed limit fields on each frame', () => {
+    const frames = generateMockTrajectory(makeInput(200_000));
+    const moving = frames.find((f) => f.speed > 10 && f.position < 1400);
+    expect(moving?.ma_end_chainage).toBe(1500);
+    expect(moving?.safety_distance).toBe(300);
+    expect(moving?.permanent_speed_limit).toBe(80);
+    expect(moving?.atp_speed_limit).toBeCloseTo(76, 0);
+  });
+
+  it('simulates ATS deviation during dwell at B station', () => {
+    const frames = generateMockTrajectory(makeInput(200_000));
+    const dwellAtB = frames.find(
+      (f) => f.position === 1500 && f.speed === 0 && f.timetable_deviation?.station_id === 'ST02',
+    );
+    expect(dwellAtB?.timetable_deviation?.delay_arrival).toBe(2.5);
+  });
 });
 
 /** 低于积分上限，防止再次生成 60000 帧死循环 */

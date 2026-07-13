@@ -353,6 +353,13 @@ export interface MockReplayFrame {
   target_station_id?: string;
   traction_level?: number;
   brake_level?: number;
+  /** Mock ATP 移动授权终点 (m)，缺省时由 frameToSnapshot 推导 */
+  ma_end_chainage?: number;
+  safety_distance?: number;
+  permanent_speed_limit?: number;
+  atp_speed_limit?: number;
+  /** Mock ATS 偏差（到站 dwell 帧可选携带） */
+  timetable_deviation?: TimetableDeviationEntry;
 }
 
 /** 预录回放场景 */

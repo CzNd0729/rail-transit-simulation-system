@@ -51,3 +51,6 @@ export function trainColorByIndex(index: number): string {
 
 /** 迭代二 MA 示意图固定安全包络长度 (m)，迭代三改为动态 ATP 包络 */
 export const MA_ENVELOPE_LENGTH = 300;
+
+/** Mock MVP 线路全长 (m)，与 mockTrackBlueprint 一致 */
+export const MOCK_LINE_TOTAL_LENGTH = 3200;

@@ -1,16 +1,17 @@
 /**
  * SignalStatusBar — 信号视图底部状态条
- * 展示运行相位、紧急制动、ATS 时刻偏差
+ * 展示运行相位、紧急制动、ATS 时刻偏差、SIG-07 追踪间隔
  */
 import { useSimulationState } from '../../../context/SimulationContext';
 import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import { getSignalPhaseLabel, resolveSignalPhase } from '../../../utils/format';
-import { resolveLatestDeviation } from '../../../utils/signalSelectors';
+import { resolveLatestDeviation, resolveTrainInterval } from '../../../utils/signalSelectors';
 
 export default function SignalStatusBar() {
   const { signaling } = useSimulationState();
   const train = useSelectedTrain();
-  const cmd = signaling.commands.find((c) => c.train_id === train?.id)
+  const trainId = train?.id ?? 'TRAIN_01';
+  const cmd = signaling.commands.find((c) => c.train_id === trainId)
     ?? signaling.commands[0];
   const phase = resolveSignalPhase(
     cmd?.running_phase,
@@ -18,10 +19,8 @@ export default function SignalStatusBar() {
     cmd?.traction_level,
     cmd?.brake_level,
   );
-  const deviation = resolveLatestDeviation(
-    signaling.timetable_deviations,
-    train?.id ?? 'TRAIN_01',
-  );
+  const deviation = resolveLatestDeviation(signaling.timetable_deviations, trainId);
+  const interval = resolveTrainInterval(signaling.train_intervals, trainId);
   const ebActive = cmd?.emergency_brake === true;
 
   return (
@@ -37,6 +36,14 @@ export default function SignalStatusBar() {
           ATS 偏差: {deviation.delay_arrival >= 0 ? '+' : ''}
           {deviation.delay_arrival.toFixed(1)} s
           {' · '}站停 {deviation.adjusted_dwell.toFixed(0)} s
+        </span>
+      )}
+      {interval && (
+        <span style={{ color: interval.safe ? 'var(--text-secondary)' : '#ff4d4f' }}>
+          追踪间隔: {interval.interval_m.toFixed(0)} m
+          {' / '}≥{interval.min_interval_m.toFixed(0)} m
+          {' · '}前车 {interval.leading_train_id}
+          {' · '}{interval.safe ? '安全' : '不足'}
         </span>
       )}
     </div>

@@ -1,7 +1,10 @@
+import { MA_ENVELOPE_LENGTH } from '../utils/constants';
 import { MOCK_STATIONS, getSegmentAt } from './mockTrackBlueprint';
 import { computeMass, computeAcceleration, msToKmh, kmhToMs } from './mockDynamics';
 import { decideMode, PLATFORM_HALF_LENGTH } from './mockThreeStage';
-import type { MockReplayFrame, MockSimInput, TrainMode } from '../types/simulation';
+import type { MockReplayFrame, MockSimInput, TrainMode, TimetableDeviationEntry } from '../types/simulation';
+
+const ATP_OVERSPEED_MARGIN = 0.05;
 
 const DT = 0.1;
 const MAX_STEPS = 60_000;
@@ -11,7 +14,21 @@ function signalFrameFields(
   speedKmh: number,
   position: number,
   targetStation: { id: string; chainage: number },
-): Pick<MockReplayFrame, 'running_phase' | 'distance_to_station' | 'target_station_id' | 'traction_level' | 'brake_level'> {
+  speedLimit: number,
+  timetableDeviation?: TimetableDeviationEntry,
+): Pick<
+  MockReplayFrame,
+  | 'running_phase'
+  | 'distance_to_station'
+  | 'target_station_id'
+  | 'traction_level'
+  | 'brake_level'
+  | 'ma_end_chainage'
+  | 'safety_distance'
+  | 'permanent_speed_limit'
+  | 'atp_speed_limit'
+  | 'timetable_deviation'
+> {
   const distance = Math.max(0, targetStation.chainage - position);
   let running_phase: string;
   if (speedKmh < 0.5 && distance < 20) running_phase = 'dwell';
@@ -25,6 +42,11 @@ function signalFrameFields(
     target_station_id: targetStation.id,
     traction_level: mode === 'traction' ? 0.8 : 0,
     brake_level: mode === 'braking' ? 0.5 : 0,
+    ma_end_chainage: targetStation.chainage,
+    safety_distance: MA_ENVELOPE_LENGTH,
+    permanent_speed_limit: speedLimit,
+    atp_speed_limit: speedLimit * (1 - ATP_OVERSPEED_MARGIN),
+    ...(timetableDeviation ? { timetable_deviation: timetableDeviation } : {}),
   };
 }
 
@@ -36,13 +58,25 @@ function appendDwellFrames(
   frames: MockReplayFrame[],
   t: number,
   stationChainage: number,
+  arrivedStation: { id: string; chainage: number },
   targetStation: { id: string; chainage: number },
   dwellTime: number,
   mass: number,
   passengerCount: number,
   prevAccel: number,
+  speedLimit: number,
 ): { t: number; prevAccel: number } {
   const dwellSteps = Math.round(dwellTime / DT);
+  const mockDelay = arrivedStation.id === 'ST02' ? 2.5 : 0;
+  const timetableDeviation: TimetableDeviationEntry | undefined = mockDelay > 0
+    ? {
+        train_id: 'TRAIN_01',
+        station_id: arrivedStation.id,
+        delay_arrival: mockDelay,
+        nominal_dwell: dwellTime,
+        adjusted_dwell: dwellTime + mockDelay,
+      }
+    : undefined;
   let accel = prevAccel;
   for (let d = 0; d < dwellSteps; d++) {
     const jerk = DT > 0 ? (0 - accel) / DT : 0;
@@ -57,11 +91,7 @@ function appendDwellFrames(
       passenger_count: passengerCount,
       pantograph_voltage: 1500,
       power_demand: 0,
-      running_phase: 'dwell',
-      distance_to_station: Math.max(0, Math.round(targetStation.chainage - stationChainage)),
-      target_station_id: targetStation.id,
-      traction_level: 0,
-      brake_level: 0,
+      ...signalFrameFields('coasting', 0, stationChainage, targetStation, speedLimit, timetableDeviation),
     });
     accel = 0;
     t += DT;
@@ -130,7 +160,7 @@ export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
       passenger_count: passengerCount,
       pantograph_voltage: 1500,
       power_demand: mode === 'traction' ? 3200 : 0,
-      ...signalFrameFields(mode, speedKmh, position, nextStation),
+      ...signalFrameFields(mode, speedKmh, position, nextStation, speedLimit),
     });
     prevAccel = acceleration;
 
@@ -146,7 +176,16 @@ export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
 
       const targetAfterDwell = MOCK_STATIONS[stationIdx + 2] ?? nextStation;
       const dwell = appendDwellFrames(
-        frames, t, nextStation.chainage, targetAfterDwell, input.signal.dwell_time, mass, passengerCount, prevAccel,
+        frames,
+        t,
+        nextStation.chainage,
+        nextStation,
+        targetAfterDwell,
+        input.signal.dwell_time,
+        mass,
+        passengerCount,
+        prevAccel,
+        speedLimit,
       );
       t = dwell.t;
       prevAccel = dwell.prevAccel;

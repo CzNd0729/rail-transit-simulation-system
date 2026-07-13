@@ -1,4 +1,9 @@
-import type { MaProfileEntry, SpeedLimitEntry, TimetableDeviationEntry } from '../types/simulation';
+import type {
+  MaProfileEntry,
+  SpeedLimitEntry,
+  TimetableDeviationEntry,
+  TrainTrackingInterval,
+} from '../types/simulation';
 
 export interface MaEnvelope {
   envelopeStart: number;
@@ -39,4 +44,11 @@ export function resolveLatestDeviation(
   const matched = deviations.filter((d) => d.train_id === trainId);
   if (matched.length === 0) return null;
   return matched[matched.length - 1];
+}
+
+export function resolveTrainInterval(
+  intervals: TrainTrackingInterval[],
+  trainId: string,
+): TrainTrackingInterval | null {
+  return intervals.find((iv) => iv.train_id === trainId) ?? null;
 }

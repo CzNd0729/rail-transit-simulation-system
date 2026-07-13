@@ -3,8 +3,9 @@ import {
   resolveMaEnvelope,
   resolveAtpSpeedLimit,
   resolveLatestDeviation,
+  resolveTrainInterval,
 } from './signalSelectors';
-import type { MaProfileEntry, SpeedLimitEntry, TimetableDeviationEntry } from '../types/simulation';
+import type { MaProfileEntry, SpeedLimitEntry, TimetableDeviationEntry, TrainTrackingInterval } from '../types/simulation';
 
 describe('resolveMaEnvelope', () => {
   it('uses backend ma_end_chainage when provided', () => {
@@ -51,5 +52,24 @@ describe('resolveLatestDeviation', () => {
 
   it('returns null when empty', () => {
     expect(resolveLatestDeviation([], 'T1')).toBeNull();
+  });
+});
+
+describe('resolveTrainInterval', () => {
+  it('returns interval for matching train', () => {
+    const intervals: TrainTrackingInterval[] = [
+      {
+        train_id: 'TRAIN_02',
+        leading_train_id: 'TRAIN_01',
+        interval_m: 480,
+        min_interval_m: 500,
+        safe: false,
+      },
+    ];
+    expect(resolveTrainInterval(intervals, 'TRAIN_02')?.safe).toBe(false);
+  });
+
+  it('returns null when no match', () => {
+    expect(resolveTrainInterval([], 'TRAIN_01')).toBeNull();
   });
 });
