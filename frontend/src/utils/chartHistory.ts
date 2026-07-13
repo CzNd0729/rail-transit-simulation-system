@@ -24,13 +24,14 @@ function trimHistory(history: TrainChartHistory): TrainChartHistory {
   if (history.speedTime.length <= MAX_POINTS) {
     return history;
   }
+  // 仅裁剪时间维度的数组；位置维度（speedPosition/voltagePosition）受线路长度自然约束
   return {
     speedTime: history.speedTime.slice(-MAX_POINTS),
     accelTime: history.accelTime.slice(-MAX_POINTS),
     jerkTime: history.jerkTime.slice(-MAX_POINTS),
-    speedPosition: history.speedPosition.slice(-MAX_POINTS),
+    speedPosition: history.speedPosition,
     positionTime: history.positionTime.slice(-MAX_POINTS),
-    voltagePosition: history.voltagePosition.slice(-MAX_POINTS),
+    voltagePosition: history.voltagePosition,
     resistanceTime: history.resistanceTime.slice(-MAX_POINTS),
     tractionEnergyTime: history.tractionEnergyTime.slice(-MAX_POINTS),
     regenEnergyTime: history.regenEnergyTime.slice(-MAX_POINTS),
