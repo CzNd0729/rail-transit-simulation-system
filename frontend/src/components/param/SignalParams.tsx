@@ -25,7 +25,6 @@ export default function SignalParamsForm({ send, disabled = false }: Props) {
   const { params, signalParamBaselines, connection } = useSimulationState();
   const { updateParams } = useSimulation(send);
   const isLive = import.meta.env.VITE_USE_MOCK !== 'true';
-  const liveLocked = isLive && connection === 'connected';
 
   const handleChange = (key: SignalParamStepKey, value: number) => {
     if (disabled) return;
@@ -44,13 +43,18 @@ export default function SignalParamsForm({ send, disabled = false }: Props) {
             value={params.signal[key]}
             step={computeFixedParamStep(baseline)}
             onChange={(v) => handleChange(key, v)}
-            disabled={disabled || (liveLocked && key !== 'target_speed_ratio')}
+            disabled={disabled}
           />
         );
       })}
-      {liveLocked && (
+      {disabled && (
         <p style={styles.hint}>
-          Live 模式仅「目标速度比」可实时修改；站停时间与发车间隔需重启仿真后生效（待后端支持）。
+          仿真运行中参数已锁定，请暂停后修改（与后端 PUT /params 行为一致）。
+        </p>
+      )}
+      {!disabled && isLive && connection === 'connected' && (
+        <p style={styles.hint}>
+          Live 模式：目标速度比可立即生效；站停/发车间隔待 Wave 2 后端写回支持。
         </p>
       )}
     </fieldset>
