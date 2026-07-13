@@ -98,6 +98,8 @@ class SimulationParams:
     """每个运行方向上的列车数（双向时上下行各 train_count 列）。"""
     departure_interval: float = 120.0
     """同方向发车间隔 (s)。"""
+    dwell_time_override: float | None = None
+    """运行时覆盖的默认站停时间 (s)；None 时使用各站 dwell_time。"""
     bidirectional: bool = False
     """True 时同时仿真上行与下行各 train_count 列车。"""
     pid: PidParams = field(default_factory=PidParams)

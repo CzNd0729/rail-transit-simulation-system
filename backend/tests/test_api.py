@@ -230,6 +230,20 @@ def test_update_signal_param():
     assert resp.json()["code"] == 0
 
 
+def test_update_signal_dwell_and_departure_interval():
+    client.post("/api/v1/simulation/reset")
+    resp = client.put("/api/v1/params", json={
+        "signal": {"dwellTime": 45, "departureInterval": 90},
+    })
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "signal.dwellTime" in data["updated"]
+    assert "signal.departureInterval" in data["updated"]
+    params = client.get("/api/v1/params").json()["data"]["signal"]
+    assert params["dwellTime"] == 45
+    assert params["departureInterval"] == 90
+
+
 def test_update_track_segment_params():
     """迭代一 UI-PARAM-02：按区段 ID 更新坡度。"""
     client.post("/api/v1/simulation/reset")

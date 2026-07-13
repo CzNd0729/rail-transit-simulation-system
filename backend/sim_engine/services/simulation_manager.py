@@ -320,7 +320,11 @@ class SimulationManager:
                 "substationCapacity": 5000,
             },
             "signal": {
-                "dwellTime": 30,
+                "dwellTime": (
+                    orch.sim_params.dwell_time_override
+                    if orch.sim_params.dwell_time_override is not None
+                    else 30
+                ),
                 "departureInterval": orch.sim_params.departure_interval,
                 "targetSpeedRatio": orch.sim_params.target_speed_ratio,
             },
@@ -386,8 +390,14 @@ class SimulationManager:
 
         signal_updates = updates.get("signal", {})
         if "targetSpeedRatio" in signal_updates:
-            orch.sim_params.target_speed_ratio = signal_updates["targetSpeedRatio"]
+            orch.sim_params.target_speed_ratio = float(signal_updates["targetSpeedRatio"])
             updated.append("signal.targetSpeedRatio")
+        if "departureInterval" in signal_updates:
+            orch.sim_params.departure_interval = float(signal_updates["departureInterval"])
+            updated.append("signal.departureInterval")
+        if "dwellTime" in signal_updates:
+            orch.sim_params.dwell_time_override = float(signal_updates["dwellTime"])
+            updated.append("signal.dwellTime")
 
         return {"updated": updated, "params": self.get_params()}
 

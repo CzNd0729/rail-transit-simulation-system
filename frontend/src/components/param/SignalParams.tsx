@@ -54,7 +54,7 @@ export default function SignalParamsForm({ send, disabled = false }: Props) {
       )}
       {!disabled && isLive && connection === 'connected' && (
         <p style={styles.hint}>
-          Live 模式：目标速度比可立即生效；站停/发车间隔待 Wave 2 后端写回支持。
+          Live 模式：暂停后可修改站停时间、发车间隔与目标速度比。
         </p>
       )}
     </fieldset>

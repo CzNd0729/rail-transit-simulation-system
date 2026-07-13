@@ -181,7 +181,11 @@ class ThreeStageController:
 
     def _start_dwell(self, st: TrainSignalState, station: Station, elapsed: float) -> None:
         """进入站停：有 ATS 时按策略 B 调整 dwell_remaining。"""
-        nominal = station.dwell_time
+        nominal = (
+            self.sim_params.dwell_time_override
+            if self.sim_params.dwell_time_override is not None
+            else station.dwell_time
+        )
         if self._ats is not None:
             adjusted, _ = self._ats.adjust_dwell(station.id, nominal, elapsed)
             st.dwell_remaining = adjusted
