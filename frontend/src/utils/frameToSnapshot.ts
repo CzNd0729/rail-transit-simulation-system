@@ -58,12 +58,15 @@ export function frameToSnapshot(
       target_station_id: frame.target_station_id ?? '',
       direction: 'up',
       fault_alarm: null,
+      traction_force: frame.traction_force ?? 0,
+      brake_force: frame.brake_force ?? 0,
+      total_resistance: frame.total_resistance ?? 0,
     }],
     power: {
       substations: [],
       voltage_profile: [{ chainage: frame.position, voltage: frame.pantograph_voltage }],
-      total_consumption: 0,
-      total_regeneration: 0,
+      total_consumption: frame.traction_energy_kwh ?? 0,
+      total_regeneration: frame.regen_energy_kwh ?? 0,
       regeneration_rate: 0,
     },
     signaling: {

@@ -134,6 +134,26 @@ describe('parseServerSnapshot', () => {
     expect(snap.signaling.speed_limits[0]?.atp_limit).toBe(76);
     expect(snap.signaling.timetable_deviations[0]?.delay_arrival).toBe(2.5);
   });
+
+  it('maps vehicle force fields from backend snapshot', () => {
+    const raw = {
+      clock: { elapsed: 5, speedMultiplier: 1 as const },
+      trains: [{
+        id: 'T1', position: 800, speed: 40, acceleration: 0.2,
+        mode: 'traction' as const, mass: 254000, passengerCount: 900,
+        pantographVoltage: 1480, powerDemand: 1200, doorStatus: 'closed' as const,
+        distanceToStation: 700, targetStationId: 'ST02', faultAlarm: null,
+        tractionForce: 280000, brakeForce: 0, totalResistance: 42000,
+      }],
+      power: { substations: [], voltageProfile: [], totalConsumption: 2.5, totalRegeneration: 0.8 },
+      signaling: { controlCommands: [], emergencyBrakes: [] },
+      track: { occupancy: [], switchStates: [] },
+      events: [],
+    };
+    const train = parseServerSnapshot(raw).trains[0];
+    expect(train.traction_force).toBe(280000);
+    expect(train.total_resistance).toBe(42000);
+  });
 });
 
 describe('toApiParamUpdate', () => {
@@ -200,5 +220,18 @@ describe('parseSimulationSummary', () => {
     expect(stats.trip_time).toBe(120.5);
     expect(stats.avg_speed).toBe(45.2);
     expect(stats.max_speed).toBe(64);
+  });
+
+  it('maps energy fields from simulation summary', () => {
+    expect(parseSimulationSummary({
+      totalTime: 120,
+      avgSpeed: 45,
+      maxSpeed: 64,
+      totalConsumption: 12.5,
+      totalRegeneration: 3.2,
+    })).toMatchObject({
+      total_energy_consumption: 12.5,
+      total_regeneration: 3.2,
+    });
   });
 });

@@ -58,5 +58,8 @@ export function useMockTrain(): TrainState {
     target_station_id: '',
     direction: 'up',
     fault_alarm: null,
+    traction_force: 0,
+    brake_force: 0,
+    total_resistance: 0,
   };
 }

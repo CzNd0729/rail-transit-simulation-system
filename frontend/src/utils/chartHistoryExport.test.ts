@@ -12,6 +12,9 @@ describe('chartHistoryToCsv', () => {
           jerkTime: [[1, 0.8], [2, -0.2]],
           positionTime: [[1, 100], [2, 200]],
           voltagePosition: [],
+          resistanceTime: [],
+          tractionEnergyTime: [],
+          regenEnergyTime: [],
         },
       },
     });

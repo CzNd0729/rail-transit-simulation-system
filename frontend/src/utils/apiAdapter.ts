@@ -45,6 +45,9 @@ function mapTrain(t: ApiSimulationSnapshot['trains'][0]): TrainState {
     target_station_id: t.targetStationId ?? '',
     direction: t.direction ?? 'up',
     fault_alarm: t.faultAlarm,
+    traction_force: t.tractionForce ?? 0,
+    brake_force: t.brakeForce ?? 0,
+    total_resistance: t.totalResistance ?? 0,
   };
 }
 
@@ -265,5 +268,12 @@ export function parseSimulationSummary(raw: Record<string, unknown>): Partial<Si
     trip_time: Number(raw.totalTime ?? raw.total_time ?? 0),
     avg_speed: Number(raw.avgSpeed ?? raw.avg_speed ?? 0),
     max_speed: Number(raw.maxSpeed ?? raw.max_speed ?? 0),
+    total_energy_consumption: Number(
+      raw.totalEnergyConsumption ?? raw.total_energy_consumption
+        ?? raw.tractionEnergy ?? raw.totalConsumption ?? 0,
+    ),
+    total_regeneration: Number(
+      raw.totalRegeneration ?? raw.total_regeneration ?? raw.regenEnergy ?? 0,
+    ),
   };
 }

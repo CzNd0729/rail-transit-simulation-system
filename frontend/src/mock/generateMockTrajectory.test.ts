@@ -109,6 +109,14 @@ describe('generateMockTrajectory', () => {
     );
     expect(dwellAtB?.timetable_deviation?.delay_arrival).toBe(2.5);
   });
+
+  it('accumulates mock traction and regen energy over run', () => {
+    const frames = generateMockTrajectory(makeInput(200_000));
+    const last = frames.at(-1);
+    const moving = frames.find((f) => f.speed > 20);
+    expect(last?.traction_energy_kwh ?? 0).toBeGreaterThan(0);
+    expect(moving?.total_resistance ?? 0).toBeGreaterThan(0);
+  });
 });
 
 /** 低于积分上限，防止再次生成 60000 帧死循环 */

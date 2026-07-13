@@ -31,6 +31,9 @@ const makeTrain = (
   target_station_id: '',
   direction: 'up' as const,
   fault_alarm: null,
+  traction_force: 0,
+  brake_force: 0,
+  total_resistance: 0,
 });
 
 const makeSnapshot = (
@@ -46,8 +49,8 @@ const makeSnapshot = (
   power: {
     substations: [],
     voltage_profile: [],
-    total_consumption: 0,
-    total_regeneration: 0,
+    total_consumption: 1.2,
+    total_regeneration: 0.3,
     regeneration_rate: 0,
   },
   signaling: { ...EMPTY_SIGNAL_STATE },
@@ -64,6 +67,9 @@ describe('appendChartHistory', () => {
     expect(h.jerkTime).toEqual([[1.0, 0]]);
     expect(h.speedPosition).toEqual([[100, 50]]);
     expect(h.positionTime).toEqual([[1.0, 100]]);
+    expect(h.resistanceTime).toEqual([[1.0, 0]]);
+    expect(h.tractionEnergyTime).toEqual([[1.0, 1.2]]);
+    expect(h.regenEnergyTime).toEqual([[1.0, 0.3]]);
   });
 
   it('truncates positionTime when exceeding MAX_POINTS', () => {

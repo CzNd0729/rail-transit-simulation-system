@@ -122,6 +122,9 @@ export interface TrainState {
   target_station_id: string;   // 目标站 ID
   direction: TrainDirection;   // 运行方向（上行/下行分轨）
   fault_alarm: FaultAlarm | null;
+  traction_force: number;      // 当前牵引力 (N)
+  brake_force: number;         // 当前制动力 (N)
+  total_resistance: number;    // 当前总阻力 (N)
 }
 
 /** 故障告警 */
@@ -327,6 +330,9 @@ export interface TrainChartHistory {
   speedPosition: [number, number][];   // [位置m, 速度km/h]
   positionTime: [number, number][];    // [时间s, 位置m] — UI-SIG-03 运行图
   voltagePosition: [number, number][]; // [位置m, 网压V] — UI-PWR-01 电压分布
+  resistanceTime: [number, number][];  // [时间s, 总阻力kN] — UI-VHC-04
+  tractionEnergyTime: [number, number][]; // [时间s, 牵引能耗kWh] — UI-VHC-05
+  regenEnergyTime: [number, number][];    // [时间s, 再生电量kWh] — UI-VHC-05
 }
 
 /** 实时曲线历史数据（按列车 ID 分桶，供多车视图与选中车详情） */
@@ -360,6 +366,11 @@ export interface MockReplayFrame {
   atp_speed_limit?: number;
   /** Mock ATS 偏差（到站 dwell 帧可选携带） */
   timetable_deviation?: TimetableDeviationEntry;
+  traction_force?: number;
+  brake_force?: number;
+  total_resistance?: number;
+  traction_energy_kwh?: number;
+  regen_energy_kwh?: number;
 }
 
 /** 预录回放场景 */
@@ -456,6 +467,9 @@ export interface ApiTrainState {
   targetStationId: string;
   direction?: TrainDirection;
   faultAlarm: FaultAlarm | null;
+  tractionForce?: number;
+  brakeForce?: number;
+  totalResistance?: number;
 }
 
 export interface ApiControlCommand {

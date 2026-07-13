@@ -38,7 +38,14 @@ export function useMockReplay() {
   const paramsRef = useRef(params);
   paramsRef.current = params;
   const replayerRef = useRef<MockReplayer | null>(null);
-  const runStatsRef = useRef({ sumSpeed: 0, count: 0, maxSpeed: 0, tripTime: 0 });
+  const runStatsRef = useRef({
+    sumSpeed: 0,
+    count: 0,
+    maxSpeed: 0,
+    tripTime: 0,
+    tractionKwh: 0,
+    regenKwh: 0,
+  });
 
   useEffect(() => {
     dispatch({ type: 'WS_CONNECTED' });
@@ -50,6 +57,8 @@ export function useMockReplay() {
         runStatsRef.current.count += 1;
         runStatsRef.current.maxSpeed = Math.max(runStatsRef.current.maxSpeed, speed);
         runStatsRef.current.tripTime = snapshot.clock.elapsed;
+        runStatsRef.current.tractionKwh = snapshot.power.total_consumption;
+        runStatsRef.current.regenKwh = snapshot.power.total_regeneration;
         dispatch({ type: 'RUNTIME_UPDATE', payload: snapshot });
       },
       onComplete: () => {
@@ -60,6 +69,8 @@ export function useMockReplay() {
             trip_time: s.tripTime,
             avg_speed: s.count > 0 ? s.sumSpeed / s.count : 0,
             max_speed: s.maxSpeed,
+            total_energy_consumption: s.tractionKwh,
+            total_regeneration: s.regenKwh,
           },
         });
         dispatch({ type: 'SET_RUN_STATE', payload: 'stopped' });
@@ -82,7 +93,9 @@ export function useMockReplay() {
       switch (action) {
         case 'start':
           dispatch({ type: 'RESET_RUN_DATA' });
-          runStatsRef.current = { sumSpeed: 0, count: 0, maxSpeed: 0, tripTime: 0 };
+          runStatsRef.current = {
+            sumSpeed: 0, count: 0, maxSpeed: 0, tripTime: 0, tractionKwh: 0, regenKwh: 0,
+          };
           replayer.loadScenario(buildScenarioFromParams(paramsRef.current));
           dispatch({ type: 'SET_RUN_STATE', payload: 'running' });
           replayer.start();
@@ -104,6 +117,8 @@ export function useMockReplay() {
               trip_time: s.tripTime,
               avg_speed: s.count > 0 ? s.sumSpeed / s.count : 0,
               max_speed: s.maxSpeed,
+              total_energy_consumption: s.tractionKwh,
+              total_regeneration: s.regenKwh,
             },
           });
           dispatch({ type: 'SET_RUN_STATE', payload: 'stopped' });

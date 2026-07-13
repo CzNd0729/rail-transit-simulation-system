@@ -7,6 +7,9 @@ export const EMPTY_TRAIN_CHART_HISTORY: TrainChartHistory = {
   speedPosition: [],
   positionTime: [],
   voltagePosition: [],
+  resistanceTime: [],
+  tractionEnergyTime: [],
+  regenEnergyTime: [],
 };
 
 export const EMPTY_CHART_HISTORY: ChartHistory = {
@@ -26,6 +29,9 @@ function trimHistory(history: TrainChartHistory): TrainChartHistory {
     speedPosition: history.speedPosition.slice(-MAX_POINTS),
     positionTime: history.positionTime.slice(-MAX_POINTS),
     voltagePosition: history.voltagePosition.slice(-MAX_POINTS),
+    resistanceTime: history.resistanceTime.slice(-MAX_POINTS),
+    tractionEnergyTime: history.tractionEnergyTime.slice(-MAX_POINTS),
+    regenEnergyTime: history.regenEnergyTime.slice(-MAX_POINTS),
   };
 }
 
@@ -46,6 +52,8 @@ export function appendChartHistory(
 
   const byTrain = { ...history.byTrain };
   const t = snapshot.clock.elapsed;
+  const tractionKwh = snapshot.power.total_consumption;
+  const regenKwh = snapshot.power.total_regeneration;
 
   for (const train of snapshot.trains) {
     const prev = byTrain[train.id] ?? EMPTY_TRAIN_CHART_HISTORY;
@@ -56,6 +64,9 @@ export function appendChartHistory(
       speedPosition: [...prev.speedPosition, [train.position, train.speed]],
       positionTime: [...prev.positionTime, [t, train.position]],
       voltagePosition: [...prev.voltagePosition, [train.position, train.pantograph_voltage]],
+      resistanceTime: [...prev.resistanceTime, [t, train.total_resistance / 1000]],
+      tractionEnergyTime: [...prev.tractionEnergyTime, [t, tractionKwh]],
+      regenEnergyTime: [...prev.regenEnergyTime, [t, regenKwh]],
     });
   }
 

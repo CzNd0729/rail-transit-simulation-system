@@ -1,35 +1,54 @@
 /**
- * ResistanceChart — 阻力分解图
- * 基于《需求文档》UI-VHC-04（迭代三）
- * 堆叠面积图或柱状图，展示各阻力分量占比
+ * ResistanceChart — 总阻力-时间曲线（UI-VHC-04 降级版）
+ * 后端未推送四分项时展示 totalResistance 时序；完整分解留迭代三
  */
+import ReactECharts from 'echarts-for-react';
+import { useSimulationState } from '../../../context/SimulationContext';
+import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
+import { axisTooltip } from '../../../utils/format';
+
 export default function ResistanceChart() {
-  // TODO: 迭代三实现
-  // 展示 Davis 基本阻力、坡度附加阻力、弯道附加阻力、隧道空气阻力的分解
+  const { clock } = useSimulationState();
+  const chartHistory = useActiveChartHistory();
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'axis' as const, formatter: axisTooltip(1) },
+    grid: { left: 50, right: 20, top: 20, bottom: 40 },
+    xAxis: {
+      type: 'value' as const,
+      name: '时间 (s)',
+      max: chartHistory.resistanceTime.length > 0
+        ? Math.max(clock.elapsed + 10, chartHistory.resistanceTime.at(-1)?.[0] ?? 0 + 10)
+        : 600,
+      nameTextStyle: { color: '#a0a0a0' },
+      axisLabel: { color: '#a0a0a0' },
+      axisLine: { lineStyle: { color: '#2a2a4a' } },
+    },
+    yAxis: {
+      type: 'value' as const,
+      name: '总阻力 (kN)',
+      nameTextStyle: { color: '#a0a0a0' },
+      axisLabel: { color: '#a0a0a0' },
+      axisLine: { lineStyle: { color: '#2a2a4a' } },
+    },
+    series: [
+      {
+        name: '总阻力',
+        type: 'line',
+        showSymbol: false,
+        data: chartHistory.resistanceTime,
+        lineStyle: { color: '#fa8c16', width: 2 },
+        itemStyle: { color: '#fa8c16' },
+        areaStyle: { color: 'rgba(250, 140, 22, 0.08)' },
+      },
+    ],
+  };
+
   return (
     <div className="panel" style={{ height: '100%' }}>
-      <div className="panel-title">📊 阻力分解</div>
-      <div style={styles.placeholder}>
-        <span>阻力分解图将在迭代三实现</span>
-        <span style={styles.hint}>Davis阻力 / 坡度阻力 / 弯道阻力 / 隧道阻力</span>
-      </div>
+      <div className="panel-title">📊 总阻力-时间</div>
+      <ReactECharts option={option} style={{ height: 'calc(100% - 30px)' }} notMerge />
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  placeholder: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 'calc(100% - 30px)',
-    color: 'var(--text-secondary)',
-    fontSize: '13px',
-    gap: '8px',
-  },
-  hint: {
-    fontSize: '11px',
-    opacity: 0.7,
-  },
-};

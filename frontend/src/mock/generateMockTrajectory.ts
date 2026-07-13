@@ -1,6 +1,14 @@
 import { MA_ENVELOPE_LENGTH } from '../utils/constants';
 import { MOCK_STATIONS, getSegmentAt } from './mockTrackBlueprint';
-import { computeMass, computeAcceleration, msToKmh, kmhToMs } from './mockDynamics';
+import {
+  computeMass,
+  computeAcceleration,
+  computeDavisResistance,
+  computeGradeResistance,
+  lookupTractionForce,
+  kmhToMs,
+  msToKmh,
+} from './mockDynamics';
 import { decideMode, PLATFORM_HALF_LENGTH } from './mockThreeStage';
 import type { MockReplayFrame, MockSimInput, TrainMode, TimetableDeviationEntry } from '../types/simulation';
 
@@ -8,6 +16,8 @@ const ATP_OVERSPEED_MARGIN = 0.05;
 
 const DT = 0.1;
 const MAX_STEPS = 60_000;
+const REGEN_EFFICIENCY = 0.3;
+const JOULES_PER_KWH = 3_600_000;
 
 function signalFrameFields(
   mode: TrainMode,
@@ -65,6 +75,8 @@ function appendDwellFrames(
   passengerCount: number,
   prevAccel: number,
   speedLimit: number,
+  tractionEnergyKwh: number,
+  regenEnergyKwh: number,
 ): { t: number; prevAccel: number } {
   const dwellSteps = Math.round(dwellTime / DT);
   const mockDelay = arrivedStation.id === 'ST02' ? 2.5 : 0;
@@ -91,6 +103,11 @@ function appendDwellFrames(
       passenger_count: passengerCount,
       pantograph_voltage: 1500,
       power_demand: 0,
+      traction_force: 0,
+      brake_force: 0,
+      total_resistance: 0,
+      traction_energy_kwh: tractionEnergyKwh,
+      regen_energy_kwh: regenEnergyKwh,
       ...signalFrameFields('coasting', 0, stationChainage, targetStation, speedLimit, timetableDeviation),
     });
     accel = 0;
@@ -109,6 +126,8 @@ export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
   let speedKmh = 0;
   let stationIdx = 0;
   let prevAccel = 0;
+  let tractionEnergyJ = 0;
+  let regenEnergyJ = 0;
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const nextStation = MOCK_STATIONS[stationIdx + 1];
@@ -149,6 +168,18 @@ export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
 
     const jerk = DT > 0 ? (acceleration - prevAccel) / DT : 0;
 
+    const vMs = kmhToMs(speedKmh);
+    const totalResistance = computeDavisResistance(vMs, mass, input.vehicle)
+      + computeGradeResistance(gradient, mass);
+    const tractionForce = mode === 'traction' ? lookupTractionForce(speedKmh, input.vehicle) : 0;
+    const brakeForce = mode === 'braking' ? input.vehicle.max_brake_force : 0;
+    if (tractionForce > 0 && vMs > 0) {
+      tractionEnergyJ += tractionForce * vMs * DT;
+    }
+    if (brakeForce > 0 && vMs > 0) {
+      regenEnergyJ += brakeForce * vMs * REGEN_EFFICIENCY * DT;
+    }
+
     frames.push({
       t: Math.round(t * 10) / 10,
       position: Math.round(position * 10) / 10,
@@ -160,11 +191,15 @@ export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
       passenger_count: passengerCount,
       pantograph_voltage: 1500,
       power_demand: mode === 'traction' ? 3200 : 0,
+      traction_force: tractionForce,
+      brake_force: brakeForce,
+      total_resistance: totalResistance,
+      traction_energy_kwh: tractionEnergyJ / JOULES_PER_KWH,
+      regen_energy_kwh: regenEnergyJ / JOULES_PER_KWH,
       ...signalFrameFields(mode, speedKmh, position, nextStation, speedLimit),
     });
     prevAccel = acceleration;
 
-    const vMs = kmhToMs(speedKmh);
     const vNext = Math.max(0, vMs + acceleration * DT);
     speedKmh = msToKmh(vNext);
     position += ((kmhToMs(speedKmh) + vMs) / 2) * DT;
@@ -186,6 +221,8 @@ export function generateMockTrajectory(input: MockSimInput): MockReplayFrame[] {
         passengerCount,
         prevAccel,
         speedLimit,
+        tractionEnergyJ / JOULES_PER_KWH,
+        regenEnergyJ / JOULES_PER_KWH,
       );
       t = dwell.t;
       prevAccel = dwell.prevAccel;

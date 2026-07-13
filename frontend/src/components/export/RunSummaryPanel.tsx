@@ -1,5 +1,5 @@
 import { useSimulationState } from '../../context/SimulationContext';
-import { formatSimTime } from '../../utils/format';
+import { formatEnergy, formatSimTime } from '../../utils/format';
 
 export default function RunSummaryPanel() {
   const { runState, stats } = useSimulationState();
@@ -23,6 +23,18 @@ export default function RunSummaryPanel() {
         <span style={styles.label}>最高速度</span>
         <span style={styles.value}>{stats.max_speed.toFixed(1)} km/h</span>
       </div>
+      {stats.total_energy_consumption > 0 && (
+        <div style={styles.row}>
+          <span style={styles.label}>牵引能耗</span>
+          <span style={styles.value}>{formatEnergy(stats.total_energy_consumption)}</span>
+        </div>
+      )}
+      {stats.total_regeneration > 0 && (
+        <div style={styles.row}>
+          <span style={styles.label}>再生电量</span>
+          <span style={styles.value}>{formatEnergy(stats.total_regeneration)}</span>
+        </div>
+      )}
     </div>
   );
 }
