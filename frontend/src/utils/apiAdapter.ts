@@ -48,6 +48,10 @@ function mapTrain(t: ApiSimulationSnapshot['trains'][0]): TrainState {
     traction_force: t.tractionForce ?? 0,
     brake_force: t.brakeForce ?? 0,
     total_resistance: t.totalResistance ?? 0,
+    davis_resistance: t.davisResistance ?? 0,
+    gradient_resistance: t.gradientResistance ?? 0,
+    curve_resistance: t.curveResistance ?? 0,
+    tunnel_resistance: t.tunnelResistance ?? 0,
   };
 }
 

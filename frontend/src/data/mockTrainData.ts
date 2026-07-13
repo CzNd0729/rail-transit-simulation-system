@@ -61,5 +61,9 @@ export function useMockTrain(): TrainState {
     traction_force: 0,
     brake_force: 0,
     total_resistance: 0,
+    davis_resistance: 0,
+    gradient_resistance: 0,
+    curve_resistance: 0,
+    tunnel_resistance: 0,
   };
 }

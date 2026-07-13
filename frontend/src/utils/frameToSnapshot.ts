@@ -28,6 +28,18 @@ function resolveMaEndChainage(frame: MockReplayFrame): number {
   return Math.min(frame.position + safety, MOCK_LINE_TOTAL_LENGTH);
 }
 
+function splitMockResistance(total: number) {
+  if (total <= 0) {
+    return { davis: 0, gradient: 0, curve: 0, tunnel: 0 };
+  }
+  return {
+    davis: total * 0.6,
+    gradient: total * 0.25,
+    curve: total * 0.1,
+    tunnel: total * 0.05,
+  };
+}
+
 export function frameToSnapshot(
   frame: MockReplayFrame,
   speedMultiplier: SpeedMultiplier = 1,
@@ -39,6 +51,8 @@ export function frameToSnapshot(
   const permanentLimit = frame.permanent_speed_limit ?? DEFAULT_SPEED_LIMIT;
   const atpLimit = frame.atp_speed_limit
     ?? permanentLimit * (1 - ATP_OVERSPEED_MARGIN);
+  const totalResistance = frame.total_resistance ?? 0;
+  const resistanceParts = splitMockResistance(totalResistance);
 
   return {
     clock: { elapsed: frame.t, speed_multiplier: speedMultiplier },
@@ -60,7 +74,11 @@ export function frameToSnapshot(
       fault_alarm: null,
       traction_force: frame.traction_force ?? 0,
       brake_force: frame.brake_force ?? 0,
-      total_resistance: frame.total_resistance ?? 0,
+      total_resistance: totalResistance,
+      davis_resistance: resistanceParts.davis,
+      gradient_resistance: resistanceParts.gradient,
+      curve_resistance: resistanceParts.curve,
+      tunnel_resistance: resistanceParts.tunnel,
     }],
     power: {
       substations: [],

@@ -125,6 +125,10 @@ export interface TrainState {
   traction_force: number;      // 当前牵引力 (N)
   brake_force: number;         // 当前制动力 (N)
   total_resistance: number;    // 当前总阻力 (N)
+  davis_resistance: number;    // Davis 基本阻力 (N)
+  gradient_resistance: number; // 坡度附加阻力 (N)
+  curve_resistance: number;    // 弯道附加阻力 (N)
+  tunnel_resistance: number;   // 隧道附加阻力 (N)
 }
 
 /** 故障告警 */
@@ -331,6 +335,10 @@ export interface TrainChartHistory {
   positionTime: [number, number][];    // [时间s, 位置m] — UI-SIG-03 运行图
   voltagePosition: [number, number][]; // [位置m, 网压V] — UI-PWR-01 电压分布
   resistanceTime: [number, number][];  // [时间s, 总阻力kN] — UI-VHC-04
+  davisResistanceTime: [number, number][];    // [时间s, Davis阻力kN]
+  gradientResistanceTime: [number, number][]; // [时间s, 坡度阻力kN]
+  curveResistanceTime: [number, number][];    // [时间s, 弯道阻力kN]
+  tunnelResistanceTime: [number, number][];   // [时间s, 隧道阻力kN]
   tractionEnergyTime: [number, number][]; // [时间s, 牵引能耗kWh] — UI-VHC-05
   regenEnergyTime: [number, number][];    // [时间s, 再生电量kWh] — UI-VHC-05
 }
@@ -470,6 +478,10 @@ export interface ApiTrainState {
   tractionForce?: number;
   brakeForce?: number;
   totalResistance?: number;
+  davisResistance?: number;
+  gradientResistance?: number;
+  curveResistance?: number;
+  tunnelResistance?: number;
 }
 
 export interface ApiControlCommand {

@@ -235,3 +235,28 @@ describe('parseSimulationSummary', () => {
     });
   });
 });
+
+describe('parseServerSnapshot resistance breakdown', () => {
+  it('maps davis/gradient/curve/tunnel from backend', () => {
+    const raw = {
+      clock: { elapsed: 5, speedMultiplier: 1 as const },
+      trains: [{
+        id: 'T1', position: 100, speed: 40, acceleration: 0.2,
+        mode: 'traction' as const, mass: 200000, passengerCount: 0,
+        pantographVoltage: 1500, powerDemand: 500, doorStatus: 'closed' as const,
+        distanceToStation: 0, targetStationId: '', faultAlarm: null,
+        totalResistance: 18000, davisResistance: 10000, gradientResistance: 5000,
+        curveResistance: 2000, tunnelResistance: 1000,
+      }],
+      power: { substations: [], voltageProfile: [], totalConsumption: 1, totalRegeneration: 0 },
+      signaling: { controlCommands: [], emergencyBrakes: [] },
+      track: { occupancy: [], switchStates: [] },
+      events: [],
+    };
+    const train = parseServerSnapshot(raw).trains[0];
+    expect(train.davis_resistance).toBe(10000);
+    expect(train.gradient_resistance).toBe(5000);
+    expect(train.curve_resistance).toBe(2000);
+    expect(train.tunnel_resistance).toBe(1000);
+  });
+});

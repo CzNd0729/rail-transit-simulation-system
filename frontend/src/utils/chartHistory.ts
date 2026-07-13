@@ -8,6 +8,10 @@ export const EMPTY_TRAIN_CHART_HISTORY: TrainChartHistory = {
   positionTime: [],
   voltagePosition: [],
   resistanceTime: [],
+  davisResistanceTime: [],
+  gradientResistanceTime: [],
+  curveResistanceTime: [],
+  tunnelResistanceTime: [],
   tractionEnergyTime: [],
   regenEnergyTime: [],
 };
@@ -33,6 +37,10 @@ function trimHistory(history: TrainChartHistory): TrainChartHistory {
     positionTime: history.positionTime.slice(-MAX_POINTS),
     voltagePosition: history.voltagePosition,
     resistanceTime: history.resistanceTime.slice(-MAX_POINTS),
+    davisResistanceTime: history.davisResistanceTime.slice(-MAX_POINTS),
+    gradientResistanceTime: history.gradientResistanceTime.slice(-MAX_POINTS),
+    curveResistanceTime: history.curveResistanceTime.slice(-MAX_POINTS),
+    tunnelResistanceTime: history.tunnelResistanceTime.slice(-MAX_POINTS),
     tractionEnergyTime: history.tractionEnergyTime.slice(-MAX_POINTS),
     regenEnergyTime: history.regenEnergyTime.slice(-MAX_POINTS),
   };
@@ -68,6 +76,10 @@ export function appendChartHistory(
       positionTime: [...prev.positionTime, [t, train.position]],
       voltagePosition: [...prev.voltagePosition, [train.position, train.pantograph_voltage]],
       resistanceTime: [...prev.resistanceTime, [t, train.total_resistance / 1000]],
+      davisResistanceTime: [...prev.davisResistanceTime, [t, (train.davis_resistance ?? 0) / 1000]],
+      gradientResistanceTime: [...prev.gradientResistanceTime, [t, (train.gradient_resistance ?? 0) / 1000]],
+      curveResistanceTime: [...prev.curveResistanceTime, [t, (train.curve_resistance ?? 0) / 1000]],
+      tunnelResistanceTime: [...prev.tunnelResistanceTime, [t, (train.tunnel_resistance ?? 0) / 1000]],
       tractionEnergyTime: [...prev.tractionEnergyTime, [t, tractionKwh]],
       regenEnergyTime: [...prev.regenEnergyTime, [t, regenKwh]],
     });
