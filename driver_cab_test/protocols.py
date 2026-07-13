@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 # ====================================================================
-# PLC 协议编解码（文档 7.1 / 7.2 节，PLC 使用小端序）
+# PLC 协议编解码（文档 7.1 / 7.2 节，PLC 使用大端序）
 # ====================================================================
 
-# ---- PLC -> 上位机 (46字节, 小端序) ----
+# ---- PLC -> 上位机 (46字节, 大端序) ----
 
 # 字节 24 位定义 (指示灯/标志)
 PLC_BIT_24 = {
@@ -217,28 +217,28 @@ def pack_plc_to_upper(
     brake_level: int = 0,
 ) -> bytes:
     """
-    打包 PLC -> 上位机 报文（46字节，小端序）
+    打包 PLC -> 上位机 报文（46字节，大端序）
 
     协议定义见文档 7.1 节
     """
     data = bytearray(PLC_TO_UPPER_LEN)
 
-    # 固定头（PLC 使用小端序）
-    struct.pack_into("<I", data, 0, 0xAA55AA55)  # identify
-    struct.pack_into("<H", data, 4, PLC_TO_UPPER_LEN)  # total_len
-    struct.pack_into("<H", data, 6, 22)  # data_len
+    # 固定头（PLC 使用大端序）
+    struct.pack_into(">I", data, 0, 0xAA55AA55)  # identify
+    struct.pack_into(">H", data, 4, PLC_TO_UPPER_LEN)  # total_len
+    struct.pack_into(">H", data, 6, 22)  # data_len
 
     # 时间
-    struct.pack_into("<H", data, 8, year & 0xFFFF)
-    struct.pack_into("<H", data, 10, month & 0xFFFF)
-    struct.pack_into("<H", data, 12, day & 0xFFFF)
-    struct.pack_into("<H", data, 14, hour & 0xFFFF)
-    struct.pack_into("<H", data, 16, minute & 0xFFFF)
-    struct.pack_into("<H", data, 18, second & 0xFFFF)
+    struct.pack_into(">H", data, 8, year & 0xFFFF)
+    struct.pack_into(">H", data, 10, month & 0xFFFF)
+    struct.pack_into(">H", data, 12, day & 0xFFFF)
+    struct.pack_into(">H", data, 14, hour & 0xFFFF)
+    struct.pack_into(">H", data, 16, minute & 0xFFFF)
+    struct.pack_into(">H", data, 18, second & 0xFFFF)
 
     # 校验
-    struct.pack_into("<H", data, 20, verify_type & 0xFFFF)
-    struct.pack_into("<H", data, 22, verify_code & 0xFFFF)
+    struct.pack_into(">H", data, 20, verify_type & 0xFFFF)
+    struct.pack_into(">H", data, 22, verify_code & 0xFFFF)
 
     # 字节 24-25 BOOL 标志（单字节，字节序无关）
     data[24] = _encode_bits_byte(
@@ -253,7 +253,7 @@ def pack_plc_to_upper(
     )
 
     # 车辆速度
-    struct.pack_into("<H", data, 26, vehicle_speed & 0xFFFF)
+    struct.pack_into(">H", data, 26, vehicle_speed & 0xFFFF)
 
     # 字节 28-29 BOOL 标志
     data[28] = _encode_bits_byte(
@@ -270,8 +270,8 @@ def pack_plc_to_upper(
     )
 
     # 外部照明开关 / 门模式开关
-    struct.pack_into("<H", data, 30, light_switch & 0xFFFF)
-    struct.pack_into("<H", data, 32, door_mode_switch & 0xFFFF)
+    struct.pack_into(">H", data, 30, light_switch & 0xFFFF)
+    struct.pack_into(">H", data, 32, door_mode_switch & 0xFFFF)
 
     # 字节 34-35 BOOL 标志
     data[34] = _encode_bits_byte(
@@ -288,10 +288,10 @@ def pack_plc_to_upper(
     )
 
     # 方向手柄 / 主手柄 / 极位
-    struct.pack_into("<H", data, 36, dir_handle & 0xFFFF)
-    struct.pack_into("<H", data, 38, main_handle & 0xFFFF)
-    struct.pack_into("<H", data, 40, traction_level & 0xFFFF)
-    struct.pack_into("<H", data, 42, brake_level & 0xFFFF)
+    struct.pack_into(">H", data, 36, dir_handle & 0xFFFF)
+    struct.pack_into(">H", data, 38, main_handle & 0xFFFF)
+    struct.pack_into(">H", data, 40, traction_level & 0xFFFF)
+    struct.pack_into(">H", data, 42, brake_level & 0xFFFF)
 
     # 字节 44-45: 预留
     return bytes(data)
@@ -299,57 +299,57 @@ def pack_plc_to_upper(
 
 def parse_plc_to_upper(data: bytes) -> dict:
     """
-    解析 PLC -> 上位机 报文（46字节，小端序）
+    解析 PLC -> 上位机 报文（46字节，大端序）
 
     协议定义见文档 7.1 节
     """
     if len(data) < PLC_TO_UPPER_LEN:
         raise ValueError(f"PLC报文长度不足: {len(data)} < {PLC_TO_UPPER_LEN}")
 
-    identify = struct.unpack_from("<I", data, 0)[0]
-    total_len = struct.unpack_from("<H", data, 4)[0]
-    data_len = struct.unpack_from("<H", data, 6)[0]
+    identify = struct.unpack_from(">I", data, 0)[0]
+    total_len = struct.unpack_from(">H", data, 4)[0]
+    data_len = struct.unpack_from(">H", data, 6)[0]
 
     # 时间
-    year = struct.unpack_from("<H", data, 8)[0]
-    month = struct.unpack_from("<H", data, 10)[0]
-    day = struct.unpack_from("<H", data, 12)[0]
-    hour = struct.unpack_from("<H", data, 14)[0]
-    minute = struct.unpack_from("<H", data, 16)[0]
-    second = struct.unpack_from("<H", data, 18)[0]
+    year = struct.unpack_from(">H", data, 8)[0]
+    month = struct.unpack_from(">H", data, 10)[0]
+    day = struct.unpack_from(">H", data, 12)[0]
+    hour = struct.unpack_from(">H", data, 14)[0]
+    minute = struct.unpack_from(">H", data, 16)[0]
+    second = struct.unpack_from(">H", data, 18)[0]
 
     # 校验
-    verify_type = struct.unpack_from("<H", data, 20)[0]
-    verify_code = struct.unpack_from("<H", data, 22)[0]
+    verify_type = struct.unpack_from(">H", data, 20)[0]
+    verify_code = struct.unpack_from(">H", data, 22)[0]
 
     # BOOL 标志字节
     flags_24 = _decode_bits_byte(data[24], PLC_BIT_24)
     flags_25 = _decode_bits_byte(data[25], PLC_BIT_25)
 
     # 车辆速度 (WORD, 小端)
-    vehicle_speed = struct.unpack_from("<H", data, 26)[0]
+    vehicle_speed = struct.unpack_from(">H", data, 26)[0]
 
     flags_28 = _decode_bits_byte(data[28], PLC_BIT_28)
     flags_29 = _decode_bits_byte(data[29], PLC_BIT_29)
 
     # 外部照明开关 / 门模式开关
-    light_switch = struct.unpack_from("<H", data, 30)[0]
-    door_mode_switch = struct.unpack_from("<H", data, 32)[0]
+    light_switch = struct.unpack_from(">H", data, 30)[0]
+    door_mode_switch = struct.unpack_from(">H", data, 32)[0]
 
     flags_34 = _decode_bits_byte(data[34], PLC_BIT_34)
     flags_35 = _decode_bits_byte(data[35], PLC_BIT_35)
 
     # 方向手柄 / 主手柄 / 极位
-    dir_handle = struct.unpack_from("<H", data, 36)[0]
-    main_handle = struct.unpack_from("<H", data, 38)[0]
-    traction_level = struct.unpack_from("<H", data, 40)[0]
-    brake_level = struct.unpack_from("<H", data, 42)[0]
+    dir_handle = struct.unpack_from(">H", data, 36)[0]
+    main_handle = struct.unpack_from(">H", data, 38)[0]
+    traction_level = struct.unpack_from(">H", data, 40)[0]
+    brake_level = struct.unpack_from(">H", data, 42)[0]
     # 极位换算：1% = 256 (100% -> 25600)
     traction_level_pct = traction_level / 256.0
     brake_level_pct = brake_level / 256.0
 
     # 预留字节 44-45
-    reserved = struct.unpack_from("<H", data, 44)[0]
+    reserved = struct.unpack_from(">H", data, 44)[0]
 
     # 枚举映射
     light_str = LIGHT_SWITCH_MAP.get(light_switch, f"未知({light_switch})")
@@ -465,28 +465,28 @@ def pack_upper_to_plc(
     vehicle_speed: int = 0,
 ) -> bytes:
     """
-    打包 上位机 -> PLC 报文（28字节，小端序）
+    打包 上位机 -> PLC 报文（28字节，大端序）
 
     协议定义见文档 7.2 节
     """
     data = bytearray(UPPER_TO_PLC_LEN)
 
     # 固定头
-    struct.pack_into("<I", data, 0, 0x55AA55AA)  # identify (DWORD)
-    struct.pack_into("<H", data, 4, UPPER_TO_PLC_LEN)  # total_len
-    struct.pack_into("<H", data, 6, UPPER_TO_PLC_LEN - 24)  # data_len = 4
+    struct.pack_into(">I", data, 0, 0x55AA55AA)  # identify (DWORD)
+    struct.pack_into(">H", data, 4, UPPER_TO_PLC_LEN)  # total_len
+    struct.pack_into(">H", data, 6, UPPER_TO_PLC_LEN - 24)  # data_len = 4
 
     # 时间
-    struct.pack_into("<H", data, 8, year & 0xFFFF)
-    struct.pack_into("<H", data, 10, month & 0xFFFF)
-    struct.pack_into("<H", data, 12, day & 0xFFFF)
-    struct.pack_into("<H", data, 14, hour & 0xFFFF)
-    struct.pack_into("<H", data, 16, minute & 0xFFFF)
-    struct.pack_into("<H", data, 18, second & 0xFFFF)
+    struct.pack_into(">H", data, 8, year & 0xFFFF)
+    struct.pack_into(">H", data, 10, month & 0xFFFF)
+    struct.pack_into(">H", data, 12, day & 0xFFFF)
+    struct.pack_into(">H", data, 14, hour & 0xFFFF)
+    struct.pack_into(">H", data, 16, minute & 0xFFFF)
+    struct.pack_into(">H", data, 18, second & 0xFFFF)
 
     # 校验
-    struct.pack_into("<H", data, 20, verify_type & 0xFFFF)
-    struct.pack_into("<H", data, 22, verify_code & 0xFFFF)
+    struct.pack_into(">H", data, 20, verify_type & 0xFFFF)
+    struct.pack_into(">H", data, 22, verify_code & 0xFFFF)
 
     # 字节 24-25 BOOL 标志
     # 字节24: 同7.1字节24，但bit4=开门灯
@@ -504,42 +504,42 @@ def pack_upper_to_plc(
     )
 
     # 车辆速度 (WORD)
-    struct.pack_into("<H", data, 26, vehicle_speed & 0xFFFF)
+    struct.pack_into(">H", data, 26, vehicle_speed & 0xFFFF)
 
     return bytes(data)
 
 
 def parse_upper_to_plc(data: bytes) -> dict:
     """
-    解析 上位机 -> PLC 报文（28字节，小端序）
+    解析 上位机 -> PLC 报文（28字节，大端序）
 
     协议定义见文档 7.2 节
     """
     if len(data) < UPPER_TO_PLC_LEN:
         raise ValueError(f"上位机报文长度不足: {len(data)} < {UPPER_TO_PLC_LEN}")
 
-    identify = struct.unpack_from("<I", data, 0)[0]
-    total_len = struct.unpack_from("<H", data, 4)[0]
-    data_len = struct.unpack_from("<H", data, 6)[0]
+    identify = struct.unpack_from(">I", data, 0)[0]
+    total_len = struct.unpack_from(">H", data, 4)[0]
+    data_len = struct.unpack_from(">H", data, 6)[0]
 
     # 时间
-    year = struct.unpack_from("<H", data, 8)[0]
-    month = struct.unpack_from("<H", data, 10)[0]
-    day = struct.unpack_from("<H", data, 12)[0]
-    hour = struct.unpack_from("<H", data, 14)[0]
-    minute = struct.unpack_from("<H", data, 16)[0]
-    second = struct.unpack_from("<H", data, 18)[0]
+    year = struct.unpack_from(">H", data, 8)[0]
+    month = struct.unpack_from(">H", data, 10)[0]
+    day = struct.unpack_from(">H", data, 12)[0]
+    hour = struct.unpack_from(">H", data, 14)[0]
+    minute = struct.unpack_from(">H", data, 16)[0]
+    second = struct.unpack_from(">H", data, 18)[0]
 
     # 校验
-    verify_type = struct.unpack_from("<H", data, 20)[0]
-    verify_code = struct.unpack_from("<H", data, 22)[0]
+    verify_type = struct.unpack_from(">H", data, 20)[0]
+    verify_code = struct.unpack_from(">H", data, 22)[0]
 
     # BOOL 标志字节
     flags_24 = _decode_bits_byte(data[24], PLC_BIT_24)
     flags_25 = _decode_bits_byte(data[25], PLC_BIT_25)
 
     # 车辆速度 (WORD, 小端)
-    vehicle_speed = struct.unpack_from("<H", data, 26)[0]
+    vehicle_speed = struct.unpack_from(">H", data, 26)[0]
 
     result = {
         # 固定头
