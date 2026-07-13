@@ -1,9 +1,8 @@
-# 北京地铁4号线高峰参考运行图（v2）
-# 区间时分：50 km/h 均速 + track.yaml 站停时间
+# 北京地铁4号线平峰参考运行图（v2）
 timetable:
   meta:
     line_name: "北京地铁4号线"
-    profile: peak_reference
+    profile: offpeak_reference
     turnback_time_s: 150
     default_turnback_switch:
       down: SW04
@@ -14,7 +13,7 @@ timetable:
     origin_station: ST01
     initial_direction: down
     first_departure_s: 0
-    headway_s: 150
+    headway_s: 270
     max_active_trains: 40
     min_origin_clearance_m: 500
 
