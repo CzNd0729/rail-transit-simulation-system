@@ -20,10 +20,12 @@ from sim_engine.power.substation import Substation
 from sim_engine.signaling.atp import ATPController
 from sim_engine.signaling.ats import ATSController
 from sim_engine.signaling.manual_drive import ManualDriveController
-from sim_engine.signaling.models import MaProfile, SafetyStatus, Timetable, TimetableEntry
+from sim_engine.signaling.fleet_scheduler import FleetScheduler
+from sim_engine.signaling.models import MaProfile, SafetyStatus, ServiceTimetable, Timetable, TimetableEntry
 from sim_engine.signaling.three_stage import ThreeStageController
-from sim_engine.signaling.timetable_loader import load_timetable
+from sim_engine.signaling.timetable_loader import load_service_timetable, load_timetable, materialize_trip_timetables
 from sim_engine.signaling.train_following import is_interval_safe, tracking_gap
+from sim_engine.signaling.turnback import TurnbackController
 from sim_engine.track.config import load_track
 from sim_engine.track.occupancy import OccupancyDetector
 from sim_engine.track.switch import SwitchManager
@@ -79,6 +81,9 @@ class TrainRun:
     active: bool = False
     direction: str = "up"
     last_step: StepResult | None = None
+    legs: list[Timetable] = field(default_factory=list)
+    leg_index: int = 0
+    turnback_state: str | None = None
 
 
 @dataclass
@@ -96,6 +101,10 @@ class Orchestrator:
     recorder: DataRecorder = field(default_factory=DataRecorder)
     trains: list[TrainRun] = field(default_factory=list)
     _timetable_path: Path = field(default_factory=lambda: CONFIG_DIR / "timetable.yaml")
+    _service_timetable: ServiceTimetable | None = None
+    _fleet_scheduler: FleetScheduler | None = None
+    _turnback: TurnbackController | None = None
+    _passenger_load: float = 0.6
     run_state: RunState = RunState.IDLE
     last_snapshot: dict | None = None
     _on_snapshot: Callable[[dict], None] | None = None
@@ -175,10 +184,30 @@ class Orchestrator:
             switch_manager=switch_manager,
             _timetable_path=config_dir / "timetable.yaml",
         )
+        orch._service_timetable = load_service_timetable(orch._timetable_path)
+        if orch._is_continuous():
+            orch._fleet_scheduler = FleetScheduler(orch._service_timetable)
+            orch._turnback = TurnbackController(orch._service_timetable)
         orch._init_trains()
         return orch
 
+    def _is_continuous(self) -> bool:
+        return (
+            self._service_timetable is not None
+            and self._service_timetable.dispatch.mode == "continuous"
+        )
+
     def _init_trains(self, passenger_load: float = 0.6) -> None:
+        """continuous 模式空车队；fixed 模式按 train_count 预创建。"""
+        self._passenger_load = passenger_load
+        if self._is_continuous():
+            self.trains = []
+            if self._fleet_scheduler is not None:
+                self._fleet_scheduler.reset()
+            return
+        self._init_trains_fixed(passenger_load)
+
+    def _init_trains_fixed(self, passenger_load: float = 0.6) -> None:
         """按 train_count / departure_interval / bidirectional 创建各列车运行单元。"""
         base_tt = load_timetable(self._timetable_path)
         interval = self.sim_params.departure_interval
@@ -225,6 +254,45 @@ class Orchestrator:
                     )
                 )
 
+    def _create_train_run(self, train_id: str, spawn_time: float) -> TrainRun:
+        """continuous 模式动态创建列车（down→up 交路）。"""
+        assert self._service_timetable is not None
+        legs = materialize_trip_timetables(self._service_timetable, train_id)
+        direction = self._service_timetable.dispatch.initial_direction
+        total_length = self.track.track.total_length
+        start_pos = _start_chainage(direction, total_length)
+        abs_tt = legs[0].with_absolute_times(spawn_time)
+        ats = ATSController(self.sim_params.signal.ats, abs_tt)
+        signaling = ThreeStageController(
+            self.track, self.vehicle.params, self.sim_params, ats=ats
+        )
+        signaling.reset(direction=direction)
+        return TrainRun(
+            train_id=train_id,
+            state=self.vehicle.create_initial_state(
+                position=start_pos,
+                passenger_load=self._passenger_load,
+                direction=direction,
+            ),
+            signaling=signaling,
+            ats=ats,
+            manual_driver=ManualDriveController(),
+            spawn_time=spawn_time,
+            active=True,
+            direction=direction,
+            legs=legs,
+            leg_index=0,
+        )
+
+    def _tick_continuous_dispatch(self, elapsed: float) -> None:
+        assert self._fleet_scheduler is not None
+
+        def create_run(train_id: str, spawn_time: float) -> None:
+            self.trains.append(self._create_train_run(train_id, spawn_time))
+
+        active = [r for r in self.trains if r.active]
+        self._fleet_scheduler.tick(elapsed, active, create_run)
+
     def set_snapshot_callback(self, callback: Callable[[dict], None]) -> None:
         """注册每步快照回调（供 WebSocket 推送层使用）。"""
         self._on_snapshot = callback
@@ -248,7 +316,11 @@ class Orchestrator:
         self.last_snapshot = None
 
     def start(self, passenger_load: float = 0.6) -> None:
-        if self.train_state is None:
+        if not self.trains and not self._is_continuous():
+            self.reset(passenger_load)
+        elif self._is_continuous() and self.run_state == RunState.IDLE:
+            self.reset(passenger_load)
+        elif self.train_state is None:
             self.reset(passenger_load)
         self.run_state = RunState.RUNNING
 
@@ -361,16 +433,24 @@ class Orchestrator:
 
     def step_once(self) -> dict | None:
         """推进一个仿真步（ENG-06 单步调试）。暂停/空闲时也可强制调用。"""
-        if not self.trains:
-            self.reset()
-        assert self.trains
+        if self._service_timetable is None:
+            self._service_timetable = load_service_timetable(self._timetable_path)
+            if self._is_continuous():
+                self._fleet_scheduler = FleetScheduler(self._service_timetable)
+                self._turnback = TurnbackController(self._service_timetable)
 
         dt = self.clock.time_step
         elapsed = self.clock.elapsed
-        self._spawn_trains(elapsed)
+        if self._is_continuous():
+            self._tick_continuous_dispatch(elapsed)
+        else:
+            if not self.trains:
+                self._init_trains_fixed(self._passenger_load)
+            self._spawn_trains(elapsed)
 
         active_runs = [r for r in self.trains if r.active]
         if not active_runs:
+            self.clock.tick()
             return None
 
         step_outputs: list[
@@ -383,6 +463,16 @@ class Orchestrator:
             sorted_runs = sorted(dir_runs, key=lambda r: r.state.position)
             for i, run in enumerate(sorted_runs):
                 leading_pos = _leading_chainage(sorted_runs, i, direction)
+                if (
+                    self._turnback is not None
+                    and run.turnback_state is not None
+                    and self._turnback.step(run, elapsed, self.switch_manager, dt)
+                ):
+                    continue
+                if self._turnback is not None and self._turnback.at_terminal_dwell(run):
+                    if run.leg_index + 1 < len(run.legs) and run.turnback_state is None:
+                        self._turnback.step(run, elapsed, self.switch_manager, dt)
+                        continue
                 result, cmd, speed_limit, ma, timetable_dev, power_demand = self._step_train(
                     run, dt, elapsed, leading_pos=leading_pos, direction=direction
                 )

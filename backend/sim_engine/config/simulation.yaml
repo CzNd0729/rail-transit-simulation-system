@@ -1,10 +1,10 @@
 simulation:
-  bidirectional: true
+  bidirectional: false
   coasting_min_speed: 30.0
   departure_interval: 120.0
   speed_multiplier: 1
   station_stop_tolerance: 1.0
   target_speed_ratio: 0.8
   time_step: 0.1
-  total_time: 6000
+  total_time: 600
   train_count: 3
