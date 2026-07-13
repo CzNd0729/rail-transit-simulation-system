@@ -670,10 +670,11 @@ def test_slew_rate_limits_level_jump():
 def test_full_run_jerk_mostly_within_comfort_limit():
     """全程仿真中冲击率尖峰应极少且幅度受控。"""
     from sim_engine.orchestrator import Orchestrator
+    from tests.conftest import use_fixed_legacy_timetable
 
     orch = Orchestrator.from_config_dir()
     orch.sim_params.train_count = 1
-    orch.reset()
+    use_fixed_legacy_timetable(orch)
     orch.start()
     limit = orch.sim_params.pid.max_jerk
     over_soft = 0

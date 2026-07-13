@@ -5,8 +5,14 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from sim_engine.app import app
+from tests.conftest import use_fixed_legacy_timetable
 
 client = TestClient(app)
+
+# API 集成测试使用 legacy 固定车队（与单车回归一致）
+from sim_engine.app import sim_manager as _sim_manager
+
+use_fixed_legacy_timetable(_sim_manager.orchestrator)
 
 
 def test_health():
@@ -233,6 +239,7 @@ def test_update_signal_param():
 def test_update_track_segment_params():
     """迭代一 UI-PARAM-02：按区段 ID 更新坡度。"""
     client.post("/api/v1/simulation/reset")
+    use_fixed_legacy_timetable(_sim_manager.orchestrator)
     resp = client.put("/api/v1/params", json={
         "track": {"segmentId": "SEC02", "gradient": 30},
     })

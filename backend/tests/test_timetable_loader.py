@@ -8,11 +8,18 @@ from sim_engine.signaling.timetable_loader import load_timetable
 
 
 def test_load_timetable():
-    path = Path(__file__).resolve().parents[1] / "sim_engine/config/timetable.yaml"
+    path = Path(__file__).resolve().parents[1] / "sim_engine/config/timetable_legacy.yaml"
     tt = load_timetable(path)
     assert tt.train_id == "TRAIN_01"
     assert tt.planned_arrival("ST02") == 90.0
     assert len(tt.entries) == 3
+
+
+def test_load_peak_timetable_v2():
+    path = Path(__file__).resolve().parents[1] / "sim_engine/config/timetable.yaml"
+    tt = load_timetable(path)
+    assert tt.planned_arrival("ST02") == 114.0
+    assert len(tt.entries) == 24
 
 
 def test_load_timetable_flat_root(tmp_path):

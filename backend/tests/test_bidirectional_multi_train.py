@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 from sim_engine.orchestrator import Orchestrator
+from tests.conftest import use_fixed_legacy_timetable
 
 
-def test_bidirectional_creates_six_trains():
+def _bidir_orch() -> Orchestrator:
     orch = Orchestrator.from_config_dir()
     orch.sim_params.bidirectional = True
     orch.sim_params.train_count = 3
-    orch.reset()
+    use_fixed_legacy_timetable(orch)
+    return orch
+
+
+def test_bidirectional_creates_six_trains():
+    orch = _bidir_orch()
 
     assert len(orch.trains) == 6
     down_ids = [t.train_id for t in orch.trains if t.direction == "down"]
@@ -19,10 +25,7 @@ def test_bidirectional_creates_six_trains():
 
 
 def test_bidirectional_first_train_per_direction_active():
-    orch = Orchestrator.from_config_dir()
-    orch.sim_params.bidirectional = True
-    orch.sim_params.train_count = 3
-    orch.reset()
+    orch = _bidir_orch()
 
     down = [t for t in orch.trains if t.direction == "down"]
     up = [t for t in orch.trains if t.direction == "up"]
@@ -33,10 +36,7 @@ def test_bidirectional_first_train_per_direction_active():
 
 
 def test_bidirectional_snapshot_has_both_directions():
-    orch = Orchestrator.from_config_dir()
-    orch.sim_params.bidirectional = True
-    orch.sim_params.train_count = 3
-    orch.reset()
+    orch = _bidir_orch()
     orch.start()
     snap = orch.step_once()
     directions = {t["direction"] for t in snap["data"]["trains"]}

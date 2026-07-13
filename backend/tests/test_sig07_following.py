@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sim_engine.orchestrator import Orchestrator
+from tests.conftest import use_fixed_legacy_timetable
 
 
 def test_interval_violation_triggers_eb_on_following_train():
@@ -12,10 +13,12 @@ def test_interval_violation_triggers_eb_on_following_train():
     orch.sim_params.train_count = 2
     orch.sim_params.departure_interval = 0.0
     orch.sim_params.signal.following_min_interval = 500.0
-    orch.reset()
+    use_fixed_legacy_timetable(orch)
     orch.trains[0].active = True
     orch.trains[1].active = True
     orch.trains[0].state.position = 2000.0
+    orch.trains[0].state.direction = "down"
+    orch.trains[1].state.direction = "down"
     orch.trains[0].state.speed = 40.0
     orch.trains[1].state.position = 1600.0  # 间隔 400m < 500m
     orch.trains[1].state.speed = 40.0

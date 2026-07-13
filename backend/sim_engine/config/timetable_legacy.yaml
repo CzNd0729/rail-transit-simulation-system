@@ -1,0 +1,13 @@
+# 迭代一/二兼容：单车三站时刻表（fixed 模式 fallback）
+timetable:
+  train_id: TRAIN_01
+  entries:
+    - station_id: ST01
+      planned_arrival: 0
+      planned_departure: 30
+    - station_id: ST02
+      planned_arrival: 90
+      planned_departure: 120
+    - station_id: ST03
+      planned_arrival: 180
+      planned_departure: 210
