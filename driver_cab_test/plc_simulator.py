@@ -206,7 +206,7 @@ class PlcSimulator:
             time.sleep(SIM_CYCLE_INTERVAL)
 
     def _build_packet(self) -> bytes:
-        """构建当前状态报文（文档 7.1 节 46字节大端序）"""
+        """构建当前状态报文（文档 7.1 节 46字节小端序）"""
         return pack_plc_to_upper(
             year=self.year, month=self.month, day=self.day,
             hour=self.hour, minute=self.minute, second=self.second,
@@ -514,7 +514,7 @@ def run_plc_simulator(port: int = PLC_PORT_A, local_only: bool = False, interact
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="PLC 模拟器（文档 7.1 节 46字节大端序）")
+    parser = argparse.ArgumentParser(description="PLC 模拟器（文档 7.1 节 46字节小端序）")
     parser.add_argument("--port", type=int, default=PLC_PORT_A, help="监听端口")
     parser.add_argument("--local", action="store_true", help="仅绑定 127.0.0.1（无真实硬件时使用）")
     parser.add_argument("--interactive", "-i", action="store_true", help="交互模式（默认后台运行）")
