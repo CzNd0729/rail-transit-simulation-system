@@ -21,6 +21,39 @@ if _backend not in sys.path:
 import uvicorn
 
 
+def _configure_logging(level: str) -> None:
+    """配置 root logger，让所有桥接等模块的日志也输出到控制台。"""
+    logging.basicConfig(
+        level=getattr(logging, level.upper(), logging.INFO),
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
+
+def _print_banner(args: argparse.Namespace) -> None:
+    """打印启动横幅（服务地址、外部设备目标等）。"""
+    bind_addr = f"{args.host}:{args.port}"
+    if args.external:
+        print("=" * 60)
+        print("  外部系统模式已启用")
+        print(f"  ─────────────────────────────────────────")
+        print(f"  本机服务         {bind_addr}")
+        print(f"  WebSocket 端点   ws://{bind_addr}/ws")
+        print(f"  API 文档         http://{bind_addr}/docs")
+        print(f"  ─────────────────────────────────────────")
+        print(f"  PLC:            192.168.100.123:8001")
+        print(f"  网络屏 (HMI):   192.168.100.121:8888")
+        print(f"  信号屏 (MMI):   192.168.100.122:9999")
+        print(f"  UDP 总控:       192.168.200.110:23001 → 192.168.200.102:23002")
+        print("=" * 60)
+    else:
+        print("=" * 60)
+        print(f"  常规模式 — 仅提供 REST API + WebSocket 对接前端")
+        print(f"  本机服务: {bind_addr}")
+        print(f"  API 文档: http://{bind_addr}/docs")
+        print("=" * 60)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="城市轨道交通运行仿真系统 — 后端服务",
@@ -52,30 +85,15 @@ def main():
 
     args = parser.parse_args()
 
-    bind_addr = f"{args.host}:{args.port}"
+    # 配置 Python logging，确保桥接等模块的日志也输出到控制台
+    _configure_logging(args.log_level)
+    # 打印启动横幅
+    _print_banner(args)
 
-    if args.external:
-        print("=" * 60)
-        print("  外部系统模式已启用")
-        print(f"  ─────────────────────────────────────────")
-        print(f"  本机服务         {bind_addr}")
-        print(f"  WebSocket 端点   ws://{bind_addr}/ws")
-        print(f"  API 文档         http://{bind_addr}/docs")
-        print(f"  ─────────────────────────────────────────")
-        print(f"  PLC:            192.168.100.123:8001")
-        print(f"  网络屏 (HMI):   192.168.100.121:8888")
-        print(f"  信号屏 (MMI):   192.168.100.122:9999")
-        print(f"  UDP 总控:       192.168.200.110:23001 → 192.168.200.102:23002")
-        print("=" * 60)
-    else:
-        print("=" * 60)
-        print(f"  常规模式 — 仅提供 REST API + WebSocket 对接前端")
-        print(f"  本机服务: {bind_addr}")
-        print(f"  API 文档: http://{bind_addr}/docs")
-        print("=" * 60)
-
-    # 通过环境变量传递 external_mode 给 app.py
+    # 通过环境变量传递 external_mode / host / port 给 app.py
     os.environ["SIM_ENGINE_EXTERNAL"] = "1" if args.external else "0"
+    os.environ["SIM_ENGINE_HOST"] = args.host
+    os.environ["SIM_ENGINE_PORT"] = str(args.port)
 
     uvicorn.run(
         "sim_engine.app:app",

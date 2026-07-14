@@ -395,8 +395,37 @@ class HmiBridge:
             self._connected = True
             logger.info(f"网络屏已连接: {self.host}:{self.port}")
             return True
+        except socket.timeout:
+            msg = f"网络屏 {self.host}:{self.port} 连接超时 (>{CONNECT_TIMEOUT}s)"
+            logger.error(msg)
+            print(f"  ⚠ {msg}")
+            self.sock = None
+            self._connected = False
+            return False
+        except ConnectionRefusedError:
+            msg = f"网络屏 {self.host}:{self.port} 拒绝连接 (服务未启动?)"
+            logger.error(msg)
+            print(f"  ⚠ {msg}")
+            self.sock = None
+            self._connected = False
+            return False
+        except socket.gaierror as e:
+            msg = f"网络屏 {self.host}:{self.port} 地址解析失败: {e}"
+            logger.error(msg)
+            print(f"  ⚠ {msg}")
+            self.sock = None
+            self._connected = False
+            return False
+        except OSError as e:
+            msg = f"网络屏 {self.host}:{self.port} 连接异常 (OSError: {e})"
+            logger.error(msg)
+            print(f"  ⚠ {msg}")
+            self.sock = None
+            self._connected = False
+            return False
         except Exception as e:
             logger.error(f"网络屏连接失败 {self.host}:{self.port}: {e}")
+            print(f"  ⚠ 网络屏 {self.host}:{self.port} 未知错误: {e}")
             self.sock = None
             self._connected = False
             return False

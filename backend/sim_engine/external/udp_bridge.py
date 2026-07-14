@@ -147,8 +147,17 @@ class UdpBridge:
                 f"→ 远程 {self.remote_addr[0]}:{self.remote_addr[1]}"
             )
             return True
+        except OSError as e:
+            msg = f"UDP {self.local_addr[0]}:{self.local_addr[1]} 绑定失败: {e}"
+            logger.error(msg)
+            print(f"  ⚠ {msg}")
+            self.sock = None
+            self.running = False
+            return False
         except Exception as e:
-            logger.error(f"UDP 桥接启动失败: {e}")
+            msg = f"UDP 桥接启动失败: {e}"
+            logger.error(msg)
+            print(f"  ⚠ {msg}")
             self.sock = None
             self.running = False
             return False

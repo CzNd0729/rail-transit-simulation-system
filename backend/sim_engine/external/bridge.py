@@ -155,33 +155,68 @@ class ExternalBridge:
         Returns:
             dict: 各通道的连接结果 {"plc": bool, "hmi": bool, "mmi": bool, "udp": bool}
         """
-        results = {"plc": False, "hmi": False, "mmi": False, "udp": False}
+        results: dict[str, bool] = {"plc": False, "hmi": False, "mmi": False, "udp": False}
 
         if not self.use_real_hardware:
+            print("  ── 模拟模式配置 ──────────────────────────")
+            print(f"  PLC:      {self.plc.host}:{self.plc.port}  (模拟)")
+            print(f"  网络屏:   {self.hmi.host}:{self.hmi.port}  (模拟)")
+            print(f"  信号屏:   {self.mmi.host}:{self.mmi.port}  (模拟)")
+            print(f"  UDP 本地: {self.udp.local_addr[0]}:{self.udp.local_addr[1]}")
+            print(f"  UDP 远端: {self.udp.remote_addr[0]}:{self.udp.remote_addr[1]}")
+            print("  ─────────────────────────────────────────")
             logger.info("外部桥接: 模拟模式 (不连接真实外设)")
             self.running = True
             return results
 
+        print("  ── 连接外部系统 ────────────────────────────")
+
         # 连接 PLC
-        if self.plc.connect():
+        plc_ok = self._connect_one("PLC", self.plc, self.plc.host, self.plc.port)
+        if plc_ok:
             self.plc.start()
             results["plc"] = True
 
         # 连接网络屏
-        if self.hmi.connect():
+        hmi_ok = self._connect_one("网络屏", self.hmi, self.hmi.host, self.hmi.port)
+        if hmi_ok:
             results["hmi"] = True
 
         # 连接信号屏
-        if self.mmi.connect():
+        mmi_ok = self._connect_one("信号屏", self.mmi, self.mmi.host, self.mmi.port)
+        if mmi_ok:
             results["mmi"] = True
 
         # 启动 UDP
+        print(f"  UDP:      {self.udp.local_addr[0]}:{self.udp.local_addr[1]}"
+              f" → {self.udp.remote_addr[0]}:{self.udp.remote_addr[1]}", end="")
         if self.udp.start():
             results["udp"] = True
+            print("  ✓")
+        # udp.start() 内部已打印错误详情，此处不重复打印 ✗
 
+        print("  ─────────────────────────────────────────")
         self.running = True
         logger.info(f"外部桥接启动结果: {results}")
         return results
+
+    @staticmethod
+    def _connect_one(name: str, bridge, host: str, port: int) -> bool:
+        """连接单个外设，打印详细诊断信息。"""
+        import traceback
+        label = f"  {name:6s} {host}:{port}"
+        print(label, end="")
+        try:
+            ok = bridge.connect()
+            if ok:
+                print("  ✓")
+            # bridge.connect() 失败时内部已打印 logger.error
+            return ok
+        except Exception as e:
+            tb = traceback.format_exc()
+            print(f"  ✗ 异常: {e}")
+            logger.error(f"{name} 连接异常:\n{tb}")
+            return False
 
     def stop_all(self):
         """停止所有外设连接。"""
