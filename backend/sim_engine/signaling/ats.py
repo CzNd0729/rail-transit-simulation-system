@@ -30,7 +30,11 @@ class ATSController:
             else:
                 planned_dep = self._timetable.planned_departure(station_id)
                 if planned_dep is not None:
-                    adjusted = max(nominal_dwell, planned_dep - actual_arrival)
+                    hold = max(nominal_dwell, planned_dep - actual_arrival)
+                    # 早点 hold 不超过 nominal + early_hold_margin，避免系统性早点拖长站停
+                    adjusted = min(
+                        hold, nominal_dwell + self._config.early_hold_margin
+                    )
                 else:
                     adjusted = nominal_dwell - delay
         elif mode == "extend":

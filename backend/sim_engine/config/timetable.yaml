@@ -63,7 +63,7 @@ timetable:
       direction: up
       terminal_station: ST01
       entries:
-        - { station_id: ST24, planned_arrival: 0,    planned_departure: 150 }
+        - { station_id: ST24, planned_arrival: 0,    planned_departure: 35 }
         - { station_id: ST23, planned_arrival: 215,  planned_departure: 240 }
         - { station_id: ST22, planned_arrival: 298,  planned_departure: 323 }
         - { station_id: ST21, planned_arrival: 395,  planned_departure: 435 }

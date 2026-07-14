@@ -43,8 +43,18 @@ def test_late_clamped_by_min_dwell():
 def test_early_holds_to_planned_departure():
     ats = ATSController(AtsConfig(dwell_adjust_mode="recover", max_dwell_time=300.0), _tt())
     adjusted, _ = ats.adjust_dwell("ST02", nominal_dwell=30.0, actual_arrival=80.0)
-    # planned_departure - actual = 50
+    # planned_departure - actual = 50，未超 nominal+margin(60)
     assert adjusted == 50.0
+
+
+def test_early_hold_capped_by_margin():
+    ats = ATSController(
+        AtsConfig(dwell_adjust_mode="recover", early_hold_margin=30.0, max_dwell_time=300.0),
+        _tt(),
+    )
+    # planned_dep - arrival = 80 > nominal(30) + margin(30)
+    adjusted, _ = ats.adjust_dwell("ST02", nominal_dwell=30.0, actual_arrival=50.0)
+    assert adjusted == 60.0
 
 
 def test_extend_mode_still_adds_delay():

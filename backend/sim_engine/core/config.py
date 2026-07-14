@@ -76,6 +76,7 @@ class AtsConfig:
     dwell_adjust_mode: str = "recover"
     min_dwell_time: float = 15.0
     max_dwell_time: float = 300.0
+    early_hold_margin: float = 30.0
 
 
 @dataclass
@@ -230,6 +231,7 @@ def load_signal_params(config_dir: str | Path) -> SignalConfig:
             dwell_adjust_mode=str(ats_data.get("dwell_adjust_mode", "recover")),
             min_dwell_time=float(ats_data.get("min_dwell_time", 15.0)),
             max_dwell_time=float(ats_data.get("max_dwell_time", 300.0)),
+            early_hold_margin=float(ats_data.get("early_hold_margin", 30.0)),
         ),
         following_min_interval=float(following_data.get("min_interval", 500.0)),
     )
