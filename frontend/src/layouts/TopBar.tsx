@@ -51,7 +51,6 @@ export default function TopBar() {
       <div style={styles.right}>
         <TrainSelector />
         <span style={styles.clock}>⏱ {formatSimTime(clock.elapsed)}</span>
-        <span style={styles.multiplier}>{clock.speed_multiplier}×</span>
         <span
           style={{
             ...styles.connectionDot,
@@ -112,14 +111,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'monospace',
     color: 'var(--text-highlight)',
     fontWeight: 600,
-  },
-  multiplier: {
-    fontSize: '13px',
-    color: 'var(--color-primary)',
-    fontWeight: 600,
-    padding: '2px 6px',
-    borderRadius: '4px',
-    backgroundColor: 'rgba(24, 144, 255, 0.1)',
   },
   connectionDot: {
     width: '8px',

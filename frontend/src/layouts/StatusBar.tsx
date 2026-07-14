@@ -39,12 +39,6 @@ export default function StatusBar() {
         <StatusItem label="列车数量" value={`${trains.length}`} />
       </div>
 
-      <div style={styles.divider} />
-
-      <div style={styles.section}>
-        <StatusItem label="速度倍率" value={`${clock.speed_multiplier}×`} />
-      </div>
-
       <div style={styles.spacer} />
 
       <div style={styles.section}>

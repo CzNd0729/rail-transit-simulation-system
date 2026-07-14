@@ -5,7 +5,7 @@
  */
 import { useSimulationState, useSimulationDispatch } from '../../context/SimulationContext';
 import { setSimulationSpeed } from '../../services/api';
-import { SPEED_MULTIPLIER_OPTIONS, USE_MOCK } from '../../utils/constants';
+import { SPEED_MULTIPLIER_OPTIONS, USE_MOCK, formatSpeedMultiplier } from '../../utils/constants';
 import type { SpeedMultiplier } from '../../types/simulation';
 
 interface Props {
@@ -40,7 +40,7 @@ export default function SpeedSelector({ send }: Props) {
             onClick={() => handleSpeedChange(opt)}
             style={styles.btn}
           >
-            {opt}×
+            <span dangerouslySetInnerHTML={{ __html: formatSpeedMultiplier(opt) }} style={styles.icon} />
           </button>
         ))}
       </div>
@@ -66,5 +66,11 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     fontSize: '12px',
     padding: '4px 0',
+  },
+  icon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    lineHeight: 1,
   },
 };
