@@ -200,6 +200,12 @@ export function toApiParamUpdate(params: Partial<SimulationParams>): Record<stri
       ...(params.signal.max_jerk !== undefined && {
         maxJerk: params.signal.max_jerk,
       }),
+      ...(params.signal.evaluation_time !== undefined && {
+        evaluationTime: params.signal.evaluation_time,
+      }),
+      ...(params.signal.total_time !== undefined && {
+        totalTime: params.signal.total_time,
+      }),
     };
   }
   if (params.power) {
@@ -288,6 +294,12 @@ export function parseApiParams(raw: Record<string, unknown>): Partial<Simulation
       }),
       ...(signalRaw.maxJerk !== undefined && {
         max_jerk: signalRaw.maxJerk as number,
+      }),
+      ...(signalRaw.evaluationTime !== undefined && {
+        evaluation_time: signalRaw.evaluationTime as number,
+      }),
+      ...(signalRaw.totalTime !== undefined && {
+        total_time: signalRaw.totalTime as number,
       }),
     };
   }

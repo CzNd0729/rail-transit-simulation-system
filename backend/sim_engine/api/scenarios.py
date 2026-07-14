@@ -222,6 +222,21 @@ async def delete_scenario(scenario_id: str) -> dict:
     return {"code": 0, "message": "success", "data": {"success": True}}
 
 
+@router.patch("/scenarios/{scenario_id}")
+async def rename_scenario(scenario_id: str, body: dict) -> dict:
+    """重命名方案。
+
+    请求体: { name: string }
+    """
+    data = _read_scenario(scenario_id)
+    new_name = body.get("name", "").strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="方案名称不能为空")
+    data["name"] = new_name
+    _write_scenario(data)
+    return {"code": 0, "message": "success", "data": {"id": scenario_id, "name": new_name}}
+
+
 @router.put("/scenarios/{scenario_id}/apply")
 async def apply_scenario(scenario_id: str) -> dict:
     """加载方案参数到当前引擎。

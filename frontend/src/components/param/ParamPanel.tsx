@@ -15,6 +15,7 @@ import VehicleParamsForm from './VehicleParams';
 import TrackParamsForm from './TrackParams';
 import PowerParamsForm from './PowerParams';
 import SignalParamsForm from './SignalParams';
+import EvaluationParamsForm from './EvaluationParams';
 import PresetManager from './PresetManager';
 
 interface Props {
@@ -32,6 +33,7 @@ export default function ParamPanel({ send }: Props) {
         <div style={styles.lockBanner}>仿真运行中，请先暂停或停止后再修改参数</div>
       )}
       <div style={{ ...styles.content, ...(locked ? styles.contentLocked : {}) }}>
+        <EvaluationParamsForm send={send} disabled={locked} />
         <VehicleParamsForm send={send} disabled={locked} />
         <TrackParamsForm send={send} disabled={locked} />
         <PowerParamsForm send={send} disabled={locked} />

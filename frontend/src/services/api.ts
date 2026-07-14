@@ -10,7 +10,6 @@ import type {
   SimulationParams,
   SpeedMultiplier,
   ScenarioSummary,
-  ScenarioSaveResponse,
   ScenarioDetailResponse,
 } from '../types/simulation';
 
@@ -161,17 +160,17 @@ export async function getScenario(id: string): Promise<ScenarioDetailResponse> {
   return requestData<ScenarioDetailResponse>(`/scenarios/${id}`);
 }
 
-/** 保存当前参数+结果为方案 */
-export async function saveScenario(name: string, description?: string): Promise<ScenarioSaveResponse> {
-  return requestData<ScenarioSaveResponse>('/scenarios', {
-    method: 'POST',
-    body: JSON.stringify({ name, description }),
-  });
-}
-
 /** 删除方案 */
 export async function deleteScenario(id: string): Promise<{ success: boolean }> {
   return requestData<{ success: boolean }>(`/scenarios/${id}`, { method: 'DELETE' });
+}
+
+/** 重命名方案 */
+export async function renameScenario(id: string, name: string): Promise<{ id: string; name: string }> {
+  return requestData<{ id: string; name: string }>(`/scenarios/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
 }
 
 /** 加载方案参数到引擎 */

@@ -61,6 +61,12 @@ export function useWebSocket(url: string = WS_BASE_URL) {
                 },
               });
               break;
+            case 'scenario_auto_saved':
+              // 触发全局事件，刷新方案列表
+              window.dispatchEvent(new CustomEvent('scenario-auto-saved', {
+                detail: message.data,
+              }));
+              break;
             case 'init_state':
               if (message.state?.runState) {
                 dispatch({ type: 'SET_RUN_STATE', payload: message.state.runState });

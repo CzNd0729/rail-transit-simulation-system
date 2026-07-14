@@ -292,6 +292,10 @@ export interface SimulationParams {
     comfort_decel?: number;
     /** 冲击率上限 (m/s³) */
     max_jerk?: number;
+    /** 评估窗口时长 (s) */
+    evaluation_time?: number;
+    /** 仿真总时长 (s) */
+    total_time?: number;
   };
 }
 
