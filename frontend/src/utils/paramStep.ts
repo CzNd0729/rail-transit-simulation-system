@@ -55,6 +55,8 @@ export const DEFAULT_SIGNAL_PARAMS = {
   safety_distance: 300,
   comfort_decel: 0.8,
   max_jerk: 0.75,
+  evaluation_time: 600,
+  total_time: 6000,
 } as const;
 
 /** 供电参数步进字段 */

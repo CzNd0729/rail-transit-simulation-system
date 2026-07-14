@@ -572,6 +572,7 @@ export type ServerMessage =
   | { type: 'simulation_status'; data: { runState: RunState; simulationTime: number; reason?: string } }
   | { type: 'simulation_complete'; data: Record<string, unknown> }
   | { type: 'evaluation_complete'; data: { evaluationTime: number; elapsed: number; message?: string } }
+  | { type: 'scenario_auto_saved'; data: { id: string; name: string } }
   | { type: 'heartbeat'; serverTime?: string };
 
 /** 客户端发送消息 */
