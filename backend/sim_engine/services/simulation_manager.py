@@ -501,6 +501,7 @@ class SimulationManager:
                 "comfortDecel": orch.sim_params.pid.comfort_decel,
                 "maxJerk": orch.sim_params.pid.max_jerk,
                 "evaluationTime": orch.sim_params.evaluation_time,
+                "totalTime": orch.sim_params.total_time,
             },
         }
 
@@ -595,6 +596,9 @@ class SimulationManager:
         if "evaluationTime" in signal_updates:
             orch.sim_params.evaluation_time = float(signal_updates["evaluationTime"])
             updated.append("signal.evaluationTime")
+        if "totalTime" in signal_updates:
+            orch.sim_params.total_time = float(signal_updates["totalTime"])
+            updated.append("signal.totalTime")
 
         return {"updated": updated, "params": self.get_params()}
 

@@ -3,9 +3,10 @@
  * 展示所有已保存方案，支持勾选、加载、删除
  */
 import { useSimulationState } from '../../context/SimulationContext';
-import { deleteScenario, applyScenario } from '../../services/api';
+import { deleteScenario, applyScenario, renameScenario } from '../../services/api';
 import type { ScenarioSummary } from '../../types/simulation';
 import { formatSimTime } from '../../utils/format';
+import { useState, useRef, useEffect } from 'react';
 
 interface ScenarioListPanelProps {
   scenarios: ScenarioSummary[];
@@ -26,6 +27,47 @@ export default function ScenarioListPanel({
 }: ScenarioListPanelProps) {
   const { runState } = useSimulationState();
   const isRunning = runState === 'running';
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (renaming) {
+      const s = scenarios.find((x) => x.id === renaming);
+      setEditValue(s?.name ?? '');
+      // 延迟让 DOM 渲染后再 focus
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [renaming, scenarios]);
+
+  const handleStartRename = (id: string) => {
+    setRenaming(id);
+  };
+
+  const handleSubmitRename = async () => {
+    const id = renaming;
+    if (!id) return;
+    const name = editValue.trim();
+    if (!name) {
+      setRenaming(null);
+      return;
+    }
+    try {
+      await renameScenario(id, name);
+      onDeleted(); // 复用刷新列表
+    } catch {
+      alert('重命名失败');
+    }
+    setRenaming(null);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSubmitRename();
+    } else if (e.key === 'Escape') {
+      setRenaming(null);
+    }
+  };
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`确认删除方案「${name}」？此操作不可撤销。`)) return;
@@ -89,7 +131,28 @@ export default function ScenarioListPanel({
                 style={styles.checkbox}
               />
               <div style={styles.info}>
-                <div style={styles.name}>{s.name}</div>
+                <div style={styles.name}>
+                  {renaming === s.id ? (
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={handleSubmitRename}
+                      onKeyDown={handleKeyDown}
+                      onClick={(e) => e.stopPropagation()}
+                      style={styles.renameInput}
+                    />
+                  ) : (
+                    <span
+                      onClick={() => handleStartRename(s.id)}
+                      style={styles.nameText}
+                      title="点击修改方案名称"
+                    >
+                      {s.name}
+                    </span>
+                  )}
+                </div>
                 <div style={styles.meta}>
                   {formatSimTime(s.totalTime)} · {s.avgSpeed.toFixed(1)} km/h · {s.netEnergy.toFixed(1)} kWh
                 </div>
@@ -165,6 +228,22 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+  },
+  nameText: {
+    cursor: 'pointer',
+    borderBottom: '1px dashed var(--text-secondary)',
+    paddingBottom: '1px',
+  },
+  renameInput: {
+    width: '100%',
+    fontSize: '13px',
+    padding: '2px 6px',
+    border: '1px solid var(--color-primary)',
+    borderRadius: '3px',
+    outline: 'none',
+    backgroundColor: 'var(--bg-primary)',
+    color: 'var(--text-primary)',
+    boxSizing: 'border-box' as const,
   },
   meta: {
     fontSize: '11px',

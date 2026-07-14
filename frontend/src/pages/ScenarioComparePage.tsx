@@ -5,9 +5,7 @@
  * 布局：左侧方案管理 + 右侧 Tab 切换（指标对比 / 参数对比）
  */
 import { useState, useEffect, useCallback } from 'react';
-import { useSimulationState, useSimulationDispatch } from '../context/SimulationContext';
 import { getScenarios, getScenario } from '../services/api';
-import ScenarioSavePanel from '../components/scenario/ScenarioSavePanel';
 import ScenarioListPanel from '../components/scenario/ScenarioListPanel';
 import CompareTable from '../components/scenario/CompareTable';
 import CompareChartBar from '../components/scenario/CompareChartBar';
@@ -17,14 +15,13 @@ import type { ScenarioSummary, ScenarioDetailResponse } from '../types/simulatio
 type CompareTab = 'metrics' | 'params';
 
 export default function ScenarioComparePage() {
-  const dispatch = useSimulationDispatch();
-  const { evaluationComplete } = useSimulationState();
   const [scenarios, setScenarios] = useState<ScenarioSummary[]>([]);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [details, setDetails] = useState<ScenarioDetailResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<CompareTab>('metrics');
+  const [autoSavedInfo, setAutoSavedInfo] = useState<{ id: string; name: string } | null>(null);
 
   /** 加载方案列表 */
   const loadScenarios = useCallback(async () => {
@@ -42,6 +39,24 @@ export default function ScenarioComparePage() {
   useEffect(() => {
     loadScenarios();
   }, [loadScenarios]);
+
+  /** 自动保存完成后刷新方案列表并显示提示 */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setAutoSavedInfo({ id: detail.id, name: detail.name });
+      loadScenarios();
+    };
+    window.addEventListener('scenario-auto-saved', handler);
+    return () => window.removeEventListener('scenario-auto-saved', handler);
+  }, [loadScenarios]);
+
+  /** 自动保存提示 15s 后自动消失 */
+  useEffect(() => {
+    if (!autoSavedInfo) return;
+    const timer = setTimeout(() => setAutoSavedInfo(null), 15000);
+    return () => clearTimeout(timer);
+  }, [autoSavedInfo]);
 
   /** 选中方案变化时，重新加载详情（支持 1+ 个方案） */
   useEffect(() => {
@@ -71,15 +86,6 @@ export default function ScenarioComparePage() {
     return () => { cancelled = true; };
   }, [checkedIds]);
 
-  /** evaluation_complete 通知 30s 自动消失 */
-  useEffect(() => {
-    if (!evaluationComplete) return;
-    const timer = setTimeout(() => {
-      dispatch({ type: 'SET_EVALUATION_COMPLETE', payload: null });
-    }, 30000);
-    return () => clearTimeout(timer);
-  }, [evaluationComplete, dispatch]);
-
   /** 勾选/取消方案 */
   const handleToggle = (id: string) => {
     setCheckedIds((prev) => {
@@ -97,7 +103,6 @@ export default function ScenarioComparePage() {
     <div style={styles.container}>
       {/* 左侧：方案管理 */}
       <div style={styles.leftPanel}>
-        <ScenarioSavePanel onSaved={loadScenarios} />
         <ScenarioListPanel
           scenarios={scenarios}
           checkedIds={checkedIds}
@@ -112,25 +117,18 @@ export default function ScenarioComparePage() {
 
       {/* 右侧：对比视图 */}
       <div style={styles.rightPanel}>
-        {/* 评估完成通知条 */}
-        {evaluationComplete && (
-          <div style={styles.evalNotice}>
-            <span>🟢 指标评估已完成 ({evaluationComplete.evaluationTime}s)</span>
-            <span style={{ marginLeft: '12px' }}>您可以保存方案进行对比</span>
-            <button
-              className="btn btn-primary"
-              style={{ marginLeft: 'auto', fontSize: '12px', padding: '2px 12px' }}
-              onClick={() => {
-                const saveInput = document.querySelector<HTMLInputElement>('.panel input[type="text"]');
-                saveInput?.focus();
-              }}
-            >
-              💾 保存方案
-            </button>
+
+        {/* 自动保存完成通知条 */}
+        {autoSavedInfo && (
+          <div style={styles.autoSaveNotice}>
+            <span>💾 方案已自动保存</span>
+            <span style={{ marginLeft: '8px' }}>
+              点击「{autoSavedInfo.name}」名称可修改方案名
+            </span>
             <button
               className="btn"
-              style={{ marginLeft: '8px', fontSize: '12px', padding: '2px 8px' }}
-              onClick={() => dispatch({ type: 'SET_EVALUATION_COMPLETE', payload: null })}
+              style={{ marginLeft: 'auto', fontSize: '12px', padding: '2px 8px' }}
+              onClick={() => setAutoSavedInfo(null)}
             >
               ✕
             </button>
@@ -206,16 +204,16 @@ const styles: Record<string, React.CSSProperties> = {
   loadingPanel: {
     flex: 1,
   },
-  evalNotice: {
+  autoSaveNotice: {
     display: 'flex',
     alignItems: 'center',
     padding: '8px 16px',
     marginBottom: '12px',
-    backgroundColor: 'rgba(82, 196, 26, 0.12)',
-    border: '1px solid var(--color-success)',
+    backgroundColor: 'rgba(24, 144, 255, 0.1)',
+    border: '1px solid var(--color-primary)',
     borderRadius: 'var(--border-radius)',
     fontSize: '13px',
-    color: 'var(--color-success)',
+    color: 'var(--color-primary)',
     flexShrink: 0,
   },
   tabBar: {

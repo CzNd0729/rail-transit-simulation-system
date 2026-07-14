@@ -22,7 +22,7 @@ const PARAM_LABELS: Record<SignalParamStepKey, string> = {
   safety_distance: 'ATP安全距离 (m)',
   comfort_decel: '舒适减速度 (m/s²)',
   max_jerk: '冲击率上限 (m/s³)',
-};
+  };
 
 export default function SignalParamsForm({ send, disabled = false }: Props) {
   const { params, signalParamBaselines, connection } = useSimulationState();
