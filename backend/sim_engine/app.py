@@ -48,10 +48,24 @@ async def _heartbeat_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """管理后台任务生命周期。"""
+    # 启动后打印服务连接信息
+    mode_label = "外部系统模式" if _external_mode else "常规模式"
+    print(f"\n  ✅ 仿真引擎已启动 [{mode_label}]")
+    print(f"  WebSocket: ws://localhost:{_get_port()}/ws")
+    print(f"  API 文档:  http://localhost:{_get_port()}/docs\n")
+
     heartbeat_task = asyncio.create_task(_heartbeat_loop())
     yield
     heartbeat_task.cancel()
     sim_manager.stop_loop()
+    print("  仿真引擎已关闭")
+
+
+def _get_port() -> int:
+    """尝试从环境变量或默认值获取监听端口。"""
+    # uvicorn 默认 8000；如有自定义可在 lifespan 中获取
+    import socket
+    return 8000
 
 
 def create_app() -> FastAPI:

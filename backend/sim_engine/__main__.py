@@ -52,16 +52,27 @@ def main():
 
     args = parser.parse_args()
 
+    bind_addr = f"{args.host}:{args.port}"
+
     if args.external:
         print("=" * 60)
         print("  外部系统模式已启用")
-        print(f"  PLC:      192.168.100.123:8001")
-        print(f"  网络屏:    192.168.100.121:8888")
-        print(f"  信号屏:    192.168.100.122:9999")
-        print(f"  UDP 总控: 192.168.200.110:23001 → 192.168.200.102:23002")
+        print(f"  ─────────────────────────────────────────")
+        print(f"  本机服务         {bind_addr}")
+        print(f"  WebSocket 端点   ws://{bind_addr}/ws")
+        print(f"  API 文档         http://{bind_addr}/docs")
+        print(f"  ─────────────────────────────────────────")
+        print(f"  PLC:            192.168.100.123:8001")
+        print(f"  网络屏 (HMI):   192.168.100.121:8888")
+        print(f"  信号屏 (MMI):   192.168.100.122:9999")
+        print(f"  UDP 总控:       192.168.200.110:23001 → 192.168.200.102:23002")
         print("=" * 60)
     else:
-        print("常规模式 — 仅提供 REST API + WebSocket 对接前端")
+        print("=" * 60)
+        print(f"  常规模式 — 仅提供 REST API + WebSocket 对接前端")
+        print(f"  本机服务: {bind_addr}")
+        print(f"  API 文档: http://{bind_addr}/docs")
+        print("=" * 60)
 
     # 通过环境变量传递 external_mode 给 app.py
     os.environ["SIM_ENGINE_EXTERNAL"] = "1" if args.external else "0"
