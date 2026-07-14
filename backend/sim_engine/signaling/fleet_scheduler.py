@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
-from sim_engine.signaling.models import DispatchConfig, DispatchOrigin, ServiceTimetable
+from sim_engine.signaling.models import BufferSlot, DispatchConfig, DispatchOrigin, ServiceTimetable
 
 
 class _ActiveRun(Protocol):
@@ -122,6 +122,11 @@ class FleetScheduler:
             )
             for origin in origins
         ]
+        self._buffers: dict[str, list[BufferSlot]] = {
+            o.origin_station: [] for o in origins
+        }
+        self._vehicle_serial: int = 0
+        self._service_serial: int = 0
 
     @property
     def next_departure_time(self) -> float:
@@ -134,6 +139,59 @@ class FleetScheduler:
             stream.next_departure_time = stream.origin.first_departure_s
             stream.train_serial = 0
             stream.pattern_index = 0
+        for buf in self._buffers.values():
+            buf.clear()
+        self._vehicle_serial = 0
+        self._service_serial = 0
+
+    def _next_vehicle_id(self) -> str:
+        self._vehicle_serial += 1
+        return f"VEH_{self._vehicle_serial:03d}"
+
+    def _next_service_id(self, prefix: str) -> str:
+        self._service_serial += 1
+        if prefix:
+            return f"TRAIN_{prefix}{self._service_serial:02d}"
+        return f"TRAIN_{self._service_serial:02d}"
+
+    def receive_train(self, run: object) -> bool:
+        """列车到达终点站→存入本端存车线。"""
+        direction = getattr(run, "direction", "")
+        station = "ST24" if direction == "down" else "ST01"
+        if station not in self._buffers:
+            self._buffers[station] = []
+        slot = BufferSlot(
+            vehicle_id=getattr(run, "vehicle_id", ""),
+            previous_train_id=getattr(run, "train_id", ""),
+            total_trips=getattr(run, "total_trips", 0) + 1,
+            total_mileage=getattr(run, "total_mileage", 0.0),
+            passenger_load=getattr(run.state, "passenger_load", 0.6) if hasattr(run, "state") and run.state else 0.6,
+            state=getattr(run, "state", None),
+            arrival_time=0.0,
+        )
+        self._buffers[station].append(slot)
+        return True
+
+    def buffer_state(self) -> dict[str, list[dict]]:
+        result: dict[str, list[dict]] = {}
+        for station, slots in self._buffers.items():
+            result[station] = [
+                {
+                    "vehicleId": s.vehicle_id,
+                    "previousTrainId": s.previous_train_id,
+                    "totalTrips": s.total_trips,
+                    "arrivalTime": s.arrival_time,
+                }
+                for s in slots
+            ]
+        return result
+
+    def _pop_buffer(self, origin_station: str) -> BufferSlot | None:
+        """FIFO 从存车线取一列车。"""
+        buf = self._buffers.get(origin_station, [])
+        if not buf:
+            return None
+        return buf.pop(0)
 
     def tick(
         self,
@@ -167,13 +225,30 @@ class FleetScheduler:
                     break
 
                 train_id = stream.format_train_id()
-                create_run(
-                    train_id,
-                    stream.next_departure_time,
-                    origin.initial_direction,
-                    origin.trip_leg_names,
-                    origin.origin_chainage,
-                )
+                slot = self._pop_buffer(origin.origin_station)
+                if slot is not None:
+                    create_run(
+                        train_id,
+                        stream.next_departure_time,
+                        origin.initial_direction,
+                        origin.trip_leg_names,
+                        origin.origin_chainage,
+                        vehicle_id=slot.vehicle_id,
+                        total_trips=slot.total_trips,
+                        passenger_load=slot.passenger_load,
+                    )
+                else:
+                    vehicle_id = self._next_vehicle_id()
+                    create_run(
+                        train_id,
+                        stream.next_departure_time,
+                        origin.initial_direction,
+                        origin.trip_leg_names,
+                        origin.origin_chainage,
+                        vehicle_id=vehicle_id,
+                        total_trips=0,
+                        passenger_load=0.6,
+                    )
                 dispatched.append(
                     (train_id, origin.initial_direction, origin.origin_chainage)
                 )
