@@ -48,6 +48,23 @@ class SimulationManager:
         self._min_voltage: float = 1500.0
         self._peak_power: float = 0.0  # kW
 
+        # 舒适度追踪
+        self._max_jerk: float = 0.0
+        self._jerk_sum: float = 0.0
+        self._jerk_count: int = 0
+        self._max_accel: float = 0.0
+
+        # 紧急制动追踪（上升沿检测）
+        self._eb_count: int = 0
+        self._eb_prev_states: dict[str, bool] = {}
+
+        # 晚点追踪（增量累计）
+        self._total_delay: float = 0.0
+        self._prev_delays: dict[str, float] = {}
+
+        # 评估窗口缓存
+        self._evaluation_snapshot: dict | None = None
+
         # 外部系统桥接器（仅在 external_mode 时创建）
         # DEPRECATED: 外部系统接入方案已废弃
         self.external_bridge: ExternalBridge | None = None
@@ -88,6 +105,15 @@ class SimulationManager:
         self._last_summary = None
         self._min_voltage = 1500.0
         self._peak_power = 0.0
+        self._max_jerk = 0.0
+        self._jerk_sum = 0.0
+        self._jerk_count = 0
+        self._max_accel = 0.0
+        self._eb_count = 0
+        self._eb_prev_states.clear()
+        self._total_delay = 0.0
+        self._prev_delays.clear()
+        self._evaluation_snapshot = None
 
     def _apply_external_input(self) -> None:
         """[已弃用] 从外部系统读取 PLC 输入，注入仿真引擎。
@@ -128,21 +154,59 @@ class SimulationManager:
         self.external_bridge.update_from_engine(snapshot, self.orchestrator.sim_params)
 
     def _update_tracking(self, snapshot: dict) -> None:
-        """从单步 snapshot 更新 min_voltage / peak_power / last_snapshot。"""
+        """从单步 snapshot 更新追踪变量。"""
         self._last_snapshot = snapshot
-        power_data = snapshot.get("data", {}).get("power", {})
+        data = snapshot.get("data", {})
+        power_data = data.get("power", {})
+
         # 网压最低值
         vp = power_data.get("voltageProfile", [])
         for item in vp:
             v = item.get("voltage", 1500.0)
             if v < self._min_voltage:
                 self._min_voltage = v
+
         # 变电所峰值功率 (W → kW)
         subs = power_data.get("substations", [])
         for s in subs:
             p_kw = s.get("outputPower", 0) / 1000.0
             if p_kw > self._peak_power:
                 self._peak_power = p_kw
+
+        # 舒适度追踪（极值 + 平均值分母）
+        trains = data.get("trains", [])
+        for t in trains:
+            jerk = t.get("jerk", 0)
+            if jerk > self._max_jerk:
+                self._max_jerk = jerk
+            self._jerk_sum += jerk
+            self._jerk_count += 1
+            accel = abs(t.get("acceleration", 0))
+            if accel > self._max_accel:
+                self._max_accel = accel
+
+        # 紧急制动上升沿计数
+        cmds = data.get("signaling", {}).get("controlCommands", [])
+        for cmd in cmds:
+            tid = cmd.get("trainId", "")
+            eb = cmd.get("emergencyBrake", False)
+            prev_eb = self._eb_prev_states.get(tid, False)
+            if eb and not prev_eb:
+                self._eb_count += 1
+            self._eb_prev_states[tid] = eb
+
+        # 晚点增量累计
+        devs = data.get("signaling", {}).get("timetableDeviation", [])
+        for d in devs:
+            tid = d.get("trainId", "")
+            sid = d.get("stationId", "")
+            delay = d.get("delayArrival", 0)
+            if delay > 0:
+                key = f"{tid}_{sid}"
+                prev_delay = self._prev_delays.get(key, 0.0)
+                if delay > prev_delay:
+                    self._total_delay += delay - prev_delay
+                    self._prev_delays[key] = delay
 
     def start(self, passenger_load: float = 0.6) -> dict:
         if self.orchestrator.run_state not in (RunState.IDLE, RunState.STOPPED):
@@ -273,14 +337,17 @@ class SimulationManager:
         return self._last_snapshot
 
     def get_run_stats(self) -> dict:
-        """返回本次仿真运行的聚合统计数据。
-
-        返回值包含 min_voltage / peak_power 等跨步追踪值，
-        供方案保存 API 拼装 result 字段。
-        """
+        """返回本次仿真运行的聚合统计数据。"""
         return {
             "minVoltage": self._min_voltage,
             "peakPower": self._peak_power,
+            "maxJerk": self._max_jerk,
+            "avgJerk": round(
+                self._jerk_sum / max(self._jerk_count, 1), 4
+            ),
+            "maxAccel": self._max_accel,
+            "ebCount": self._eb_count,
+            "totalDelay": round(self._total_delay, 2),
         }
 
     # ==================== 配置读取 ====================
@@ -349,6 +416,7 @@ class SimulationManager:
                 "trainCount": "train_count",
                 "bidirectional": "bidirectional",
                 "departureInterval": "departure_interval",
+                "evaluationTime": "evaluation_time",
             }
             for camel_key, snake_key in field_map.items():
                 if camel_key in sim_updates:
@@ -571,6 +639,32 @@ class SimulationManager:
                         "reason": "running",
                     },
                 })
+
+                # 评估完成通知（首次到达 evaluation_time 时触发一次）
+                if (self._evaluation_snapshot is None
+                    and orch.clock.elapsed >= orch.sim_params.evaluation_time):
+                    self._evaluation_snapshot = {
+                        "elapsed": orch.clock.elapsed,
+                        "summary": orch.recorder.summary(),
+                        "tracking": {
+                            "minVoltage": self._min_voltage,
+                            "peakPower": self._peak_power,
+                            "maxJerk": self._max_jerk,
+                            "avgJerk": round(
+                                self._jerk_sum / max(self._jerk_count, 1), 4
+                            ),
+                            "maxAccel": self._max_accel,
+                            "ebCount": self._eb_count,
+                            "totalDelay": round(self._total_delay, 2),
+                        },
+                    }
+                    await self.ws_manager.broadcast({
+                        "type": "evaluation_complete",
+                        "data": {
+                            "evaluationTime": orch.sim_params.evaluation_time,
+                            "elapsed": orch.clock.elapsed,
+                        },
+                    })
             # 终点停稳判断
             line_end = (
                 not self._is_continuous_dispatch(orch)
