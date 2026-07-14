@@ -477,8 +477,16 @@ class SimulationManager:
                 "speedLimit": tp.speed_limit,
             },
             "power": {
-                "pantographVoltage": 1500,
-                "substationCapacity": 5000,
+                "pantographVoltage": (
+                    orch.sim_params.power.substations[0].rated_voltage
+                    if orch.sim_params.power.substations
+                    else 1500
+                ),
+                "substationCapacity": (
+                    orch.sim_params.power.substations[0].rated_power
+                    if orch.sim_params.power.substations
+                    else 5000
+                ),
             },
             "signal": {
                 "dwellTime": (
@@ -488,6 +496,9 @@ class SimulationManager:
                 ),
                 "departureInterval": orch.sim_params.departure_interval,
                 "targetSpeedRatio": orch.sim_params.target_speed_ratio,
+                "safetyDistance": orch.sim_params.signal.atp.safety_distance,
+                "comfortDecel": orch.sim_params.pid.comfort_decel,
+                "maxJerk": orch.sim_params.pid.max_jerk,
             },
         }
 
@@ -549,6 +560,17 @@ class SimulationManager:
                         if key in track_updates:
                             updated.append(f"track.{key}")
 
+        power_updates = updates.get("power", {})
+        subs = orch.sim_params.power.substations
+        if "pantographVoltage" in power_updates and subs:
+            for sub in subs:
+                sub.rated_voltage = float(power_updates["pantographVoltage"])
+            updated.append("power.pantographVoltage")
+        if "substationCapacity" in power_updates and subs:
+            for sub in subs:
+                sub.rated_power = float(power_updates["substationCapacity"])
+            updated.append("power.substationCapacity")
+
         signal_updates = updates.get("signal", {})
         if "targetSpeedRatio" in signal_updates:
             orch.sim_params.target_speed_ratio = float(signal_updates["targetSpeedRatio"])
@@ -559,6 +581,15 @@ class SimulationManager:
         if "dwellTime" in signal_updates:
             orch.sim_params.dwell_time_override = float(signal_updates["dwellTime"])
             updated.append("signal.dwellTime")
+        if "safetyDistance" in signal_updates:
+            orch.sim_params.signal.atp.safety_distance = float(signal_updates["safetyDistance"])
+            updated.append("signal.safetyDistance")
+        if "comfortDecel" in signal_updates:
+            orch.sim_params.pid.comfort_decel = float(signal_updates["comfortDecel"])
+            updated.append("signal.comfortDecel")
+        if "maxJerk" in signal_updates:
+            orch.sim_params.pid.max_jerk = float(signal_updates["maxJerk"])
+            updated.append("signal.maxJerk")
 
         return {"updated": updated, "params": self.get_params()}
 
