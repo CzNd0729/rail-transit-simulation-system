@@ -14,6 +14,8 @@ import React from 'react';
 
 const COMFORT_JERK_LIMIT = 0.75;
 
+const JERK_Y_MAX = 1.5; // 固定 Y 轴范围，避免 auto-scale 抖动
+
 const JerkTimeCurve = React.memo(function JerkTimeCurve() {
   const { clock, chartVersion } = useSimulationState();
   const chartHistory = useActiveChartHistory();
@@ -39,6 +41,8 @@ const JerkTimeCurve = React.memo(function JerkTimeCurve() {
       yAxis: {
         type: 'value' as const,
         name: '冲击率 (m/s³)',
+        min: -JERK_Y_MAX,
+        max: JERK_Y_MAX,
         nameTextStyle: { color: '#a0a0a0' },
         axisLabel: vehicleValueAxisLabel(),
         axisLine: { lineStyle: { color: '#2a2a4a' } },
@@ -60,20 +64,18 @@ const JerkTimeCurve = React.memo(function JerkTimeCurve() {
           lineStyle: { type: 'dashed', color: '#faad14', width: 1 },
           itemStyle: { color: '#faad14' },
           data: [[0, COMFORT_JERK_LIMIT], [xMax, COMFORT_JERK_LIMIT]],
-          markPoint: {
-            symbol: 'rect',
-            symbolSize: [0, 0],
+          markLine: {
+            silent: true,
+            symbol: 'none',
+            lineStyle: { type: 'dashed', color: '#faad14', width: 1 },
             label: {
               show: true,
-              position: 'right',
+              position: 'end' as const,
               formatter: `+${COMFORT_JERK_LIMIT}`,
               color: '#faad14',
               fontSize: 10,
-              offset: [0, 0],
             },
-            data: [
-              { name: 'upper', xAxis: xMax, yAxis: COMFORT_JERK_LIMIT, value: COMFORT_JERK_LIMIT },
-            ],
+            data: [{ yAxis: COMFORT_JERK_LIMIT }],
           },
           silent: true,
         },
@@ -84,20 +86,18 @@ const JerkTimeCurve = React.memo(function JerkTimeCurve() {
           lineStyle: { type: 'dashed', color: '#faad14', width: 1 },
           itemStyle: { color: '#faad14' },
           data: [[0, -COMFORT_JERK_LIMIT], [xMax, -COMFORT_JERK_LIMIT]],
-          markPoint: {
-            symbol: 'rect',
-            symbolSize: [0, 0],
+          markLine: {
+            silent: true,
+            symbol: 'none',
+            lineStyle: { type: 'dashed', color: '#faad14', width: 1 },
             label: {
               show: true,
-              position: 'right',
+              position: 'end' as const,
               formatter: `-${COMFORT_JERK_LIMIT}`,
               color: '#faad14',
               fontSize: 10,
-              offset: [0, 0],
             },
-            data: [
-              { name: 'lower', xAxis: xMax, yAxis: -COMFORT_JERK_LIMIT, value: -COMFORT_JERK_LIMIT },
-            ],
+            data: [{ yAxis: -COMFORT_JERK_LIMIT }],
           },
           silent: true,
         },
