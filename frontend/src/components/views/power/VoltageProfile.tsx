@@ -7,7 +7,7 @@
  * 因此每帧只追加新数据，不重绘旧数据，彻底消除抖动。
  */
 import ReactECharts from 'echarts-for-react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { getTrainChartHistory } from '../../../utils/chartHistory';
 import { trainColorById } from '../../../utils/constants';
@@ -52,6 +52,12 @@ const VoltageProfile = React.memo(function VoltageProfile() {
   const renderedLenRef = useRef<Record<string, number>>({});
   // 上一次的 chartVersion，用于检测是否被重置
   const prevVersionRef = useRef<number>(chartVersion);
+  // ECharts 就绪标志 — 解决视图切换重载时 getEchartsInstance() 时序返回 null 的问题
+  const [chartReady, setChartReady] = useState(false);
+
+  const handleChartReady = useCallback(() => {
+    setChartReady(true);
+  }, []);
 
   // 变电所标记（稳定，只在 substations 变化时重建）
   const substationSeries = useMemo(
@@ -76,15 +82,16 @@ const VoltageProfile = React.memo(function VoltageProfile() {
     [power.substations],
   );
 
-  // 检测 chartVersion 回退（历史数据被清空重置），重置渲染计数
+  // 检测 chartVersion 回退（历史数据被清空重置），重置渲染计数和就绪标志
   if (chartVersion < prevVersionRef.current) {
     renderedLenRef.current = {};
+    if (chartReady) setChartReady(false);
   }
   prevVersionRef.current = chartVersion;
 
   // 核心：每帧只追加新数据点，不重绘旧数据
   useEffect(() => {
-    if (!chartRef.current || !targetId) return;
+    if (!chartRef.current || !targetId || !chartReady) return;
     const echartsInstance = chartRef.current.getEchartsInstance();
     if (!echartsInstance) return;
 
@@ -97,7 +104,6 @@ const VoltageProfile = React.memo(function VoltageProfile() {
     if (vp.length < rendered) {
       renderedLenRef.current[targetId] = 0;
       echartsInstance.clear();
-      // 继续走下方首次渲染逻辑
     }
 
     const effectiveRendered = renderedLenRef.current[targetId] ?? 0;
@@ -210,7 +216,7 @@ const VoltageProfile = React.memo(function VoltageProfile() {
         { notMerge: false },
       );
     }
-  }, [chartVersion, targetId, trains, chartHistory, totalLength, substationSeries]);
+  }, [chartReady, chartVersion, targetId, trains, chartHistory, totalLength, substationSeries]);
 
   if (filteredTrains.length === 0) {
     return (
@@ -234,15 +240,13 @@ const VoltageProfile = React.memo(function VoltageProfile() {
         )}
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
-        <div key={filteredTrains[0].id} style={{ height: '100%' }}>
-          <ReactECharts
-            ref={chartRef}
-            option={{}}
-            style={{ height: '100%', width: '100%' }}
-            notMerge={false}
-            key={filteredTrains[0].id}
-          />
-        </div>
+        <ReactECharts
+          ref={chartRef}
+          onChartReady={handleChartReady}
+          option={{}}
+          style={{ height: '100%', width: '100%' }}
+          notMerge={true}
+        />
       </div>
     </div>
   );

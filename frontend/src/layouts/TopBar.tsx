@@ -8,7 +8,6 @@
  * - UI-TOP-03: 仿真时钟显示 (HH:MM:SS)
  * - UI-TOP-04: 仿真速度倍率显示
  */
-import { startTransition } from 'react';
 import { useSimulationState, useSimulationDispatch } from '../context/SimulationContext';
 import { formatSimTime } from '../utils/format';
 import { VIEW_CONFIG } from '../utils/constants';
@@ -24,9 +23,7 @@ export default function TopBar() {
   const handleViewChange = (view: ViewType) => {
     if (view === activeView) return;
     beginSwitch();
-    startTransition(() => {
-      dispatch({ type: 'SET_VIEW', payload: view });
-    });
+    dispatch({ type: 'SET_VIEW', payload: view });
   };
 
   return (
