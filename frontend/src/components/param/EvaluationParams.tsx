@@ -17,7 +17,7 @@ const PARAM_DEFS = [
 ];
 
 export default function EvaluationParamsForm({ send, disabled = false }: Props) {
-  const { params, runState } = useSimulationState();
+  const { params } = useSimulationState();
   const { updateParams } = useSimulation(send);
 
   const handleChange = (key: string, value: number) => {

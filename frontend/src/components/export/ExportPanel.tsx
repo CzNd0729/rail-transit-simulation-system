@@ -47,14 +47,6 @@ export default function ExportPanel() {
           <button className="btn" onClick={handleExportCSV} style={styles.btn}>
             📥 导出 CSV
           </button>
-
-          <button className="btn" disabled style={styles.btn}>
-            📊 导出截图（迭代二）
-          </button>
-
-          <button className="btn" disabled style={styles.btn}>
-            📄 导出报告（迭代四）
-          </button>
         </div>
       </div>
     </>

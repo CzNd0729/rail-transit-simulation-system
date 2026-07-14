@@ -75,6 +75,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderLeft: '1px solid var(--border-color)',
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '8px',
   },
 };

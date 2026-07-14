@@ -12,11 +12,9 @@
  */
 import { useSimulationState } from '../../context/SimulationContext';
 import VehicleParamsForm from './VehicleParams';
-import TrackParamsForm from './TrackParams';
 import PowerParamsForm from './PowerParams';
 import SignalParamsForm from './SignalParams';
 import EvaluationParamsForm from './EvaluationParams';
-import PresetManager from './PresetManager';
 
 interface Props {
   send: (data: object) => void;
@@ -35,10 +33,8 @@ export default function ParamPanel({ send }: Props) {
       <div style={{ ...styles.content, ...(locked ? styles.contentLocked : {}) }}>
         <EvaluationParamsForm send={send} disabled={locked} />
         <VehicleParamsForm send={send} disabled={locked} />
-        <TrackParamsForm send={send} disabled={locked} />
         <PowerParamsForm send={send} disabled={locked} />
         <SignalParamsForm send={send} disabled={locked} />
-        <PresetManager />
       </div>
     </div>
   );

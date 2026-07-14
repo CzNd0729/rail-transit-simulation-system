@@ -5,17 +5,12 @@ export default function RunSummaryPanel() {
   const { runState, stats } = useSimulationState();
   const visible = runState === 'stopped' && stats.trip_time > 0;
 
+  if (!visible) return null;
+
   return (
     <div
       className="panel"
-      style={{
-        ...styles.panel,
-        visibility: visible ? 'visible' : 'hidden',
-        height: visible ? 'auto' : 0,
-        marginBottom: visible ? 8 : 0,
-        overflow: 'hidden',
-      }}
-      aria-hidden={!visible}
+      style={styles.panel}
     >
       <div className="panel-title">📊 运行摘要</div>
       <div style={styles.row}>

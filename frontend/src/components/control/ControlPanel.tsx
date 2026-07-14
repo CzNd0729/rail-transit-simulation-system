@@ -8,9 +8,7 @@
  */
 import RunControlButtons from './RunControlButtons';
 import SpeedSelector from './SpeedSelector';
-import EmergencyBrakeButton from './EmergencyBrakeButton';
 import { useSimulationState, useSimulationDispatch } from '../../context/SimulationContext';
-import { useSelectedTrain } from '../../hooks/useSelectedTrain';
 
 interface Props {
   send: (data: object) => void;
@@ -18,9 +16,7 @@ interface Props {
 
 export default function ControlPanel({ send }: Props) {
   const dispatch = useSimulationDispatch();
-  const { runState, evaluationComplete } = useSimulationState();
-  const train = useSelectedTrain();
-  const speed = train?.speed ?? 0;
+  const { evaluationComplete } = useSimulationState();
 
   return (
     <div className="panel">
@@ -43,7 +39,6 @@ export default function ControlPanel({ send }: Props) {
       <div style={styles.content}>
         <RunControlButtons send={send} />
         <SpeedSelector send={send} />
-        <EmergencyBrakeButton send={send} runState={runState} speed={speed} />
       </div>
     </div>
   );
