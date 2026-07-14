@@ -73,7 +73,7 @@ class AtpConfig:
 
 @dataclass
 class AtsConfig:
-    dwell_adjust_mode: str = "extend"
+    dwell_adjust_mode: str = "recover"
     min_dwell_time: float = 15.0
     max_dwell_time: float = 300.0
 
@@ -227,7 +227,7 @@ def load_signal_params(config_dir: str | Path) -> SignalConfig:
             overspeed_margin=float(atp_data.get("overspeed_margin", 0.05)),
         ),
         ats=AtsConfig(
-            dwell_adjust_mode=str(ats_data.get("dwell_adjust_mode", "extend")),
+            dwell_adjust_mode=str(ats_data.get("dwell_adjust_mode", "recover")),
             min_dwell_time=float(ats_data.get("min_dwell_time", 15.0)),
             max_dwell_time=float(ats_data.get("max_dwell_time", 300.0)),
         ),

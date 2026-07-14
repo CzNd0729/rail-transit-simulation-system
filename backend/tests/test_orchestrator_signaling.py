@@ -27,7 +27,7 @@ def test_snapshot_has_signaling_extended_fields(orchestrator):
 
 
 def test_late_arrival_timetable_deviation_in_snapshot(orchestrator):
-    """晚点到站第二站时 snapshot 输出时刻表偏离。"""
+    """晚点到站第二站时 snapshot 输出时刻表偏离（recover：站停缩短）。"""
     orch = orchestrator
     orch.start()
     orch.clock.elapsed = 130.0
@@ -39,5 +39,5 @@ def test_late_arrival_timetable_deviation_in_snapshot(orchestrator):
     dev = dev_list[0]
     assert dev["stationId"] == "ST02"
     assert dev["delayArrival"] > 0
-    assert dev["adjustedDwell"] > dev["nominalDwell"]
-    assert orch.signaling.signal_state.dwell_remaining > dev["nominalDwell"]
+    assert dev["adjustedDwell"] <= dev["nominalDwell"]
+    assert orch.signaling.signal_state.dwell_remaining <= dev["nominalDwell"]

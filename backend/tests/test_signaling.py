@@ -428,14 +428,28 @@ def make_ctrl_with_ats():
     return _factory
 
 
-def test_late_arrival_extends_dwell(make_ctrl_with_ats):
-    """晚点到站时 ATS 延长站停时间。"""
+def test_late_arrival_shortens_dwell_recover(make_ctrl_with_ats):
+    """晚点到站时 ATS recover 缩短站停至 min_dwell。"""
     ctrl, _ = make_ctrl_with_ats()
     train = _make_train(position=999.5, speed=0.0)
     cmd = ctrl.compute_commands(train, dt=0.1, elapsed=130.0)
     assert ctrl.signal_state.phase == Phase.DWELL
-    assert ctrl.signal_state.dwell_remaining == 60.0
+    assert ctrl.signal_state.dwell_remaining == 15.0
     assert cmd.traction_level == 0.0
+
+
+def test_late_arrival_extends_dwell_when_mode_extend(make_ctrl_with_ats):
+    """显式 extend 模式仍延长站停。"""
+    ctrl, _ = make_ctrl_with_ats()
+    ctrl._ats = ATSController(
+        AtsConfig(dwell_adjust_mode="extend"),
+        Timetable("TRAIN_01", [
+            TimetableEntry("ST02", planned_arrival=100.0, planned_departure=130.0),
+        ]),
+    )
+    train = _make_train(position=999.5, speed=0.0)
+    ctrl.compute_commands(train, dt=0.1, elapsed=130.0)
+    assert ctrl.signal_state.dwell_remaining == 60.0
 
 
 def test_on_time_arrival_dwell_unchanged_with_ats(make_ctrl_with_ats):

@@ -28,7 +28,7 @@ signal:
     safety_distance: 300
     overspeed_margin: 0.05
   ats:
-    dwell_adjust_mode: extend
+    dwell_adjust_mode: recover
     min_dwell_time: 15
     max_dwell_time: 300
   following:
@@ -49,7 +49,7 @@ simulation:
     params = load_simulation_params(p)
     assert params.signal.mode == "atp_ato"
     assert params.signal.atp.safety_distance == 300.0
-    assert params.signal.ats.dwell_adjust_mode == "extend"
+    assert params.signal.ats.dwell_adjust_mode == "recover"
     assert params.signal.following_min_interval == 500.0
 
 
