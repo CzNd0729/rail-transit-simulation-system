@@ -75,7 +75,7 @@ def _make_network(chainages: list[float]):
 def test_calculate_no_substations_returns_nominal():
     """无变电所时返回额定网压，电流为 0（无供电来源）。"""
     network = PowerNetwork(substations=[])
-    result = calculate(network, train_position=500.0, power_demand=100000.0)
+    result = calculate(network, train_demands=[{"position": 500.0, "power": 100000.0}])
     assert result.pantograph_voltage == 1500.0
     assert result.current == 0.0  # 无变电所不计算取流
     assert result.voltage_drop == 0.0
@@ -84,7 +84,7 @@ def test_calculate_no_substations_returns_nominal():
 def test_calculate_at_substation_zero_drop():
     """列车正好在变电所处，距离为 0，无压降。"""
     network = _make_network([0.0, 3200.0])
-    result = calculate(network, train_position=0.0, power_demand=150000.0)
+    result = calculate(network, train_demands=[{"position": 0.0, "power": 150000.0}])
     assert result.pantograph_voltage == 1500.0
     assert result.voltage_drop == pytest.approx(0.0)
     assert result.supplying_substation_id == "S0"
@@ -97,7 +97,7 @@ def test_calculate_midpoint_voltage_drop():
     # R_total = (0.02 + 0.01) × 1.6 = 0.048 Ω
     # P = 300000W, I = 300000 / 1500 = 200A
     # ΔV = 200 × 0.048 = 9.6V
-    result = calculate(network, train_position=1600.0, power_demand=300000.0)
+    result = calculate(network, train_demands=[{"position": 1600.0, "power": 300000.0}])
     assert result.pantograph_voltage == pytest.approx(1500.0 - 9.6)
     assert result.voltage_drop == pytest.approx(9.6)
 
@@ -107,7 +107,7 @@ def test_calculate_finds_nearest_substation():
     # 三座变电所：0m, 1500m, 3200m
     network = _make_network([0.0, 1500.0, 3200.0])
     # 列车在 1600m，最近变电所是 S1 (1500m)，距离 100m = 0.1km
-    result = calculate(network, train_position=1600.0, power_demand=150000.0)
+    result = calculate(network, train_demands=[{"position": 1600.0, "power": 150000.0}])
     assert result.supplying_substation_id == "S1"
     # R = 0.03 × 0.1 = 0.003, I = 100A, ΔV = 0.3V
     assert result.voltage_drop == pytest.approx(0.3)
@@ -119,7 +119,7 @@ def test_calculate_undervoltage_clamp():
     subs = [Substation(id="S0", name="远站", chainage=0.0)]
     network = PowerNetwork(substations=subs, contact_line_resistance=0.5, rail_resistance=0.5)
     # 距离 10km, R = 1.0 × 10 = 10Ω, I 很大时压降极大
-    result = calculate(network, train_position=10000.0, power_demand=100000.0)
+    result = calculate(network, train_demands=[{"position": 10000.0, "power": 100000.0}])
     # I = 100000 / 1500 ≈ 66.67, ΔV = 66.67 × 10 = 666.7
     # V_panto = 1500 - 666.7 = 833.3, 应钳位到 1000
     assert result.pantograph_voltage == MIN_PANTOGRAPH_VOLTAGE
@@ -129,7 +129,7 @@ def test_calculate_undervoltage_clamp():
 def test_calculate_no_undervoltage_for_normal_case():
     """正常工况不应触发欠压告警。"""
     network = _make_network([0.0, 3200.0])
-    result = calculate(network, train_position=500.0, power_demand=50000.0)
+    result = calculate(network, train_demands=[{"position": 500.0, "power": 50000.0}])
     assert result.undervoltage_warning is False
     assert result.pantograph_voltage > MIN_PANTOGRAPH_VOLTAGE
 
@@ -137,7 +137,7 @@ def test_calculate_no_undervoltage_for_normal_case():
 def test_calculate_zero_power_demand():
     """功率需求为 0 时无电流无压降。"""
     network = _make_network([0.0, 3200.0])
-    result = calculate(network, train_position=800.0, power_demand=0.0)
+    result = calculate(network, train_demands=[{"position": 800.0, "power": 0.0}])
     assert result.current == 0.0
     assert result.voltage_drop == 0.0
     assert result.pantograph_voltage == 1500.0
@@ -146,7 +146,7 @@ def test_calculate_zero_power_demand():
 def test_calculate_substation_states():
     """验证变电所状态快照正确。"""
     network = _make_network([0.0, 1600.0, 3200.0])
-    result = calculate(network, train_position=800.0, power_demand=150000.0)
+    result = calculate(network, train_demands=[{"position": 800.0, "power": 150000.0}])
     # 最近变电所 S0 (0m)，距离 800m = 0.8km
     # R = 0.03 × 0.8 = 0.024Ω, I = 100A, ΔV = 2.4V, V_panto = 1497.6V
     # 消耗功率 = 1497.6 × 100 / 1000 = 149.76kW
@@ -163,6 +163,37 @@ def test_calculate_substation_states():
     s2 = next(s for s in result.substation_states if s.id == "S2")
     assert s2.output_current == 0.0
     assert s2.output_power == 0.0
+
+
+def test_calculate_multi_train_aggregation():
+    """多列车按各自最近变电所聚合输出。"""
+    network = _make_network([0.0, 3200.0, 6400.0])
+    # 列车1在A站附近 (200m → S0)，列车2在B站附近 (3500m → S1)
+    result = calculate(network, train_demands=[
+        {"position": 200.0, "power": 150000.0},   # 200m → S0 (0m)
+        {"position": 3500.0, "power": 150000.0},  # 3500m → S1 (3200m)
+    ])
+    assert len(result.substation_states) == 3
+    s0 = next(s for s in result.substation_states if s.id == "S0")
+    s1 = next(s for s in result.substation_states if s.id == "S1")
+    s2 = next(s for s in result.substation_states if s.id == "S2")
+    # S0 和 S1 都应有输出
+    assert s0.output_current > 0
+    assert s0.output_power > 0
+    assert s1.output_current > 0
+    assert s1.output_power > 0
+    # S2 无输出（无列车在其最近范围内）
+    assert s2.output_current == 0.0
+    assert s2.output_power == 0.0
+
+
+def test_calculate_empty_demands():
+    """空需求列表返回默认网压。"""
+    network = _make_network([0.0, 3200.0])
+    result = calculate(network, train_demands=[])
+    assert result.pantograph_voltage == 1500.0
+    assert result.current == 0.0
+    assert result.substation_states == []
 
 
 # ── PWR-04: 再生制动统计 ────────────────────────────────────────────

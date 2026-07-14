@@ -563,15 +563,17 @@ class Orchestrator:
         self.occupancy.update({r.train_id: (r.state.position, r.state.direction) for r in active_runs})
         self.switch_manager.update(dt)
 
-        total_power_demand = sum(item[6] for item in step_outputs)
+        # ── 多列车独立变电所分配 ──
+        train_demands = [
+            {"position": item[0].state.position, "power": item[6]}
+            for item in step_outputs
+        ]
         power_mode = self.sim_params.power.mode
-        sample_position = leading.state.position
 
         if power_mode == "simple_ohm":
             power_flow: PowerFlowResult = calculate(
                 self.power_network,
-                sample_position,
-                total_power_demand,
+                train_demands,
             )
             pantograph_voltage = power_flow.pantograph_voltage
             substation_states = power_flow.substation_states
@@ -581,8 +583,20 @@ class Orchestrator:
             pantograph_voltage = get_pantograph_voltage()
             substation_states = []
 
+        # 每列车独立计算受电弓端电压
+        def _per_train_voltage(pos: float, power_w: float) -> float:
+            if power_w <= 0 or not self.power_network.substations:
+                return 1500.0
+            nearest = min(self.power_network.substations, key=lambda s: abs(s.chainage - pos))
+            dist_km = abs(pos - nearest.chainage) / 1000.0
+            r_total = self.power_network.contact_line_resistance + self.power_network.rail_resistance
+            current = power_w / 1500.0
+            drop = current * r_total * dist_km
+            return max(1500.0 - drop, 1000.0)
+
         voltage_profile = [
-            {"chainage": sample_position, "voltage": pantograph_voltage}
+            {"chainage": item[0].state.position, "voltage": _per_train_voltage(item[0].state.position, item[6])}
+            for item in step_outputs
         ]
 
         train_entries: list[TrainSnapshotEntry] = []
@@ -599,7 +613,7 @@ class Orchestrator:
                     train_id=run.train_id,
                     state=result.state,
                     forces=result.forces,
-                    pantograph_voltage=pantograph_voltage,
+                    pantograph_voltage=_per_train_voltage(run.state.position, train_power),
                     power_demand=train_power,
                     direction=run.state.direction,
                 )

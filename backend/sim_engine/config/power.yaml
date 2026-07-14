@@ -5,11 +5,41 @@ power:
   substations:
     - chainage: 0
       id: SUB01
-      name: A站变电所
+      name: 安河桥北变电所
       rated_power: 5000
       rated_voltage: 1500
-    - chainage: 3200
+    - chainage: 2800
       id: SUB02
-      name: C站变电所
+      name: 圆明园变电所
+      rated_power: 5000
+      rated_voltage: 1500
+    - chainage: 5100
+      id: SUB03
+      name: 海淀黄庄变电所
+      rated_power: 5000
+      rated_voltage: 1500
+    - chainage: 7300
+      id: SUB04
+      name: 国家图书馆变电所
+      rated_power: 5000
+      rated_voltage: 1500
+    - chainage: 10000
+      id: SUB05
+      name: 新街口变电所
+      rated_power: 5000
+      rated_voltage: 1500
+    - chainage: 12000
+      id: SUB06
+      name: 灵境胡同变电所
+      rated_power: 5000
+      rated_voltage: 1500
+    - chainage: 14300
+      id: SUB07
+      name: 菜市口变电所
+      rated_power: 5000
+      rated_voltage: 1500
+    - chainage: 18600
+      id: SUB08
+      name: 公益西桥变电所
       rated_power: 5000
       rated_voltage: 1500
