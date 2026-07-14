@@ -19,6 +19,9 @@ const PARAM_LABELS: Record<SignalParamStepKey, string> = {
   dwell_time: '站停时间 (s)',
   departure_interval: '发车间隔 (s)',
   target_speed_ratio: '目标速度比',
+  safety_distance: 'ATP安全距离 (m)',
+  comfort_decel: '舒适减速度 (m/s²)',
+  max_jerk: '冲击率上限 (m/s³)',
 };
 
 export default function SignalParamsForm({ send, disabled = false }: Props) {

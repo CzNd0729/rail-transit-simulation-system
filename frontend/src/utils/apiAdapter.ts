@@ -191,6 +191,25 @@ export function toApiParamUpdate(params: Partial<SimulationParams>): Record<stri
       ...(params.signal.departure_interval !== undefined && {
         departureInterval: params.signal.departure_interval,
       }),
+      ...(params.signal.safety_distance !== undefined && {
+        safetyDistance: params.signal.safety_distance,
+      }),
+      ...(params.signal.comfort_decel !== undefined && {
+        comfortDecel: params.signal.comfort_decel,
+      }),
+      ...(params.signal.max_jerk !== undefined && {
+        maxJerk: params.signal.max_jerk,
+      }),
+    };
+  }
+  if (params.power) {
+    result.power = {
+      ...(params.power.pantograph_voltage !== undefined && {
+        pantographVoltage: params.power.pantograph_voltage,
+      }),
+      ...(params.power.substation_capacity !== undefined && {
+        substationCapacity: params.power.substation_capacity,
+      }),
     };
   }
   if (params.track) {
@@ -260,6 +279,15 @@ export function parseApiParams(raw: Record<string, unknown>): Partial<Simulation
       }),
       ...(signalRaw.targetSpeedRatio !== undefined && {
         target_speed_ratio: signalRaw.targetSpeedRatio as number,
+      }),
+      ...(signalRaw.safetyDistance !== undefined && {
+        safety_distance: signalRaw.safetyDistance as number,
+      }),
+      ...(signalRaw.comfortDecel !== undefined && {
+        comfort_decel: signalRaw.comfortDecel as number,
+      }),
+      ...(signalRaw.maxJerk !== undefined && {
+        max_jerk: signalRaw.maxJerk as number,
       }),
     };
   }

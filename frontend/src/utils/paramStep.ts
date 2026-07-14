@@ -11,6 +11,9 @@ export const VEHICLE_PARAM_STEP_KEYS = [
   'davis_A',
   'davis_B',
   'davis_C_front_area',
+  'davis_C_drag_coeff',
+  'curve_resist_coeff',
+  'tunnel_resist_factor',
 ] as const;
 
 export type VehicleParamStepKey = (typeof VEHICLE_PARAM_STEP_KEYS)[number];
@@ -31,6 +34,9 @@ export const SIGNAL_PARAM_STEP_KEYS = [
   'dwell_time',
   'departure_interval',
   'target_speed_ratio',
+  'safety_distance',
+  'comfort_decel',
+  'max_jerk',
 ] as const;
 
 export type SignalParamStepKey = (typeof SIGNAL_PARAM_STEP_KEYS)[number];
@@ -46,6 +52,9 @@ export const DEFAULT_SIGNAL_PARAMS = {
   dwell_time: 30,
   departure_interval: 120,
   target_speed_ratio: 0.8,
+  safety_distance: 300,
+  comfort_decel: 0.8,
+  max_jerk: 0.75,
 } as const;
 
 /** 供电参数步进字段 */
