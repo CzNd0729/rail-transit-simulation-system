@@ -3,15 +3,11 @@
 
 启动模式:
   - 常规模式: 仅对接前端（默认，也是唯一推荐模式）
-
-**已弃用外部系统模式**：SIM_ENGINE_EXTERNAL 环境变量和 external_mode 参数
-保留仅作兼容，未来版本将移除。外部系统接入方案已废弃。
 """
 
 from __future__ import annotations
 
 import asyncio
-import os
 import uuid
 from contextlib import asynccontextmanager
 
@@ -25,10 +21,7 @@ from sim_engine.ws.manager import WebSocketConnectionManager
 
 # 全局单例
 ws_manager = WebSocketConnectionManager()
-
-# 读取外部系统模式标志（由 __main__.py 设置，已弃用）
-_external_mode = os.environ.get("SIM_ENGINE_EXTERNAL", "0") == "1"  # DEPRECATED
-sim_manager = SimulationManager(ws_manager, external_mode=_external_mode)  # DEPRECATED
+sim_manager = SimulationManager(ws_manager)
 
 _HEARTBEAT_INTERVAL = 15.0  # 秒
 
@@ -71,7 +64,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # 全局异常处理器
+    # 全局异常处理
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         return JSONResponse(

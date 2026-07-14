@@ -21,26 +21,17 @@ from sim_engine.vehicle.models import TractionCurvePoint
 
 from sim_engine.ws.manager import WebSocketConnectionManager
 
-# 外部系统桥接 — 仅在 external_mode 时导入
-# DEPRECATED: 外部系统接入方案已废弃
-try:
-    from sim_engine.external.bridge import ExternalBridge  # type: ignore  # noqa: F401
-    _HAS_EXTERNAL = True
-except ImportError:
-    _HAS_EXTERNAL = False
-
 
 class SimulationManager:
     """管理 Orchestrator 生命周期 + 后台异步仿真循环。
 
     Args:
         ws_manager: WebSocket 连接管理器。
-        external_mode: [已弃用] 是否启用外部系统桥接 — 外部系统接入方案已废弃。
     """
 
     def __init__(self, ws_manager: WebSocketConnectionManager, external_mode: bool = False) -> None:
         self.ws_manager = ws_manager
-        self.external_mode = external_mode
+        # external_mode 参数保留签名兼容，已忽略
         self.orchestrator = Orchestrator.from_config_dir()
         self._loop_task: asyncio.Task | None = None
         # 追踪最近一次仿真的聚合数据（供方案保存 API 使用）
@@ -66,38 +57,6 @@ class SimulationManager:
         # 评估窗口缓存
         self._evaluation_snapshot: dict | None = None
 
-        # 外部系统桥接器（仅在 external_mode 时创建）
-        # DEPRECATED: 外部系统接入方案已废弃
-        self.external_bridge: ExternalBridge | None = None
-        if self.external_mode and _HAS_EXTERNAL:
-            self._init_external_bridge()
-
-    # ==================== 外部系统桥接（已弃用） ====================
-
-    def _init_external_bridge(self) -> None:
-        """[已弃用] 初始化外部系统桥接器 — 外部系统接入方案已废弃。"""
-        if not _HAS_EXTERNAL:
-            print("警告: 外部系统模块不可用，请检查 sim_engine.external")
-            return
-
-        cfg = self.orchestrator.sim_params.external
-        self.external_bridge = ExternalBridge(
-            plc_host=cfg.plc_device_ip,
-            plc_port=cfg.plc_port,
-            hmi_host=cfg.network_screen_device_ip,
-            hmi_port=cfg.network_screen_port,
-            mmi_host=cfg.signal_screen_device_ip,
-            mmi_port=cfg.signal_screen_port,
-            use_real_hardware=cfg.use_real_hardware,
-        )
-        results = self.external_bridge.start_all()
-        connected = [k for k, v in results.items() if v]
-        failed = [k for k, v in results.items() if not v and k != "udp"]
-        if connected:
-            print(f"  外部系统已连接: {', '.join(connected)}")
-        if failed:
-            print(f"  外部系统连接失败: {', '.join(failed)}（仿真仍可运行）")
-
     # ==================== 仿真控制 ====================
 
     def _reset_tracking(self) -> None:
@@ -115,44 +74,6 @@ class SimulationManager:
         self._total_delay = 0.0
         self._prev_delays.clear()
         self._evaluation_snapshot = None
-
-    def _apply_external_input(self) -> None:
-        """[已弃用] 从外部系统读取 PLC 输入，注入仿真引擎。
-
-        外部系统接入方案已废弃，此方法保留仅作兼容。
-        """
-        if self.external_bridge is None:
-            return
-        plc = self.external_bridge.get_plc_input()
-        if not plc.get("connected", False):
-            return
-
-        orch = self.orchestrator
-        # 紧急制动
-        if plc.get("eb_button", False):
-            orch.set_emergency_brake(True)
-        # 钥匙开关控制
-        if not plc.get("key_switch", False):
-            # 钥匙关闭时强制紧急制动
-            orch.set_emergency_brake(True)
-
-        # 手动模式 — 手柄控制（迭代一优先使用 ATO，手动模式留到迭代三）
-        # TODO: 迭代三扩展手动驾驶
-        # dir_handle = plc.get("dir_handle", 0)
-        # main_handle = plc.get("main_handle", 0)
-        # if main_handle == 1:  # 牵引
-        #     orch.trains[0].manual_driver.set_traction(...)
-        # elif main_handle == 2:  # 制动
-        #     orch.trains[0].manual_driver.set_brake(...)
-
-    def _apply_external_output(self, snapshot: dict) -> None:
-        """[已弃用] 将仿真状态输出到外部系统。
-
-        外部系统接入方案已废弃，此方法保留仅作兼容。
-        """
-        if self.external_bridge is None:
-            return
-        self.external_bridge.update_from_engine(snapshot, self.orchestrator.sim_params)
 
     def _update_tracking(self, snapshot: dict) -> None:
         """从单步 snapshot 更新追踪变量。"""
@@ -675,11 +596,6 @@ class SimulationManager:
             snapshot = orch.step_once()
             if snapshot:
                 self._update_tracking(snapshot)
-
-                # 外部系统模式：输入 → 仿真 → 输出（DEPRECATED）
-                if self.external_mode:
-                    self._apply_external_input()
-                    self._apply_external_output(snapshot)
 
                 # 广播快照
                 await self.ws_manager.broadcast(snapshot)
