@@ -723,6 +723,9 @@ class SimulationManager:
                     try:
                         from sim_engine.api.scenarios import _generate_id, _write_scenario
                         now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                        auto_name = (
+                            f"自动方案_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                        )
                         auto_id = _generate_id()
                         power_data = snapshot.get("data", {}).get("power", {}) if snapshot else {}
                         traction_energy = power_data.get("totalConsumption", 0.0)
@@ -732,7 +735,7 @@ class SimulationManager:
                         trk = self._evaluation_snapshot["tracking"]
                         auto_scenario = {
                             "id": auto_id,
-                            "name": "自动保存",
+                            "name": auto_name,
                             "description": f"评估窗口{orch.sim_params.evaluation_time}s",
                             "createdAt": now,
                             "params": {
@@ -766,7 +769,7 @@ class SimulationManager:
                         _write_scenario(auto_scenario)
                         await self.ws_manager.broadcast({
                             "type": "scenario_auto_saved",
-                            "data": {"id": auto_id, "name": "自动保存"},
+                            "data": {"id": auto_id, "name": auto_name},
                         })
                     except Exception as exc:
                         print(f"  自动保存方案失败: {exc}")
