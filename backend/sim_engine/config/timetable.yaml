@@ -1,12 +1,13 @@
-# 北京地铁4号线高峰参考运行图（v2）
-# 区间时分：50 km/h 均速 + track.yaml 站停时间
+# 北京地铁9号线参考运行图
+# 13站12区间，全长约15.7km
+# 区间时分基于约50km/h均速估算（平坡、无弯道）
 timetable:
   meta:
-    line_name: "北京地铁4号线"
+    line_name: "北京地铁9号线"
     profile: peak_reference
     turnback_time_s: 150
     default_turnback_switch:
-      down: SW04
+      down: SW02
       up: SW01
 
   dispatch:
@@ -20,7 +21,7 @@ timetable:
         train_id_prefix: D
         first_departure_s: 0
         headway_s: 150
-      - origin_station: ST24
+      - origin_station: ST13
         initial_direction: up
         trip_legs: [up, down]
         train_id_prefix: U
@@ -31,57 +32,35 @@ timetable:
     trip_legs: [down, up]
     down:
       direction: down
-      terminal_station: ST24
+      terminal_station: ST13
       entries:
         - { station_id: ST01, planned_arrival: 0,    planned_departure: 35 }
-        - { station_id: ST02, planned_arrival: 114,  planned_departure: 139 }
-        - { station_id: ST03, planned_arrival: 204,  planned_departure: 234 }
-        - { station_id: ST04, planned_arrival: 292,  planned_departure: 317 }
-        - { station_id: ST05, planned_arrival: 375,  planned_departure: 400 }
-        - { station_id: ST06, planned_arrival: 450,  planned_departure: 480 }
-        - { station_id: ST07, planned_arrival: 538,  planned_departure: 568 }
-        - { station_id: ST08, planned_arrival: 618,  planned_departure: 643 }
-        - { station_id: ST09, planned_arrival: 701,  planned_departure: 726 }
-        - { station_id: ST10, planned_arrival: 776,  planned_departure: 806 }
-        - { station_id: ST11, planned_arrival: 878,  planned_departure: 908 }
-        - { station_id: ST12, planned_arrival: 973,  planned_departure: 1013 }
-        - { station_id: ST13, planned_arrival: 1071, planned_departure: 1096 }
-        - { station_id: ST14, planned_arrival: 1146, planned_departure: 1176 }
-        - { station_id: ST15, planned_arrival: 1226, planned_departure: 1251 }
-        - { station_id: ST16, planned_arrival: 1294, planned_departure: 1319 }
-        - { station_id: ST17, planned_arrival: 1369, planned_departure: 1404 }
-        - { station_id: ST18, planned_arrival: 1462, planned_departure: 1487 }
-        - { station_id: ST19, planned_arrival: 1545, planned_departure: 1570 }
-        - { station_id: ST20, planned_arrival: 1635, planned_departure: 1660 }
-        - { station_id: ST21, planned_arrival: 1710, planned_departure: 1750 }
-        - { station_id: ST22, planned_arrival: 1822, planned_departure: 1847 }
-        - { station_id: ST23, planned_arrival: 1905, planned_departure: 1930 }
-        - { station_id: ST24, planned_arrival: 1995, planned_departure: 2030 }
+        - { station_id: ST02, planned_arrival: 130,  planned_departure: 160 }
+        - { station_id: ST03, planned_arrival: 225,  planned_departure: 255 }
+        - { station_id: ST04, planned_arrival: 330,  planned_departure: 360 }
+        - { station_id: ST05, planned_arrival: 470,  planned_departure: 500 }
+        - { station_id: ST06, planned_arrival: 595,  planned_departure: 625 }
+        - { station_id: ST07, planned_arrival: 750,  planned_departure: 780 }
+        - { station_id: ST08, planned_arrival: 875,  planned_departure: 905 }
+        - { station_id: ST09, planned_arrival: 990,  planned_departure: 1030 }
+        - { station_id: ST10, planned_arrival: 1130, planned_departure: 1160 }
+        - { station_id: ST11, planned_arrival: 1290, planned_departure: 1320 }
+        - { station_id: ST12, planned_arrival: 1400, planned_departure: 1430 }
+        - { station_id: ST13, planned_arrival: 1515, planned_departure: 1550 }
     up:
       direction: up
       terminal_station: ST01
       entries:
-        - { station_id: ST24, planned_arrival: 0,    planned_departure: 150 }
-        - { station_id: ST23, planned_arrival: 215,  planned_departure: 240 }
-        - { station_id: ST22, planned_arrival: 298,  planned_departure: 323 }
-        - { station_id: ST21, planned_arrival: 395,  planned_departure: 435 }
-        - { station_id: ST20, planned_arrival: 485,  planned_departure: 510 }
-        - { station_id: ST19, planned_arrival: 575,  planned_departure: 600 }
-        - { station_id: ST18, planned_arrival: 658,  planned_departure: 683 }
-        - { station_id: ST17, planned_arrival: 741,  planned_departure: 776 }
-        - { station_id: ST16, planned_arrival: 826,  planned_departure: 851 }
-        - { station_id: ST15, planned_arrival: 894,  planned_departure: 919 }
-        - { station_id: ST14, planned_arrival: 969,  planned_departure: 999 }
-        - { station_id: ST13, planned_arrival: 1049, planned_departure: 1074 }
-        - { station_id: ST12, planned_arrival: 1132, planned_departure: 1172 }
-        - { station_id: ST11, planned_arrival: 1237, planned_departure: 1267 }
-        - { station_id: ST10, planned_arrival: 1339, planned_departure: 1369 }
-        - { station_id: ST09, planned_arrival: 1419, planned_departure: 1444 }
-        - { station_id: ST08, planned_arrival: 1502, planned_departure: 1527 }
-        - { station_id: ST07, planned_arrival: 1577, planned_departure: 1607 }
-        - { station_id: ST06, planned_arrival: 1665, planned_departure: 1695 }
-        - { station_id: ST05, planned_arrival: 1745, planned_departure: 1770 }
-        - { station_id: ST04, planned_arrival: 1828, planned_departure: 1853 }
-        - { station_id: ST03, planned_arrival: 1911, planned_departure: 1941 }
-        - { station_id: ST02, planned_arrival: 2006, planned_departure: 2031 }
-        - { station_id: ST01, planned_arrival: 2110, planned_departure: 2145 }
+        - { station_id: ST13, planned_arrival: 0,    planned_departure: 150 }
+        - { station_id: ST12, planned_arrival: 235,  planned_departure: 265 }
+        - { station_id: ST11, planned_arrival: 345,  planned_departure: 375 }
+        - { station_id: ST10, planned_arrival: 505,  planned_departure: 535 }
+        - { station_id: ST09, planned_arrival: 635,  planned_departure: 675 }
+        - { station_id: ST08, planned_arrival: 760,  planned_departure: 790 }
+        - { station_id: ST07, planned_arrival: 885,  planned_departure: 915 }
+        - { station_id: ST06, planned_arrival: 1040, planned_departure: 1070 }
+        - { station_id: ST05, planned_arrival: 1165, planned_departure: 1195 }
+        - { station_id: ST04, planned_arrival: 1305, planned_departure: 1335 }
+        - { station_id: ST03, planned_arrival: 1410, planned_departure: 1440 }
+        - { station_id: ST02, planned_arrival: 1505, planned_departure: 1535 }
+        - { station_id: ST01, planned_arrival: 1630, planned_departure: 1665 }

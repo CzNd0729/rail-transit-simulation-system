@@ -1,298 +1,161 @@
-# 线路配置 — 北京地铁4号线（安河桥北→公益西桥）
-# 下行方向，24站23区间，全长约18.6km
-# 北段（安河桥北~国家图书馆）为地面/高架/地下过渡，南段（动物园~公益西桥）全地下
+# 线路配置 — 北京地铁9号线（郭公庄站→国家图书馆站）
+# 下行方向，13站12区间，全长约15.7km
+# 全程地下段（9号线除郭公庄站附近外均为地下线）
 line:
-  name: 4号线（下行）
+  name: 9号线（下行）
   direction: "down"  # 下行方向；未来可扩展 "up" 上行线路
   stations:
-    - { id: ST01,  name: 安河桥北,     chainage: 0,     dwell_time: 35 }
-    - { id: ST02,  name: 北宫门,       chainage: 1100,  dwell_time: 25 }
-    - { id: ST03,  name: 西苑,         chainage: 2000,  dwell_time: 30 }
-    - { id: ST04,  name: 圆明园,       chainage: 2800,  dwell_time: 25 }
-    - { id: ST05,  name: 北京大学东门,   chainage: 3600,  dwell_time: 25 }
-    - { id: ST06,  name: 中关村,       chainage: 4300,  dwell_time: 30 }
-    - { id: ST07,  name: 海淀黄庄,     chainage: 5100,  dwell_time: 30 }
-    - { id: ST08,  name: 人民大学,     chainage: 5800,  dwell_time: 25 }
-    - { id: ST09,  name: 魏公村,       chainage: 6600,  dwell_time: 25 }
-    - { id: ST10,  name: 国家图书馆,   chainage: 7300,  dwell_time: 30 }
-    - { id: ST11,  name: 动物园,       chainage: 8300,  dwell_time: 30 }
-    - { id: ST12,  name: 西直门,       chainage: 9200,  dwell_time: 40 }
-    - { id: ST13,  name: 新街口,       chainage: 10000, dwell_time: 25 }
-    - { id: ST14,  name: 平安里,       chainage: 10700, dwell_time: 30 }
-    - { id: ST15,  name: 西四,         chainage: 11400, dwell_time: 25 }
-    - { id: ST16,  name: 灵境胡同,     chainage: 12000, dwell_time: 25 }
-    - { id: ST17,  name: 西单,         chainage: 12700, dwell_time: 35 }
-    - { id: ST18,  name: 宣武门,       chainage: 13500, dwell_time: 25 }
-    - { id: ST19,  name: 菜市口,       chainage: 14300, dwell_time: 25 }
-    - { id: ST20,  name: 陶然亭,       chainage: 15200, dwell_time: 25 }
-    - { id: ST21,  name: 北京南站,     chainage: 15900, dwell_time: 40 }
-    - { id: ST22,  name: 马家堡,       chainage: 16900, dwell_time: 25 }
-    - { id: ST23,  name: 角门西,       chainage: 17700, dwell_time: 25 }
-    - { id: ST24,  name: 公益西桥,     chainage: 18600, dwell_time: 35 }
+    - { id: ST01,  name: 郭公庄站,     chainage: 372,       dwell_time: 35, platform_half_length: 59.0 }
+    - { id: ST02,  name: 丰台科技园站,  chainage: 1724.14,   dwell_time: 30, platform_half_length: 59.0 }
+    - { id: ST03,  name: 科怡路站,      chainage: 2512.677,  dwell_time: 30, platform_half_length: 59.0 }
+    - { id: ST04,  name: 丰台南路站,    chainage: 3491.832,  dwell_time: 30, platform_half_length: 59.0 }
+    - { id: ST05,  name: 丰台东大街站,  chainage: 5079.5146, dwell_time: 30, platform_half_length: 59.0 }
+    - { id: ST06,  name: 七里庄站,      chainage: 6405.27,   dwell_time: 30, platform_half_length: 59.0 }
+    - { id: ST07,  name: 六里桥站,      chainage: 8199.103,  dwell_time: 30, platform_half_length: 59.0 }
+    - { id: ST08,  name: 六里桥东站,    chainage: 9508.30248,  dwell_time: 30, platform_half_length: 59.0 }
+    - { id: ST09,  name: 北京西站,      chainage: 10656.17848, dwell_time: 40, platform_half_length: 59.0 }
+    - { id: ST10,  name: 军事博物馆站,  chainage: 12057.87933, dwell_time: 30, platform_half_length: 59.0 }
+    - { id: ST11,  name: 白堆子站,      chainage: 13967.68649, dwell_time: 30, platform_half_length: 59.0 }
+    - { id: ST12,  name: 白石桥南站,    chainage: 15012.51349, dwell_time: 30, platform_half_length: 59.0 }
+    - { id: ST13,  name: 国家图书馆站,  chainage: 16105.57149, dwell_time: 35, platform_half_length: 59.0 }
 
   segments:
-    # 安河桥北→北宫门：高架段，坡度平缓，大曲率
+    # 郭公庄站→丰台科技园站
     - id: SEC01
-      start_chainage: 0
-      end_chainage: 1100
-      gradient: 8
-      curvature: 600
+      start_chainage: 372
+      end_chainage: 1724.14
+      gradient: 0
+      curvature: 0
       speed_limit: 80
       is_tunnel: false
 
-    # 北宫门→西苑：地面→地下过渡段，下坡
+    # 丰台科技园站→科怡路站
     - id: SEC02
-      start_chainage: 1100
-      end_chainage: 2000
-      gradient: -15
-      curvature: 500
-      speed_limit: 70
+      start_chainage: 1724.14
+      end_chainage: 2512.677
+      gradient: 0
+      curvature: 0
+      speed_limit: 80
       is_tunnel: false
 
-    # 西苑→圆明园：地下段，平缓
+    # 科怡路站→丰台南路站
     - id: SEC03
-      start_chainage: 2000
-      end_chainage: 2800
-      gradient: 3
-      curvature: 800
+      start_chainage: 2512.677
+      end_chainage: 3491.832
+      gradient: 0
+      curvature: 0
       speed_limit: 80
-      is_tunnel: true
+      is_tunnel: false
 
-    # 圆明园→北京大学东门：地下段
+    # 丰台南路站→丰台东大街站
     - id: SEC04
-      start_chainage: 2800
-      end_chainage: 3600
-      gradient: 5
-      curvature: 1000
+      start_chainage: 3491.832
+      end_chainage: 5079.5146
+      gradient: 0
+      curvature: 0
       speed_limit: 80
-      is_tunnel: true
+      is_tunnel: false
 
-    # 北京大学东门→中关村：地下段，小弯道
+    # 丰台东大街站→七里庄站
     - id: SEC05
-      start_chainage: 3600
-      end_chainage: 4300
-      gradient: 2
-      curvature: 600
+      start_chainage: 5079.5146
+      end_chainage: 6405.27
+      gradient: 0
+      curvature: 0
       speed_limit: 80
-      is_tunnel: true
+      is_tunnel: false
 
-    # 中关村→海淀黄庄：地下段
+    # 七里庄站→六里桥站
     - id: SEC06
-      start_chainage: 4300
-      end_chainage: 5100
-      gradient: 4
-      curvature: 700
+      start_chainage: 6405.27
+      end_chainage: 8199.103
+      gradient: 0
+      curvature: 0
       speed_limit: 80
-      is_tunnel: true
+      is_tunnel: false
 
-    # 海淀黄庄→人民大学：地下段，弯道较多
+    # 六里桥站→六里桥东站
     - id: SEC07
-      start_chainage: 5100
-      end_chainage: 5800
-      gradient: 3
-      curvature: 500
-      speed_limit: 75
-      is_tunnel: true
+      start_chainage: 8199.103
+      end_chainage: 9508.30248
+      gradient: 0
+      curvature: 0
+      speed_limit: 80
+      is_tunnel: false
 
-    # 人民大学→魏公村：地下段
+    # 六里桥东站→北京西站
     - id: SEC08
-      start_chainage: 5800
-      end_chainage: 6600
-      gradient: 6
-      curvature: 800
+      start_chainage: 9508.30248
+      end_chainage: 10656.17848
+      gradient: 0
+      curvature: 0
       speed_limit: 80
-      is_tunnel: true
+      is_tunnel: false
 
-    # 魏公村→国家图书馆：地下段
+    # 北京西站→军事博物馆站
     - id: SEC09
-      start_chainage: 6600
-      end_chainage: 7300
-      gradient: 2
-      curvature: 1000
+      start_chainage: 10656.17848
+      end_chainage: 12057.87933
+      gradient: 0
+      curvature: 0
       speed_limit: 80
-      is_tunnel: true
+      is_tunnel: false
 
-    # 国家图书馆→动物园：地下段，长直线
+    # 军事博物馆站→白堆子站
     - id: SEC10
-      start_chainage: 7300
-      end_chainage: 8300
-      gradient: 5
-      curvature: 1200
+      start_chainage: 12057.87933
+      end_chainage: 13967.68649
+      gradient: 0
+      curvature: 0
       speed_limit: 80
-      is_tunnel: true
+      is_tunnel: false
 
-    # 动物园→西直门：地下段，接近西直门有大弯道
+    # 白堆子站→白石桥南站
     - id: SEC11
-      start_chainage: 8300
-      end_chainage: 9200
-      gradient: 8
-      curvature: 400
-      speed_limit: 65
-      is_tunnel: true
+      start_chainage: 13967.68649
+      end_chainage: 15012.51349
+      gradient: 0
+      curvature: 0
+      speed_limit: 80
+      is_tunnel: false
 
-    # 西直门→新街口：地下段，西直门始发上坡
+    # 白石桥南站→国家图书馆站
     - id: SEC12
-      start_chainage: 9200
-      end_chainage: 10000
-      gradient: 10
-      curvature: 600
-      speed_limit: 75
-      is_tunnel: true
-
-    # 新街口→平安里：地下段
-    - id: SEC13
-      start_chainage: 10000
-      end_chainage: 10700
-      gradient: 3
-      curvature: 800
+      start_chainage: 15012.51349
+      end_chainage: 16105.57149
+      gradient: 0
+      curvature: 0
       speed_limit: 80
-      is_tunnel: true
+      is_tunnel: false
 
-    # 平安里→西四：地下段
-    - id: SEC14
-      start_chainage: 10700
-      end_chainage: 11400
-      gradient: 4
-      curvature: 700
-      speed_limit: 80
-      is_tunnel: true
-
-    # 西四→灵境胡同：地下段，短区间
-    - id: SEC15
-      start_chainage: 11400
-      end_chainage: 12000
-      gradient: 2
-      curvature: 900
-      speed_limit: 80
-      is_tunnel: true
-
-    # 灵境胡同→西单：地下段
-    - id: SEC16
-      start_chainage: 12000
-      end_chainage: 12700
-      gradient: 5
-      curvature: 600
-      speed_limit: 80
-      is_tunnel: true
-
-    # 西单→宣武门：地下段，商业区弯道多
-    - id: SEC17
-      start_chainage: 12700
-      end_chainage: 13500
-      gradient: 3
-      curvature: 450
-      speed_limit: 70
-      is_tunnel: true
-
-    # 宣武门→菜市口：地下段
-    - id: SEC18
-      start_chainage: 13500
-      end_chainage: 14300
-      gradient: 6
-      curvature: 800
-      speed_limit: 80
-      is_tunnel: true
-
-    # 菜市口→陶然亭：地下段
-    - id: SEC19
-      start_chainage: 14300
-      end_chainage: 15200
-      gradient: 4
-      curvature: 700
-      speed_limit: 80
-      is_tunnel: true
-
-    # 陶然亭→北京南站：地下段，接近南站大弯道
-    - id: SEC20
-      start_chainage: 15200
-      end_chainage: 15900
-      gradient: 5
-      curvature: 500
-      speed_limit: 70
-      is_tunnel: true
-
-    # 北京南站→马家堡：地下段，出站上坡
-    - id: SEC21
-      start_chainage: 15900
-      end_chainage: 16900
-      gradient: 12
-      curvature: 800
-      speed_limit: 80
-      is_tunnel: true
-
-    # 马家堡→角门西：地下段
-    - id: SEC22
-      start_chainage: 16900
-      end_chainage: 17700
-      gradient: 3
-      curvature: 600
-      speed_limit: 80
-      is_tunnel: true
-
-    # 角门西→公益西桥：地下段，接近终点平缓
-    - id: SEC23
-      start_chainage: 17700
-      end_chainage: 18600
-      gradient: 2
-      curvature: 1000
-      speed_limit: 80
-      is_tunnel: true
-
-  # ── 轨道电路区段（TRK-07）──────────────────────────────
-  # 每相邻两站之间为一个轨道电路区段，共 23 个
-  # 用于检测列车占用/出清状态，供信号系统和前端轨道视图使用
+  # ── 轨道电路区段 ──
   track_circuits:
-    - { id: TC01, start_chainage: 0,     end_chainage: 1100,  direction: "down" }
-    - { id: TC02, start_chainage: 1100,  end_chainage: 2000,  direction: "down" }
-    - { id: TC03, start_chainage: 2000,  end_chainage: 2800,  direction: "down" }
-    - { id: TC04, start_chainage: 2800,  end_chainage: 3600,  direction: "down" }
-    - { id: TC05, start_chainage: 3600,  end_chainage: 4300,  direction: "down" }
-    - { id: TC06, start_chainage: 4300,  end_chainage: 5100,  direction: "down" }
-    - { id: TC07, start_chainage: 5100,  end_chainage: 5800,  direction: "down" }
-    - { id: TC08, start_chainage: 5800,  end_chainage: 6600,  direction: "down" }
-    - { id: TC09, start_chainage: 6600,  end_chainage: 7300,  direction: "down" }
-    - { id: TC10, start_chainage: 7300,  end_chainage: 8300,  direction: "down" }
-    - { id: TC11, start_chainage: 8300,  end_chainage: 9200,  direction: "down" }
-    - { id: TC12, start_chainage: 9200,  end_chainage: 10000, direction: "down" }
-    - { id: TC13, start_chainage: 10000, end_chainage: 10700, direction: "down" }
-    - { id: TC14, start_chainage: 10700, end_chainage: 11400, direction: "down" }
-    - { id: TC15, start_chainage: 11400, end_chainage: 12000, direction: "down" }
-    - { id: TC16, start_chainage: 12000, end_chainage: 12700, direction: "down" }
-    - { id: TC17, start_chainage: 12700, end_chainage: 13500, direction: "down" }
-    - { id: TC18, start_chainage: 13500, end_chainage: 14300, direction: "down" }
-    - { id: TC19, start_chainage: 14300, end_chainage: 15200, direction: "down" }
-    - { id: TC20, start_chainage: 15200, end_chainage: 15900, direction: "down" }
-    - { id: TC21, start_chainage: 15900, end_chainage: 16900, direction: "down" }
-    - { id: TC22, start_chainage: 16900, end_chainage: 17700, direction: "down" }
-    - { id: TC23, start_chainage: 17700, end_chainage: 18600, direction: "down" }
-    - { id: TC01U, start_chainage: 0,     end_chainage: 1100,  direction: "up" }
-    - { id: TC02U, start_chainage: 1100,  end_chainage: 2000,  direction: "up" }
-    - { id: TC03U, start_chainage: 2000,  end_chainage: 2800,  direction: "up" }
-    - { id: TC04U, start_chainage: 2800,  end_chainage: 3600,  direction: "up" }
-    - { id: TC05U, start_chainage: 3600,  end_chainage: 4300,  direction: "up" }
-    - { id: TC06U, start_chainage: 4300,  end_chainage: 5100,  direction: "up" }
-    - { id: TC07U, start_chainage: 5100,  end_chainage: 5800,  direction: "up" }
-    - { id: TC08U, start_chainage: 5800,  end_chainage: 6600,  direction: "up" }
-    - { id: TC09U, start_chainage: 6600,  end_chainage: 7300,  direction: "up" }
-    - { id: TC10U, start_chainage: 7300,  end_chainage: 8300,  direction: "up" }
-    - { id: TC11U, start_chainage: 8300,  end_chainage: 9200,  direction: "up" }
-    - { id: TC12U, start_chainage: 9200,  end_chainage: 10000, direction: "up" }
-    - { id: TC13U, start_chainage: 10000, end_chainage: 10700, direction: "up" }
-    - { id: TC14U, start_chainage: 10700, end_chainage: 11400, direction: "up" }
-    - { id: TC15U, start_chainage: 11400, end_chainage: 12000, direction: "up" }
-    - { id: TC16U, start_chainage: 12000, end_chainage: 12700, direction: "up" }
-    - { id: TC17U, start_chainage: 12700, end_chainage: 13500, direction: "up" }
-    - { id: TC18U, start_chainage: 13500, end_chainage: 14300, direction: "up" }
-    - { id: TC19U, start_chainage: 14300, end_chainage: 15200, direction: "up" }
-    - { id: TC20U, start_chainage: 15200, end_chainage: 15900, direction: "up" }
-    - { id: TC21U, start_chainage: 15900, end_chainage: 16900, direction: "up" }
-    - { id: TC22U, start_chainage: 16900, end_chainage: 17700, direction: "up" }
-    - { id: TC23U, start_chainage: 17700, end_chainage: 18600, direction: "up" }
+    - { id: TC01, start_chainage: 372,      end_chainage: 1724.14,   direction: "down" }
+    - { id: TC02, start_chainage: 1724.14,  end_chainage: 2512.677,  direction: "down" }
+    - { id: TC03, start_chainage: 2512.677, end_chainage: 3491.832,  direction: "down" }
+    - { id: TC04, start_chainage: 3491.832, end_chainage: 5079.5146, direction: "down" }
+    - { id: TC05, start_chainage: 5079.5146,end_chainage: 6405.27,   direction: "down" }
+    - { id: TC06, start_chainage: 6405.27,  end_chainage: 8199.103,  direction: "down" }
+    - { id: TC07, start_chainage: 8199.103, end_chainage: 9508.30248,direction: "down" }
+    - { id: TC08, start_chainage: 9508.30248,end_chainage: 10656.17848,direction: "down" }
+    - { id: TC09, start_chainage: 10656.17848,end_chainage: 12057.87933,direction: "down" }
+    - { id: TC10, start_chainage: 12057.87933,end_chainage: 13967.68649,direction: "down" }
+    - { id: TC11, start_chainage: 13967.68649,end_chainage: 15012.51349,direction: "down" }
+    - { id: TC12, start_chainage: 15012.51349,end_chainage: 16105.57149,direction: "down" }
+    - { id: TC01U, start_chainage: 372,      end_chainage: 1724.14,   direction: "up" }
+    - { id: TC02U, start_chainage: 1724.14,  end_chainage: 2512.677,  direction: "up" }
+    - { id: TC03U, start_chainage: 2512.677, end_chainage: 3491.832,  direction: "up" }
+    - { id: TC04U, start_chainage: 3491.832, end_chainage: 5079.5146, direction: "up" }
+    - { id: TC05U, start_chainage: 5079.5146,end_chainage: 6405.27,   direction: "up" }
+    - { id: TC06U, start_chainage: 6405.27,  end_chainage: 8199.103,  direction: "up" }
+    - { id: TC07U, start_chainage: 8199.103, end_chainage: 9508.30248,direction: "up" }
+    - { id: TC08U, start_chainage: 9508.30248,end_chainage: 10656.17848,direction: "up" }
+    - { id: TC09U, start_chainage: 10656.17848,end_chainage: 12057.87933,direction: "up" }
+    - { id: TC10U, start_chainage: 12057.87933,end_chainage: 13967.68649,direction: "up" }
+    - { id: TC11U, start_chainage: 13967.68649,end_chainage: 15012.51349,direction: "up" }
+    - { id: TC12U, start_chainage: 15012.51349,end_chainage: 16105.57149,direction: "up" }
 
-  # ── 道岔配置（TRK-06）────────────────────────────────
-  # 4 组道岔：两端折返 + 中间关键站侧线
+  # ── 道岔配置 ──
   switches:
-    - { id: SW01, chainage: 50,    switch_type: crossover, normal_direction: main, reverse_direction: siding, lateral_speed_limit: 30, state: normal }
-    - { id: SW02, chainage: 7300,  switch_type: single,    normal_direction: main, reverse_direction: siding, lateral_speed_limit: 30, state: normal }
-    - { id: SW03, chainage: 15900, switch_type: single,    normal_direction: main, reverse_direction: siding, lateral_speed_limit: 30, state: normal }
-    - { id: SW04, chainage: 18550, switch_type: crossover, normal_direction: main, reverse_direction: siding, lateral_speed_limit: 30, state: normal }
+    - { id: SW01, chainage: 322,   switch_type: crossover, normal_direction: main, reverse_direction: siding, lateral_speed_limit: 30, state: normal }
+    - { id: SW02, chainage: 16055, switch_type: crossover, normal_direction: main, reverse_direction: siding, lateral_speed_limit: 30, state: normal }
