@@ -20,12 +20,14 @@ timetable:
         train_id_prefix: D
         first_departure_s: 0
         headway_s: 150
+        buffer_capacity: 1
       - origin_station: ST24
         initial_direction: up
         trip_legs: [up, down]
         train_id_prefix: U
         first_departure_s: 0
         headway_s: 150
+        buffer_capacity: 1
 
   leg_templates:
     trip_legs: [down, up]
