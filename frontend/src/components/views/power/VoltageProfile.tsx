@@ -18,28 +18,22 @@ function shortTrainLabel(trainId: string): string {
   return num ? `#${num}` : trainId;
 }
 
-const CHART_HEIGHT = 260;
-
 const VoltageProfile = React.memo(function VoltageProfile() {
   const { power, trains, chartHistory, lineLayout, selectedTrainId, chartVersion } =
     useSimulationState();
   const totalLength = lineLayout?.total_length ?? 3200;
 
-  // 排序：选中车置顶
-  const sorted = useMemo(() => {
-    if (!selectedTrainId || trains.length <= 1) return trains;
-    const idx = trains.findIndex((t) => t.id === selectedTrainId);
-    if (idx <= 0) return trains;
-    const copy = [...trains];
-    const [selected] = copy.splice(idx, 1);
-    return [selected, ...copy];
-  }, [trains, selectedTrainId]);
+  // 仅绘制选中列车
+  const selectedTrain = selectedTrainId
+    ? trains.find((t) => t.id === selectedTrainId)
+    : trains[0];
+  const filteredTrains = selectedTrain ? [selectedTrain] : [];
 
-  // 统一的 Y 轴范围（所有子图共享，便于对比）
+  // Y 轴范围（仅选中列车）
   const yRange = useMemo(() => {
     let min = Infinity;
     let max = -Infinity;
-    for (const train of trains) {
+    for (const train of filteredTrains) {
       min = Math.min(min, train.pantograph_voltage);
       max = Math.max(max, train.pantograph_voltage);
       const vp = getTrainChartHistory(chartHistory, train.id).voltagePosition;
@@ -53,7 +47,7 @@ const VoltageProfile = React.memo(function VoltageProfile() {
       yMin: Math.floor(Math.min(1000, min - 100) / 100) * 100,
       yMax: Math.ceil(Math.max(1600, max + 100) / 100) * 100,
     };
-  }, [trains, chartHistory]);
+  }, [filteredTrains, chartHistory]);
 
   // 变电所标记（所有子图共享）
   const substationSeries = useMemo(
@@ -78,10 +72,10 @@ const VoltageProfile = React.memo(function VoltageProfile() {
     [power.substations],
   );
 
-  // 生成每车的独立 ECharts option
+  // 生成选中列车的 ECharts option
   const trainOptions = useMemo(
     () =>
-      sorted.map((train, idx) => {
+      filteredTrains.map((train, idx) => {
         const color = trainColorByIndex(
           trains.findIndex((t) => t.id === train.id),
         );
@@ -166,10 +160,10 @@ const VoltageProfile = React.memo(function VoltageProfile() {
           idx,
         };
       }),
-    [sorted, trains, chartHistory, totalLength, yRange, substationSeries, chartVersion],
+    [filteredTrains, trains, chartHistory, totalLength, yRange, substationSeries, chartVersion],
   );
 
-  if (trains.length === 0) {
+  if (filteredTrains.length === 0) {
     return (
       <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <div className="panel-title">📊 接触网电压分布</div>
@@ -182,37 +176,20 @@ const VoltageProfile = React.memo(function VoltageProfile() {
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div className="panel-title">📊 接触网电压分布</div>
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+      <div className="panel-title">
+        📊 接触网电压分布
+        {filteredTrains[0] && (
+          <span style={{ color: trainColorByIndex(trains.findIndex((t) => t.id === filteredTrains[0].id)), marginLeft: 8, fontSize: 12 }}>
+            {filteredTrains[0].id}
+          </span>
+        )}
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>
         {trainOptions.map(({ option, train }) => (
-          <div
-            key={train.id}
-            style={{
-              borderBottom: '1px solid #1a1a2e',
-              paddingBottom: 4,
-              marginBottom: 4,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: trainColorByIndex(
-                  trains.findIndex((t) => t.id === train.id),
-                ),
-                padding: '2px 12px 0',
-              }}
-            >
-              列车 {shortTrainLabel(train.id)}
-              {train.id === selectedTrainId && (
-                <span style={{ fontSize: 10, color: '#888', marginLeft: 8 }}>
-                  ● 已选中
-                </span>
-              )}
-            </div>
+          <div key={train.id} style={{ height: '100%' }}>
             <ReactECharts
               option={option}
-              style={{ height: CHART_HEIGHT, width: '100%' }}
+              style={{ height: '100%', width: '100%' }}
               notMerge={true}
             />
           </div>

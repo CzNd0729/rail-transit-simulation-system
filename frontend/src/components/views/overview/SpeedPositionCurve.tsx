@@ -1,8 +1,10 @@
 /**
- * SpeedPositionCurve — 速度-位置曲线图（多车叠加）
+ * SpeedPositionCurve — 速度-位置曲线图（单列车，选中即切换）
+ * 使用 SimEChart 避免 notMerge 全量 DOM 重建，动画关闭实现即时切换
  */
-import ReactECharts from 'echarts-for-react';
 import { useMemo } from 'react';
+import type { EChartsOption } from 'echarts';
+import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { getTrainChartHistory } from '../../../utils/chartHistory';
 import { trainColorByIndex } from '../../../utils/constants';
@@ -16,17 +18,22 @@ function shortTrainLabel(trainId: string): string {
 }
 
 export default function SpeedPositionCurve() {
-  const { chartHistory, lineLayout, profileSegments, trains, chartVersion } = useSimulationState();
+  const { chartHistory, lineLayout, profileSegments, trains, selectedTrainId, chartVersion } = useSimulationState();
   const maxPos = lineLayout?.total_length ?? 3200;
   const speedLimitData = (profileSegments ?? []).flatMap((seg) => [
     [seg.start_chainage, seg.speed_limit],
     [seg.end_chainage, seg.speed_limit],
   ] as [number, number][]);
 
+  // 仅绘制选中列车
+  const selectedTrains = trains.filter((t) => t.id === selectedTrainId);
+
   const trainSeries = useMemo(
     () =>
-      trains.map((train, idx) => {
-        const color = trainColorByIndex(idx);
+      selectedTrains.map((train) => {
+        // 用列车在全部 trains 中的实际索引确保颜色一致
+        const realIdx = trains.findIndex((t) => t.id === train.id);
+        const color = trainColorByIndex(realIdx >= 0 ? realIdx : 0);
         return {
           name: train.id,
           type: 'line' as const,
@@ -38,13 +45,14 @@ export default function SpeedPositionCurve() {
           emphasis: { focus: 'series' as const },
         };
       }),
-    [chartHistory, trains, chartVersion],
+    [chartHistory, selectedTrains, chartVersion],
   );
 
   const positionMarkers = useMemo(
     () =>
-      trains.map((train, idx) => {
-        const color = trainColorByIndex(idx);
+      selectedTrains.map((train) => {
+        const realIdx = trains.findIndex((t) => t.id === train.id);
+        const color = trainColorByIndex(realIdx >= 0 ? realIdx : 0);
         return {
           name: `${train.id}·当前`,
           type: 'scatter' as const,
@@ -61,7 +69,7 @@ export default function SpeedPositionCurve() {
           label: {
             show: true,
             formatter: shortTrainLabel(train.id),
-            position: 'top',
+            position: 'top' as const,
             distance: 8,
             color,
             fontSize: 11,
@@ -77,26 +85,15 @@ export default function SpeedPositionCurve() {
           z: 10,
         };
       }),
-    [trains],
+    [selectedTrains],
   );
 
   const option = useMemo(() => ({
     backgroundColor: 'transparent',
+    animation: false,
     tooltip: { trigger: 'axis' as const, formatter: axisTooltip(2) },
-    legend: trains.length > 1
-      ? {
-          data: trains.map((t) => t.id),
-          top: 4,
-          right: 12,
-          orient: 'horizontal' as const,
-          itemWidth: 14,
-          itemHeight: 8,
-          itemGap: 16,
-          textStyle: { color: '#a0a0a0', fontSize: 11 },
-          icon: 'roundRect',
-        }
-      : undefined,
-    grid: { left: 50, right: 20, top: trains.length > 1 ? 40 : 20, bottom: 40 },
+    legend: undefined,
+    grid: { left: 50, right: 20, top: 20, bottom: 40 },
     xAxis: {
       type: 'value' as const,
       name: '位置 (m)',
@@ -128,16 +125,21 @@ export default function SpeedPositionCurve() {
         showSymbol: false,
       },
     ],
-  }), [trainSeries, positionMarkers, speedLimitData, maxPos, trains.length, chartVersion]);
+  } as EChartsOption), [trainSeries, positionMarkers, speedLimitData, maxPos, chartVersion]);
 
   return (
-    <div className="panel" style={{ height: '100%' }}>
-      <div className="panel-title">📈 速度-位置曲线</div>
-      <ReactECharts
-        option={option}
-        style={{ height: 'calc(100% - 30px)' }}
-        notMerge
-      />
+    <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div className="panel-title">
+        📈 速度-位置曲线
+        {selectedTrains[0] && (
+          <span style={{ color: trainColorByIndex(trains.findIndex((t) => t.id === selectedTrains[0].id)), marginLeft: 8, fontSize: 12 }}>
+            {selectedTrains[0].id}
+          </span>
+        )}
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <SimEChart option={option} style={{ height: '100%' }} />
+      </div>
     </div>
   );
 }
