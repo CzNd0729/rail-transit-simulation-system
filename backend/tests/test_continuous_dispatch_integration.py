@@ -134,3 +134,28 @@ def test_continuous_buffer_new_train_stops_after_steady():
         if run.active:
             assert run.vehicle_id.startswith("VEH_"), f"Unexpected vehicle_id: {run.vehicle_id}"
     assert len(orch.trains) > 0
+
+
+def test_continuous_dwell_not_capped_massively():
+    """recover 下长时间运行不应大量出现顶满 max_dwell 的站停。"""
+    orch = Orchestrator.from_config_dir()
+    assert orch.sim_params.signal.ats.dwell_adjust_mode == "recover"
+    orch.sim_params.total_time = 2500.0
+    orch.reset()
+    orch.start()
+    capped = 0
+    samples = 0
+    max_dwell = orch.sim_params.signal.ats.max_dwell_time
+    for _ in range(25000):
+        orch.step_once()
+        for run in orch.trains:
+            if not run.active:
+                continue
+            d = run.ats.last_deviation
+            if d is None:
+                continue
+            samples += 1
+            if d.adjusted_dwell >= max_dwell - 1e-6 and d.delay_arrival > 0:
+                capped += 1
+    assert samples > 0
+    assert capped / samples < 0.05, f"capped={capped} samples={samples}"
