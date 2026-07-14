@@ -126,6 +126,8 @@ async def save_scenario(body: dict) -> dict:
     config_section = {
         "trainCount": sim_config.train_count,
         "bidirectional": sim_config.bidirectional,
+        "coastingMinSpeed": sim_config.coasting_min_speed,
+        "stationStopTolerance": sim_config.station_stop_tolerance,
     }
 
     # 收集运行统计

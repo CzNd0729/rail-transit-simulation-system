@@ -25,56 +25,58 @@ const PARAM_GROUPS: ParamGroup[] = [
   {
     name: '车辆参数', icon: '🚇',
     keys: [
-      'empty_mass', 'passenger_capacity', 'max_speed',
-      'max_traction_force', 'max_brake_force',
-      'davis_A', 'davis_B', 'davis_C_front_area',
-      'davis_C_drag_coeff', 'curve_resist_coeff', 'tunnel_resist_factor',
+      'emptyMass', 'passengerCapacity', 'maxSpeed',
+      'maxTractionForce', 'maxBrakeForce',
+      'davisA', 'davisB', 'davisCFrontArea',
+      'davisCDragCoeff', 'curveResistCoeff', 'tunnelResistFactor',
     ],
     labels: {
-      empty_mass: '空车质量', passenger_capacity: '载客量', max_speed: '最大速度',
-      max_traction_force: '最大牵引力', max_brake_force: '最大制动力',
-      davis_A: 'Davis A', davis_B: 'Davis B', davis_C_front_area: '迎风面积',
-      davis_C_drag_coeff: '空气阻力系数 Cd', curve_resist_coeff: '弯道阻力系数',
-      tunnel_resist_factor: '隧道阻力系数',
+      emptyMass: '空车质量', passengerCapacity: '载客量', maxSpeed: '最大速度',
+      maxTractionForce: '最大牵引力', maxBrakeForce: '最大制动力',
+      davisA: 'Davis A', davisB: 'Davis B', davisCFrontArea: '迎风面积',
+      davisCDragCoeff: '空气阻力系数 Cd', curveResistCoeff: '弯道阻力系数',
+      tunnelResistFactor: '隧道阻力系数',
     },
     units: {
-      empty_mass: 'kg', passenger_capacity: '人', max_speed: 'km/h',
-      max_traction_force: 'N', max_brake_force: 'N',
-      davis_A: '', davis_B: '', davis_C_front_area: 'm²',
-      davis_C_drag_coeff: '', curve_resist_coeff: '', tunnel_resist_factor: '',
+      emptyMass: 'kg', passengerCapacity: '人', maxSpeed: 'km/h',
+      maxTractionForce: 'N', maxBrakeForce: 'N',
+      davisA: '', davisB: '', davisCFrontArea: 'm²',
+      davisCDragCoeff: '', curveResistCoeff: '', tunnelResistFactor: '',
     },
     decimals: {},
   },
   {
     name: '信号参数', icon: '🚦',
-    keys: ['dwell_time', 'departure_interval', 'target_speed_ratio', 'safety_distance', 'comfort_decel', 'max_jerk'],
+    keys: ['dwellTime', 'departureInterval', 'targetSpeedRatio', 'safetyDistance', 'comfortDecel', 'maxJerk', 'evaluationTime', 'totalTime'],
     labels: {
-      dwell_time: '站停时间', departure_interval: '发车间隔', target_speed_ratio: '目标速度比',
-      safety_distance: 'ATP安全距离', comfort_decel: '舒适减速度', max_jerk: '冲击率上限',
+      dwellTime: '站停时间', departureInterval: '发车间隔', targetSpeedRatio: '目标速度比',
+      safetyDistance: 'ATP安全距离', comfortDecel: '舒适减速度', maxJerk: '冲击率上限',
+      evaluationTime: '评估窗口', totalTime: '仿真总时长',
     },
     units: {
-      dwell_time: 's', departure_interval: 's', target_speed_ratio: '',
-      safety_distance: 'm', comfort_decel: 'm/s²', max_jerk: 'm/s³',
+      dwellTime: 's', departureInterval: 's', targetSpeedRatio: '',
+      safetyDistance: 'm', comfortDecel: 'm/s²', maxJerk: 'm/s³',
+      evaluationTime: 's', totalTime: 's',
     },
-    decimals: { target_speed_ratio: 2, comfort_decel: 1, max_jerk: 2 },
+    decimals: { targetSpeedRatio: 2, comfortDecel: 1, maxJerk: 2, evaluationTime: 0, totalTime: 0 },
   },
   {
     name: '供电参数', icon: '⚡',
-    keys: ['pantograph_voltage', 'substation_capacity'],
-    labels: { pantograph_voltage: '网压', substation_capacity: '变电所容量' },
-    units: { pantograph_voltage: 'V', substation_capacity: 'kW' },
+    keys: ['pantographVoltage', 'substationCapacity'],
+    labels: { pantographVoltage: '网压', substationCapacity: '变电所容量' },
+    units: { pantographVoltage: 'V', substationCapacity: 'kW' },
     decimals: {},
   },
 ];
 
-/** simulation 参数展示 */
-const SIM_PARAM_KEYS = ['totalTime', 'evaluationTime', 'coastingMinSpeed', 'stationStopTolerance'] as const;
+/** simulation 参数展示（按方案 JSON 实际存储字段） */
+const SIM_PARAM_KEYS = ['trainCount', 'bidirectional', 'coastingMinSpeed', 'stationStopTolerance'] as const;
 const SIM_PARAM_LABELS: Record<string, string> = {
-  totalTime: '仿真总时长', evaluationTime: '评估窗口',
+  trainCount: '列车数量', bidirectional: '双向运行',
   coastingMinSpeed: '惰行最低速度', stationStopTolerance: '站台停车容忍度',
 };
 const SIM_PARAM_UNITS: Record<string, string> = {
-  totalTime: 's', evaluationTime: 's', coastingMinSpeed: 'km/h', stationStopTolerance: 'm',
+  trainCount: '列', bidirectional: '', coastingMinSpeed: 'km/h', stationStopTolerance: 'm',
 };
 
 function formatParamValue(value: unknown, unit: string, decimals?: number): string {
