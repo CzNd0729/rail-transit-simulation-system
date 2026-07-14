@@ -2,7 +2,7 @@ simulation:
   bidirectional: false
   coasting_min_speed: 30.0
   departure_interval: 120.0
-  evaluation_time: 30.0
+  evaluation_time: 60.0
   speed_multiplier: 1
   station_stop_tolerance: 1.0
   target_speed_ratio: 0.8

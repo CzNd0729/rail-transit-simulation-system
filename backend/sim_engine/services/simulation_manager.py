@@ -735,7 +735,15 @@ class SimulationManager:
                             "name": "自动保存",
                             "description": f"评估窗口{orch.sim_params.evaluation_time}s",
                             "createdAt": now,
-                            "params": self.get_params(),
+                            "params": {
+                                **self.get_params(),
+                                "simulation": {
+                                    "trainCount": orch.sim_params.train_count,
+                                    "bidirectional": orch.sim_params.bidirectional,
+                                    "coastingMinSpeed": orch.sim_params.coasting_min_speed,
+                                    "stationStopTolerance": orch.sim_params.station_stop_tolerance,
+                                },
+                            },
                             "result": {
                                 "totalTime": round(self._evaluation_snapshot["elapsed"], 2),
                                 "totalDistance": round(self._evaluation_snapshot["summary"]["max_position"], 2),
