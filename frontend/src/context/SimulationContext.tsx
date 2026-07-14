@@ -52,7 +52,7 @@ export const initialState: AppState = {
   params: {
     vehicle: { ...DEFAULT_VEHICLE_PARAMS },
     track: { ...DEFAULT_TRACK_PARAMS },
-    power: {},
+    power: { ...DEFAULT_POWER_PARAMS },
     signal: { ...DEFAULT_SIGNAL_PARAMS },
   },
   stats: {
@@ -75,6 +75,7 @@ export const initialState: AppState = {
   powerParamBaselines: extractPowerParamBaselines(DEFAULT_POWER_PARAMS),
   tractionCurveBaselines: extractTractionCurveBaselines(DEFAULT_VEHICLE_PARAMS.traction_curve),
   chartVersion: 0,
+  evaluationComplete: null,
 };
 
 // ==================== Action 类型 ====================
@@ -96,7 +97,8 @@ export type SimulationAction =
   | { type: 'INIT_PARAMS'; payload: Partial<SimulationParams> }
   | { type: 'SET_SPEED_MULTIPLIER'; payload: SpeedMultiplier }
   | { type: 'SET_LINE_LAYOUT'; payload: { layout: LineLayout; profileSegments: ProfileSegment[] } }
-  | { type: 'SET_STATS'; payload: Partial<SimulationStats> };
+  | { type: 'SET_STATS'; payload: Partial<SimulationStats> }
+  | { type: 'SET_EVALUATION_COMPLETE'; payload: { evaluationTime: number; elapsed: number } | null };
 
 // ==================== Reducer ====================
 
@@ -221,6 +223,9 @@ export function simulationReducer(state: AppState, action: SimulationAction): Ap
         ...state,
         clock: { ...state.clock, speed_multiplier: action.payload },
       };
+
+    case 'SET_EVALUATION_COMPLETE':
+      return { ...state, evaluationComplete: action.payload };
 
     default:
       return state;

@@ -286,6 +286,12 @@ export interface SimulationParams {
     dwell_time?: number;
     departure_interval?: number;
     target_speed_ratio?: number;
+    /** ATP安全距离 (m) */
+    safety_distance?: number;
+    /** 舒适减速度 (m/s²) */
+    comfort_decel?: number;
+    /** 冲击率上限 (m/s³) */
+    max_jerk?: number;
   };
 }
 
@@ -456,6 +462,8 @@ export interface AppState {
   tractionCurveBaselines: import('../utils/paramStep').TractionCurvePointBaseline[];
   /** chartHistory 写入版本号，每次可变 push 后递增，驱动 useMemo 重算 */
   chartVersion: number;
+  /** 评估完成通知（null = 未触发或已关闭） */
+  evaluationComplete: { evaluationTime: number; elapsed: number } | null;
 }
 
 // ==================== API 原始类型（camelCase，适配前） ====================
@@ -559,6 +567,7 @@ export type ServerMessage =
   | { type: 'init_state'; config: Record<string, unknown>; state?: { runState: RunState; simulationTime: number } }
   | { type: 'simulation_status'; data: { runState: RunState; simulationTime: number; reason?: string } }
   | { type: 'simulation_complete'; data: Record<string, unknown> }
+  | { type: 'evaluation_complete'; data: { evaluationTime: number; elapsed: number; message?: string } }
   | { type: 'heartbeat'; serverTime?: string };
 
 /** 客户端发送消息 */
@@ -628,6 +637,20 @@ export interface ScenarioResult {
   netEnergy: number;
   minVoltage: number;
   peakPower: number;
+  /** 最大冲击率 (m/s³) */
+  maxJerk: number;
+  /** 平均冲击率 (m/s³) */
+  avgJerk: number;
+  /** 最大加速度 (m/s²) */
+  maxAccel: number;
+  /** 再生利用率 (%) */
+  regenRate: number;
+  /** 紧急制动次数 */
+  ebCount: number;
+  /** 总晚点时间 (s) */
+  totalDelay: number;
+  /** 评估窗口时长 (s)，实际截取长度 */
+  evaluationDuration: number;
 }
 
 /** 完整方案数据 */

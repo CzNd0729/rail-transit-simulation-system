@@ -29,6 +29,9 @@ const PARAM_LABELS: Record<VehicleParamStepKey, string> = {
   davis_A: 'Davis A',
   davis_B: 'Davis B',
   davis_C_front_area: '迎风面积 (m²)',
+  davis_C_drag_coeff: '空气阻力系数 Cd',
+  curve_resist_coeff: '弯道阻力系数',
+  tunnel_resist_factor: '隧道阻力系数',
 };
 
 export default function VehicleParamsForm({ send, disabled = false }: Props) {

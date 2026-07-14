@@ -52,6 +52,15 @@ export function useWebSocket(url: string = WS_BASE_URL) {
               }
               break;
             }
+            case 'evaluation_complete':
+              dispatch({
+                type: 'SET_EVALUATION_COMPLETE',
+                payload: {
+                  evaluationTime: message.data.evaluationTime,
+                  elapsed: message.data.elapsed,
+                },
+              });
+              break;
             case 'init_state':
               if (message.state?.runState) {
                 dispatch({ type: 'SET_RUN_STATE', payload: message.state.runState });
