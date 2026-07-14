@@ -2,6 +2,9 @@
 skills-lock.json
 .cursor/
 
+# Scenario auto-save files
+backend/sim_engine/data/scenarios/
+
 # Python
 __pycache__/
 *.py[cod]
