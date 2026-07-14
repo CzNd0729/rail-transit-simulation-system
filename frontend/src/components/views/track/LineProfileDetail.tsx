@@ -7,7 +7,7 @@ import { useMemo, useRef, useEffect, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
-import { trainColorByIndex } from '../../../utils/constants';
+import { trainColorById } from '../../../utils/constants';
 import { mockLineData, mockSegmentParams } from '../../../data/mockLineData';
 import { useViewport, parseViewBox } from '../../../hooks/useViewport';
 import ViewportControls from '../overview/ViewportControls';
@@ -224,13 +224,13 @@ export default function LineProfileDetail() {
             preserveAspectRatio="none"
             style={{ flex: 1, height: '100%' }}
           >
-            {trains.map((tr, idx) => (
+            {trains.map((tr) => (
               <circle
                 key={tr.id}
                 cx={tr.position}
                 cy={10}
                 r={tr.id === focusTrain?.id ? 5 : 4}
-                fill={trainColorByIndex(idx)}
+                fill={trainColorById(tr.id)}
               />
             ))}
             {visibleStations.map((s) => (

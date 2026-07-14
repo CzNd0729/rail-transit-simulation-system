@@ -4,10 +4,10 @@
  * 各列车独立网压曲线 + 变电所标记，选中列车置顶
  */
 import ReactECharts from 'echarts-for-react';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { getTrainChartHistory } from '../../../utils/chartHistory';
-import { trainColorByIndex } from '../../../utils/constants';
+import { trainColorById } from '../../../utils/constants';
 import { axisTooltip } from '../../../utils/format';
 import { downsample } from '../../../utils/downsample';
 import React from 'react';
@@ -23,10 +23,25 @@ const VoltageProfile = React.memo(function VoltageProfile() {
     useSimulationState();
   const totalLength = lineLayout?.total_length ?? 3200;
 
-  // 仅绘制选中列车
-  const selectedTrain = selectedTrainId
-    ? trains.find((t) => t.id === selectedTrainId)
-    : trains[0];
+  // 记住当前展示的列车，不随新车发车自动切换
+  const pinnedTrainRef = useRef<string | null>(null);
+  // 用户手动选车时更新锚定
+  if (selectedTrainId && selectedTrainId !== pinnedTrainRef.current) {
+    pinnedTrainRef.current = selectedTrainId;
+  }
+  // 初始化：无锚定时取首车
+  if (!pinnedTrainRef.current && trains.length > 0) {
+    pinnedTrainRef.current = trains[0].id;
+  }
+  // 锚定车已消失才回退
+  const pinnedId = pinnedTrainRef.current;
+  const trainExists = pinnedId && trains.some((t) => t.id === pinnedId);
+  if (!trainExists && trains.length > 0) {
+    pinnedTrainRef.current = trains[0].id;
+  }
+
+  const targetId = pinnedTrainRef.current;
+  const selectedTrain = targetId ? trains.find((t) => t.id === targetId) : trains[0];
   const filteredTrains = selectedTrain ? [selectedTrain] : [];
 
   // Y 轴范围（仅选中列车）
@@ -76,9 +91,7 @@ const VoltageProfile = React.memo(function VoltageProfile() {
   const trainOptions = useMemo(
     () =>
       filteredTrains.map((train, idx) => {
-        const color = trainColorByIndex(
-          trains.findIndex((t) => t.id === train.id),
-        );
+        const color = trainColorById(train.id);
         const vp =
           getTrainChartHistory(chartHistory, train.id).voltagePosition;
 
@@ -179,7 +192,7 @@ const VoltageProfile = React.memo(function VoltageProfile() {
       <div className="panel-title">
         📊 接触网电压分布
         {filteredTrains[0] && (
-          <span style={{ color: trainColorByIndex(trains.findIndex((t) => t.id === filteredTrains[0].id)), marginLeft: 8, fontSize: 12 }}>
+          <span style={{ color: trainColorById(filteredTrains[0].id), marginLeft: 8, fontSize: 12 }}>
             {filteredTrains[0].id}
           </span>
         )}

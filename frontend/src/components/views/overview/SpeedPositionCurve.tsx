@@ -2,12 +2,12 @@
  * SpeedPositionCurve — 速度-位置曲线图（单列车，选中即切换）
  * 使用 SimEChart 避免 notMerge 全量 DOM 重建，动画关闭实现即时切换
  */
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type { EChartsOption } from 'echarts';
 import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { getTrainChartHistory } from '../../../utils/chartHistory';
-import { trainColorByIndex } from '../../../utils/constants';
+import { trainColorById } from '../../../utils/constants';
 import { axisTooltip } from '../../../utils/format';
 import { downsample } from '../../../utils/downsample';
 
@@ -25,15 +25,27 @@ export default function SpeedPositionCurve() {
     [seg.end_chainage, seg.speed_limit],
   ] as [number, number][]);
 
-  // 仅绘制选中列车
-  const selectedTrains = trains.filter((t) => t.id === selectedTrainId);
+  // 记住当前展示的列车，不随新车发车自动切换
+  const pinnedRef = useRef<string | null>(null);
+  if (selectedTrainId && selectedTrainId !== pinnedRef.current) {
+    pinnedRef.current = selectedTrainId;
+  }
+  if (!pinnedRef.current && trains.length > 0) {
+    pinnedRef.current = trains[0].id;
+  }
+  const pinnedExists = pinnedRef.current && trains.some((t) => t.id === pinnedRef.current);
+  if (!pinnedExists && trains.length > 0) {
+    pinnedRef.current = trains[0].id;
+  }
+  const displayId = pinnedRef.current;
+
+  // 仅绘制锚定列车
+  const selectedTrains = trains.filter((t) => t.id === displayId);
 
   const trainSeries = useMemo(
     () =>
       selectedTrains.map((train) => {
-        // 用列车在全部 trains 中的实际索引确保颜色一致
-        const realIdx = trains.findIndex((t) => t.id === train.id);
-        const color = trainColorByIndex(realIdx >= 0 ? realIdx : 0);
+        const color = trainColorById(train.id);
         return {
           name: train.id,
           type: 'line' as const,
@@ -51,8 +63,7 @@ export default function SpeedPositionCurve() {
   const positionMarkers = useMemo(
     () =>
       selectedTrains.map((train) => {
-        const realIdx = trains.findIndex((t) => t.id === train.id);
-        const color = trainColorByIndex(realIdx >= 0 ? realIdx : 0);
+        const color = trainColorById(train.id);
         return {
           name: `${train.id}·当前`,
           type: 'scatter' as const,
@@ -132,7 +143,7 @@ export default function SpeedPositionCurve() {
       <div className="panel-title">
         📈 速度-位置曲线
         {selectedTrains[0] && (
-          <span style={{ color: trainColorByIndex(trains.findIndex((t) => t.id === selectedTrains[0].id)), marginLeft: 8, fontSize: 12 }}>
+          <span style={{ color: trainColorById(selectedTrains[0].id), marginLeft: 8, fontSize: 12 }}>
             {selectedTrains[0].id}
           </span>
         )}

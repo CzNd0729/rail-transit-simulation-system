@@ -62,6 +62,12 @@ export function trainColorByIndex(index: number): string {
   return TRAIN_CHART_COLORS[index % TRAIN_CHART_COLORS.length];
 }
 
+/** 按列车 ID 稳定取色，不受数组排序/新增车辆影响 */
+export function trainColorById(trainId: string): string {
+  const num = parseInt(trainId.replace(/\D/g, ''), 10) || 0;
+  return TRAIN_CHART_COLORS[(num - 1) % TRAIN_CHART_COLORS.length];
+}
+
 /** 迭代二 MA 示意图固定安全包络长度 (m)，迭代三改为动态 ATP 包络 */
 export const MA_ENVELOPE_LENGTH = 300;
 
