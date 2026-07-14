@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 from pathlib import Path
 
 import yaml
@@ -499,6 +500,7 @@ class SimulationManager:
                 "safetyDistance": orch.sim_params.signal.atp.safety_distance,
                 "comfortDecel": orch.sim_params.pid.comfort_decel,
                 "maxJerk": orch.sim_params.pid.max_jerk,
+                "evaluationTime": orch.sim_params.evaluation_time,
             },
         }
 
@@ -590,6 +592,9 @@ class SimulationManager:
         if "maxJerk" in signal_updates:
             orch.sim_params.pid.max_jerk = float(signal_updates["maxJerk"])
             updated.append("signal.maxJerk")
+        if "evaluationTime" in signal_updates:
+            orch.sim_params.evaluation_time = float(signal_updates["evaluationTime"])
+            updated.append("signal.evaluationTime")
 
         return {"updated": updated, "params": self.get_params()}
 
@@ -696,6 +701,50 @@ class SimulationManager:
                             "elapsed": orch.clock.elapsed,
                         },
                     })
+
+                    # 自动保存方案
+                    try:
+                        from sim_engine.api.scenarios import _generate_id, _write_scenario
+                        now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                        auto_id = _generate_id()
+                        power_data = snapshot.get("data", {}).get("power", {}) if snapshot else {}
+                        traction_energy = power_data.get("totalConsumption", 0.0)
+                        regen_energy = power_data.get("totalRegeneration", 0.0)
+                        net_energy = round(traction_energy - regen_energy, 4)
+                        regen_rate = round((regen_energy / traction_energy) * 100, 2) if traction_energy > 0 else 0.0
+                        trk = self._evaluation_snapshot["tracking"]
+                        auto_scenario = {
+                            "id": auto_id,
+                            "name": "自动保存",
+                            "description": f"评估窗口{orch.sim_params.evaluation_time}s",
+                            "createdAt": now,
+                            "params": self.get_params(),
+                            "result": {
+                                "totalTime": round(self._evaluation_snapshot["elapsed"], 2),
+                                "totalDistance": round(self._evaluation_snapshot["summary"]["max_position"], 2),
+                                "avgSpeed": round(self._evaluation_snapshot["summary"]["avg_speed"], 2),
+                                "maxSpeed": round(self._evaluation_snapshot["summary"]["max_speed"], 2),
+                                "tractionEnergy": round(traction_energy, 4),
+                                "regenEnergy": round(regen_energy, 4),
+                                "netEnergy": net_energy,
+                                "minVoltage": round(trk["minVoltage"], 2),
+                                "peakPower": round(trk["peakPower"], 2),
+                                "maxJerk": round(trk["maxJerk"], 4),
+                                "avgJerk": round(trk["avgJerk"], 4),
+                                "maxAccel": round(trk["maxAccel"], 4),
+                                "regenRate": regen_rate,
+                                "ebCount": trk["ebCount"],
+                                "totalDelay": round(trk["totalDelay"], 2),
+                                "evaluationDuration": round(self._evaluation_snapshot["elapsed"], 2),
+                            },
+                        }
+                        _write_scenario(auto_scenario)
+                        await self.ws_manager.broadcast({
+                            "type": "scenario_auto_saved",
+                            "data": {"id": auto_id, "name": "自动保存"},
+                        })
+                    except Exception as exc:
+                        print(f"  自动保存方案失败: {exc}")
             # 终点停稳判断
             line_end = (
                 not self._is_continuous_dispatch(orch)
