@@ -48,24 +48,35 @@ export const VIEW_CONFIG = {
   scenario: { label: '方案对比', icon: '📊' },
 } as const;
 
-/** 多车标识配色：红 / 黄 / 蓝（高对比，按 TRAIN_01 起顺序） */
+/** 上行配色（6色） */
 export const TRAIN_CHART_COLORS = [
-  '#ff4d4f',
-  '#fadb14',
-  '#1890ff',
-  '#eb2f96',
-  '#722ed1',
-  '#13c2c2',
+  '#ff4d4f', // 红
+  '#fadb14', // 黄
+  '#1890ff', // 蓝
+  '#eb2f96', // 粉
+  '#722ed1', // 紫
+  '#13c2c2', // 青
+] as const;
+
+/** 下行独立配色（6色，与上行无重叠） */
+const TRAIN_CHART_COLORS_DOWN = [
+  '#ff7a45', // 橙
+  '#73d13d', // 绿
+  '#597ef7', // 靛蓝
+  '#ff85c0', // 浅粉
+  '#b37feb', // 浅紫
+  '#36cfc9', // 浅青
 ] as const;
 
 export function trainColorByIndex(index: number): string {
   return TRAIN_CHART_COLORS[index % TRAIN_CHART_COLORS.length];
 }
 
-/** 按列车 ID 稳定取色，不受数组排序/新增车辆影响 */
-export function trainColorById(trainId: string): string {
+/** 按列车 ID 稳定取色，上下行独立色盘无碰撞 */
+export function trainColorById(trainId: string, direction?: string): string {
   const num = parseInt(trainId.replace(/\D/g, ''), 10) || 0;
-  return TRAIN_CHART_COLORS[(num - 1) % TRAIN_CHART_COLORS.length];
+  const palette = direction === 'down' ? TRAIN_CHART_COLORS_DOWN : TRAIN_CHART_COLORS;
+  return palette[(num - 1) % palette.length];
 }
 
 /** 迭代二 MA 示意图固定安全包络长度 (m)，迭代三改为动态 ATP 包络 */

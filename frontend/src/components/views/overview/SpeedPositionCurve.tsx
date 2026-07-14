@@ -45,7 +45,7 @@ export default function SpeedPositionCurve() {
   const trainSeries = useMemo(
     () =>
       selectedTrains.map((train) => {
-        const color = trainColorById(train.id);
+        const color = trainColorById(train.id, train.direction);
         return {
           name: train.id,
           type: 'line' as const,
@@ -63,7 +63,7 @@ export default function SpeedPositionCurve() {
   const positionMarkers = useMemo(
     () =>
       selectedTrains.map((train) => {
-        const color = trainColorById(train.id);
+        const color = trainColorById(train.id, train.direction);
         return {
           name: `${train.id}·当前`,
           type: 'scatter' as const,
@@ -143,7 +143,7 @@ export default function SpeedPositionCurve() {
       <div className="panel-title">
         📈 速度-位置曲线
         {selectedTrains[0] && (
-          <span style={{ color: trainColorById(selectedTrains[0].id), marginLeft: 8, fontSize: 12 }}>
+          <span style={{ color: trainColorById(selectedTrains[0].id, selectedTrains[0].direction), marginLeft: 8, fontSize: 12 }}>
             {selectedTrains[0].id}
           </span>
         )}

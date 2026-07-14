@@ -230,7 +230,7 @@ export default function LineProfileDetail() {
                 cx={tr.position}
                 cy={10}
                 r={tr.id === focusTrain?.id ? 5 : 4}
-                fill={trainColorById(tr.id)}
+                fill={trainColorById(tr.id, tr.direction)}
               />
             ))}
             {visibleStations.map((s) => (

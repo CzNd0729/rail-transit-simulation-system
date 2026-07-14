@@ -91,7 +91,7 @@ const VoltageProfile = React.memo(function VoltageProfile() {
   const trainOptions = useMemo(
     () =>
       filteredTrains.map((train, idx) => {
-        const color = trainColorById(train.id);
+        const color = trainColorById(train.id, train.direction);
         const vp =
           getTrainChartHistory(chartHistory, train.id).voltagePosition;
 
@@ -192,7 +192,7 @@ const VoltageProfile = React.memo(function VoltageProfile() {
       <div className="panel-title">
         📊 接触网电压分布
         {filteredTrains[0] && (
-          <span style={{ color: trainColorById(filteredTrains[0].id), marginLeft: 8, fontSize: 12 }}>
+          <span style={{ color: trainColorById(filteredTrains[0].id, filteredTrains[0].direction), marginLeft: 8, fontSize: 12 }}>
             {filteredTrains[0].id}
           </span>
         )}
