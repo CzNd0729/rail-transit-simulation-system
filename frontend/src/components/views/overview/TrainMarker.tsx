@@ -132,10 +132,14 @@ export default function TrainMarker({
       {(() => {
         const centerX = trainStart + TRAIN_LENGTH / 2;
         const centerY = getTrackY(centerX, direction, stations, transitionLength);
+        // 下轨标注放在车身下方，避免与上轨车身重叠
+        const labelY = direction === 'down'
+          ? centerY + TRAIN_HEIGHT / 2 + 10
+          : centerY - TRAIN_HEIGHT / 2 - 2;
         return (
           <text
             x={centerX}
-            y={centerY - TRAIN_HEIGHT / 2 - 4}
+            y={labelY}
             textAnchor="middle"
             fontSize={8}
             fill={color}
