@@ -292,8 +292,11 @@ class Orchestrator:
         direction: str,
         trip_leg_names: tuple[str, ...],
         start_pos: float | None = None,
+        vehicle_id: str = "",
+        total_trips: int = 0,
+        passenger_load: float | None = None,
     ) -> TrainRun:
-        """continuous 模式动态创建列车（按派车端交路）。"""
+        """continuous 模式动态创建列车（支持 buffer 旧车复用）。"""
         assert self._service_timetable is not None
         legs = materialize_trip_timetables(
             self._service_timetable, train_id, trip_leg_names
@@ -307,11 +310,13 @@ class Orchestrator:
             self.track, self.vehicle.params, self.sim_params, ats=ats
         )
         signaling.reset(direction=direction)
+        pl = passenger_load if passenger_load is not None else self._passenger_load
         return TrainRun(
             train_id=train_id,
+            vehicle_id=vehicle_id or self._next_vehicle_id(),
             state=self.vehicle.create_initial_state(
                 position=start_pos,
-                passenger_load=self._passenger_load,
+                passenger_load=pl,
                 direction=direction,
             ),
             signaling=signaling,
@@ -323,7 +328,16 @@ class Orchestrator:
             legs=legs,
             leg_index=0,
             trip_leg_names=trip_leg_names,
+            total_trips=total_trips,
+            total_mileage=0.0,
         )
+
+    def _next_vehicle_id(self) -> str:
+        """生成全局唯一 vehicle_id。"""
+        if not hasattr(self, '_vehicle_serial'):
+            self._vehicle_serial = 0
+        self._vehicle_serial += 1
+        return f"VEH_{self._vehicle_serial:03d}"
 
     def _tick_continuous_dispatch(self, elapsed: float) -> None:
         assert self._fleet_scheduler is not None
@@ -334,15 +348,30 @@ class Orchestrator:
             direction: str,
             trip_leg_names: tuple[str, ...],
             start_pos: float,
+            vehicle_id: str = "",
+            total_trips: int = 0,
+            passenger_load: float = 0.6,
         ) -> None:
             self.trains.append(
                 self._create_train_run(
-                    train_id, spawn_time, direction, trip_leg_names, start_pos
+                    train_id, spawn_time, direction, trip_leg_names, start_pos,
+                    vehicle_id=vehicle_id,
+                    total_trips=total_trips,
+                    passenger_load=passenger_load,
                 )
             )
 
         active = [r for r in self.trains if r.active]
         self._fleet_scheduler.tick(elapsed, active, create_run)
+
+    def _at_terminal(self, run: TrainRun) -> bool:
+        """判断列车是否到达终点站并停稳。"""
+        if run.state.speed >= 0.1:
+            return False
+        total = self.track.track.total_length
+        if run.direction == "down":
+            return run.state.position >= total - 1.0
+        return run.state.position <= 1.0
 
     def set_snapshot_callback(self, callback: Callable[[dict], None]) -> None:
         """注册每步快照回调（供 WebSocket 推送层使用）。"""
@@ -505,6 +534,15 @@ class Orchestrator:
             if not self.trains:
                 self._init_trains_fixed(self._passenger_load)
             self._spawn_trains(elapsed)
+
+        # ── 列车到达终点→存入存车线 ──
+        if self._fleet_scheduler is not None:
+            for run in self.trains:
+                if not run.active:
+                    continue
+                if self._at_terminal(run):
+                    run.active = False
+                    self._fleet_scheduler.receive_train(run)
 
         active_runs = [r for r in self.trains if r.active]
         if not active_runs:
@@ -671,11 +709,16 @@ class Orchestrator:
                     ),
                 })
 
+        buffer_state = {}
+        if self._fleet_scheduler is not None:
+            buffer_state = self._fleet_scheduler.buffer_state()
+
         snapshot = build_simulation_snapshot(
             self.clock,
             self.sim_params,
             train_entries,
             voltage_profile=voltage_profile,
+            buffer_state=buffer_state,
             substation_states=substation_states,
             occupancy=self.occupancy.occupancy_list(),
             switch_states=self.switch_manager.switch_list(),
