@@ -10,7 +10,6 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory, useChartFollowClock } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
 import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS, xAxisSplitLineForRunState } from '../../../utils/vehicleChart';
-import { downsample } from '../../../utils/downsample';
 import React from 'react';
 
 const SpeedTimeCurve = React.memo(function SpeedTimeCurve() {
@@ -48,7 +47,8 @@ const SpeedTimeCurve = React.memo(function SpeedTimeCurve() {
         name: '速度',
         type: 'line',
         showSymbol: false,
-        data: downsample(chartHistory.speedTime, 800),
+        sampling: 'lttb',
+        data: chartHistory.speedTime,
         lineStyle: { color: '#1890ff', width: 2 },
         itemStyle: { color: '#1890ff' },
         areaStyle: { color: 'rgba(24, 144, 255, 0.08)' },

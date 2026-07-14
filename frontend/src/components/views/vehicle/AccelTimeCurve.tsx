@@ -10,7 +10,6 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory, useChartFollowClock } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
 import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS, xAxisSplitLineForRunState } from '../../../utils/vehicleChart';
-import { downsample } from '../../../utils/downsample';
 import React from 'react';
 
 const AccelTimeCurve = React.memo(function AccelTimeCurve() {
@@ -47,7 +46,8 @@ const AccelTimeCurve = React.memo(function AccelTimeCurve() {
         name: '加速度',
         type: 'line',
         showSymbol: false,
-        data: downsample(chartHistory.accelTime, 800),
+        sampling: 'lttb',
+        data: chartHistory.accelTime,
         lineStyle: { color: '#52c41a', width: 2 },
         itemStyle: { color: '#52c41a' },
         areaStyle: { color: 'rgba(82, 196, 26, 0.08)' },

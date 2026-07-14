@@ -9,7 +9,6 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory, useChartFollowClock } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
 import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS } from '../../../utils/vehicleChart';
-import { downsample } from '../../../utils/downsample';
 import React from 'react';
 
 const COMFORT_JERK_LIMIT = 0.75;
@@ -54,7 +53,8 @@ const JerkTimeCurve = React.memo(function JerkTimeCurve() {
           name: '冲击率',
           type: 'line',
           showSymbol: false,
-          data: downsample(chartHistory.jerkTime, 800),
+          sampling: 'lttb',
+          data: chartHistory.jerkTime,
           lineStyle: { color: '#9254de', width: 2 },
           itemStyle: { color: '#9254de' },
           areaStyle: { color: 'rgba(146, 84, 222, 0.08)' },

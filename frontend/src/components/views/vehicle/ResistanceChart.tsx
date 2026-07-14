@@ -9,7 +9,6 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory, useChartFollowClock } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
 import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS, xAxisSplitLineForRunState } from '../../../utils/vehicleChart';
-import { downsample } from '../../../utils/downsample';
 import React from 'react';
 
 function hasBreakdownData(history: ReturnType<typeof useActiveChartHistory>): boolean {
@@ -36,10 +35,10 @@ const ResistanceChart = React.memo(function ResistanceChart() {
       : 600;
 
     const stackedSeries = [
-      { name: 'Davis', data: downsample(chartHistory.davisResistanceTime, 800), color: '#1890ff' },
-      { name: '坡度', data: downsample(chartHistory.gradientResistanceTime, 800), color: '#52c41a' },
-      { name: '弯道', data: downsample(chartHistory.curveResistanceTime, 800), color: '#faad14' },
-      { name: '隧道', data: downsample(chartHistory.tunnelResistanceTime, 800), color: '#9254de' },
+      { name: 'Davis', data: chartHistory.davisResistanceTime, color: '#1890ff' },
+      { name: '坡度', data: chartHistory.gradientResistanceTime, color: '#52c41a' },
+      { name: '弯道', data: chartHistory.curveResistanceTime, color: '#faad14' },
+      { name: '隧道', data: chartHistory.tunnelResistanceTime, color: '#9254de' },
     ];
 
     return {
@@ -77,6 +76,7 @@ const ResistanceChart = React.memo(function ResistanceChart() {
             type: 'line' as const,
             stack: 'resistance',
             showSymbol: false,
+            sampling: 'lttb',
             data: s.data,
             lineStyle: { color: s.color, width: 1 },
             itemStyle: { color: s.color },
@@ -86,7 +86,8 @@ const ResistanceChart = React.memo(function ResistanceChart() {
             name: '总阻力',
             type: 'line' as const,
             showSymbol: false,
-            data: downsample(chartHistory.resistanceTime, 800),
+            sampling: 'lttb',
+            data: chartHistory.resistanceTime,
             lineStyle: { color: '#fa8c16', width: 2 },
             itemStyle: { color: '#fa8c16' },
             areaStyle: { color: 'rgba(250, 140, 22, 0.08)' },

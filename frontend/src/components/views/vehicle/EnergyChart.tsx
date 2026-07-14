@@ -9,7 +9,6 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory, useChartFollowClock } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
 import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS, xAxisSplitLineForRunState } from '../../../utils/vehicleChart';
-import { downsample } from '../../../utils/downsample';
 import React from 'react';
 
 const EnergyChart = React.memo(function EnergyChart() {
@@ -51,7 +50,8 @@ const EnergyChart = React.memo(function EnergyChart() {
         name: '牵引能耗',
         type: 'line',
         showSymbol: false,
-        data: downsample(chartHistory.tractionEnergyTime, 800),
+        sampling: 'lttb',
+        data: chartHistory.tractionEnergyTime,
         lineStyle: { color: '#ff4d4f', width: 2 },
         itemStyle: { color: '#ff4d4f' },
       },
@@ -59,7 +59,8 @@ const EnergyChart = React.memo(function EnergyChart() {
         name: '再生电量',
         type: 'line',
         showSymbol: false,
-        data: downsample(chartHistory.regenEnergyTime, 800),
+        sampling: 'lttb',
+        data: chartHistory.regenEnergyTime,
         lineStyle: { color: '#52c41a', width: 2 },
         itemStyle: { color: '#52c41a' },
       },
