@@ -12,6 +12,8 @@ import { axisTooltip } from '../../../utils/format';
 import { resolveAtpSpeedLimit, resolvePermanentSpeedLimit } from '../../../utils/signalSelectors';
 import { useSelectedTrain } from '../../../hooks/useSelectedTrain';
 import type { ProfileSegment } from '../../../data/mvpLineLayout';
+import { downsample } from '../../../utils/downsample';
+import React from 'react';
 
 function toStepData(
   segments: ProfileSegment[],
@@ -25,8 +27,8 @@ function toStepData(
   return result;
 }
 
-export default function SpeedEnvelope() {
-  const { lineLayout, profileSegments, params, signaling } = useSimulationState();
+const SpeedEnvelope = React.memo(function SpeedEnvelope() {
+  const { lineLayout, profileSegments, params, signaling, chartVersion } = useSimulationState();
   const chartHistory = useActiveChartHistory();
   const train = useSelectedTrain();
   const maxPos = lineLayout?.total_length ?? 3200;
@@ -123,7 +125,7 @@ export default function SpeedEnvelope() {
         name: '实际速度',
         type: 'line',
         smooth: true,
-        data: chartHistory.speedPosition,
+        data: downsample(chartHistory.speedPosition, 500),
         lineStyle: { color: '#1890ff', width: 2 },
         itemStyle: { color: '#1890ff' },
         showSymbol: false,
@@ -135,6 +137,7 @@ export default function SpeedEnvelope() {
     targetSpeedData,
     chartHistory.speedPosition,
     maxPos,
+    chartVersion,
   ]);
 
   return (
@@ -145,4 +148,6 @@ export default function SpeedEnvelope() {
       </div>
     </div>
   );
-}
+});
+
+export default SpeedEnvelope;

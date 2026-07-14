@@ -10,9 +10,11 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
 import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS } from '../../../utils/vehicleChart';
+import { downsample } from '../../../utils/downsample';
+import React from 'react';
 
-export default function AccelTimeCurve() {
-  const { clock } = useSimulationState();
+const AccelTimeCurve = React.memo(function AccelTimeCurve() {
+  const { clock, chartVersion } = useSimulationState();
   const chartHistory = useActiveChartHistory();
 
   const option = useMemo((): EChartsOption => ({
@@ -42,13 +44,13 @@ export default function AccelTimeCurve() {
         name: '加速度',
         type: 'line',
         showSymbol: false,
-        data: chartHistory.accelTime,
+        data: downsample(chartHistory.accelTime, 800),
         lineStyle: { color: '#52c41a', width: 2 },
         itemStyle: { color: '#52c41a' },
         areaStyle: { color: 'rgba(82, 196, 26, 0.08)' },
       },
     ],
-  }), [chartHistory.accelTime, clock.elapsed]);
+  }), [chartHistory.accelTime, clock.elapsed, chartVersion]);
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -58,4 +60,6 @@ export default function AccelTimeCurve() {
       </div>
     </div>
   );
-}
+});
+
+export default AccelTimeCurve;

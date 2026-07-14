@@ -9,9 +9,11 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
 import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS } from '../../../utils/vehicleChart';
+import { downsample } from '../../../utils/downsample';
+import React from 'react';
 
-export default function EnergyChart() {
-  const { clock } = useSimulationState();
+const EnergyChart = React.memo(function EnergyChart() {
+  const { clock, chartVersion } = useSimulationState();
   const chartHistory = useActiveChartHistory();
 
   const option = useMemo((): EChartsOption => ({
@@ -46,7 +48,7 @@ export default function EnergyChart() {
         name: '牵引能耗',
         type: 'line',
         showSymbol: false,
-        data: chartHistory.tractionEnergyTime,
+        data: downsample(chartHistory.tractionEnergyTime, 800),
         lineStyle: { color: '#ff4d4f', width: 2 },
         itemStyle: { color: '#ff4d4f' },
       },
@@ -54,12 +56,12 @@ export default function EnergyChart() {
         name: '再生电量',
         type: 'line',
         showSymbol: false,
-        data: chartHistory.regenEnergyTime,
+        data: downsample(chartHistory.regenEnergyTime, 800),
         lineStyle: { color: '#52c41a', width: 2 },
         itemStyle: { color: '#52c41a' },
       },
     ],
-  }), [chartHistory.tractionEnergyTime, chartHistory.regenEnergyTime, clock.elapsed]);
+  }), [chartHistory.tractionEnergyTime, chartHistory.regenEnergyTime, clock.elapsed, chartVersion]);
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -69,4 +71,6 @@ export default function EnergyChart() {
       </div>
     </div>
   );
-}
+});
+
+export default EnergyChart;

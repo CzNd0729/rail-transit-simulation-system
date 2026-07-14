@@ -7,6 +7,7 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { getTrainChartHistory } from '../../../utils/chartHistory';
 import { trainColorByIndex } from '../../../utils/constants';
 import { axisTooltip } from '../../../utils/format';
+import { downsample } from '../../../utils/downsample';
 
 /** 图例 / 标签用短车号 */
 function shortTrainLabel(trainId: string): string {
@@ -15,7 +16,7 @@ function shortTrainLabel(trainId: string): string {
 }
 
 export default function SpeedPositionCurve() {
-  const { chartHistory, lineLayout, profileSegments, trains } = useSimulationState();
+  const { chartHistory, lineLayout, profileSegments, trains, chartVersion } = useSimulationState();
   const maxPos = lineLayout?.total_length ?? 3200;
   const speedLimitData = (profileSegments ?? []).flatMap((seg) => [
     [seg.start_chainage, seg.speed_limit],
@@ -37,7 +38,7 @@ export default function SpeedPositionCurve() {
           emphasis: { focus: 'series' as const },
         };
       }),
-    [chartHistory, trains],
+    [chartHistory, trains, chartVersion],
   );
 
   const positionMarkers = useMemo(
@@ -79,7 +80,7 @@ export default function SpeedPositionCurve() {
     [trains],
   );
 
-  const option = {
+  const option = useMemo(() => ({
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis' as const, formatter: axisTooltip(2) },
     legend: trains.length > 1
@@ -113,7 +114,10 @@ export default function SpeedPositionCurve() {
       max: 100,
     },
     series: [
-      ...trainSeries,
+      ...trainSeries.map((s) => ({
+        ...s,
+        data: downsample(s.data as [number, number][], 500),
+      })),
       ...positionMarkers,
       {
         name: '限速',
@@ -124,7 +128,7 @@ export default function SpeedPositionCurve() {
         showSymbol: false,
       },
     ],
-  };
+  }), [trainSeries, positionMarkers, speedLimitData, maxPos, trains.length, chartVersion]);
 
   return (
     <div className="panel" style={{ height: '100%' }}>

@@ -10,6 +10,8 @@ import { useActiveChartHistory, useSelectedTrain } from '../../../hooks/useSelec
 import { mockLineData } from '../../../data/mockLineData';
 import { axisTooltip } from '../../../utils/format';
 import { resolveLatestDeviation } from '../../../utils/signalSelectors';
+import { downsample } from '../../../utils/downsample';
+import React from 'react';
 
 /** X 轴上限按 50s 阶梯取整，避免每帧 float 抖动 */
 function stableTimeMax(points: [number, number][]): number {
@@ -78,9 +80,9 @@ function buildStationLabel(
   };
 }
 
-export default function TimetableChart() {
+const TimetableChart = React.memo(function TimetableChart() {
   const chartHistory = useActiveChartHistory();
-  const { lineLayout, signaling } = useSimulationState();
+  const { lineLayout, signaling, chartVersion } = useSimulationState();
   const train = useSelectedTrain();
   const stations = lineLayout?.stations ?? mockLineData.stations;
   const maxPos = lineLayout?.total_length ?? mockLineData.total_length;
@@ -155,7 +157,7 @@ export default function TimetableChart() {
           name: '运行轨迹',
           type: 'line',
           smooth: true,
-          data: chartHistory.positionTime,
+          data: downsample(chartHistory.positionTime, 1000),
           lineStyle: { color: '#1890ff', width: 2 },
           itemStyle: { color: '#1890ff' },
           showSymbol: false,
@@ -167,7 +169,7 @@ export default function TimetableChart() {
         },
       ],
     }),
-    [chartHistory.positionTime, xMax, maxPos, stationMarkLines],
+    [chartHistory.positionTime, xMax, maxPos, stationMarkLines, chartVersion],
   );
 
   const deviationText = deviation
@@ -196,4 +198,6 @@ export default function TimetableChart() {
       </div>
     </div>
   );
-}
+});
+
+export default TimetableChart;

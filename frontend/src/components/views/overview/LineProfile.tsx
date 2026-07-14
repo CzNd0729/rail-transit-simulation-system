@@ -3,6 +3,7 @@
  * 基于《需求文档》UI-VW-01
  */
 import ReactECharts from 'echarts-for-react';
+import { useMemo } from 'react';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { buildProfileSegments } from '../../../data/mvpLineLayout';
 import { toStepData } from '../../../utils/profileChart';
@@ -13,7 +14,7 @@ export default function LineProfile() {
   const gradientData = toStepData(segments, 'gradient');
   const stations = lineLayout?.stations ?? [];
 
-  const option = {
+  const option = useMemo(() => ({
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis' as const },
     grid: { left: 50, right: 20, top: 30, bottom: 40 },
@@ -53,7 +54,7 @@ export default function LineProfile() {
         },
       },
     ],
-  };
+  }), [gradientData, stations, segments, lineLayout?.total_length]);
 
   return (
     <div className="panel" style={{ height: '100%' }}>

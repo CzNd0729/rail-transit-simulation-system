@@ -23,27 +23,43 @@ export const EMPTY_CHART_HISTORY: ChartHistory = {
 /** 每列车每序列最大缓存点数（0.1s 步长约 5000s 全程） */
 export const CHART_HISTORY_MAX_POINTS = 50_000;
 
-function trimHistory(history: TrainChartHistory): TrainChartHistory {
-  const MAX_POINTS = CHART_HISTORY_MAX_POINTS;
-  if (history.speedTime.length <= MAX_POINTS) {
-    return history;
+/** 向系列数组追加一个点，超出上限时移除最早的点（零拷贝） */
+function pushPoint(series: [number, number][], point: [number, number], max: number): void {
+  series.push(point);
+  if (series.length > max) {
+    series.shift();
   }
-  // 仅裁剪时间维度的数组；位置维度（speedPosition/voltagePosition）受线路长度自然约束
+}
+
+function createEmptyTrainHistory(): TrainChartHistory {
   return {
-    speedTime: history.speedTime.slice(-MAX_POINTS),
-    accelTime: history.accelTime.slice(-MAX_POINTS),
-    jerkTime: history.jerkTime.slice(-MAX_POINTS),
-    speedPosition: history.speedPosition,
-    positionTime: history.positionTime.slice(-MAX_POINTS),
-    voltagePosition: history.voltagePosition,
-    resistanceTime: history.resistanceTime.slice(-MAX_POINTS),
-    davisResistanceTime: history.davisResistanceTime.slice(-MAX_POINTS),
-    gradientResistanceTime: history.gradientResistanceTime.slice(-MAX_POINTS),
-    curveResistanceTime: history.curveResistanceTime.slice(-MAX_POINTS),
-    tunnelResistanceTime: history.tunnelResistanceTime.slice(-MAX_POINTS),
-    tractionEnergyTime: history.tractionEnergyTime.slice(-MAX_POINTS),
-    regenEnergyTime: history.regenEnergyTime.slice(-MAX_POINTS),
+    speedTime: [],
+    accelTime: [],
+    jerkTime: [],
+    speedPosition: [],
+    positionTime: [],
+    voltagePosition: [],
+    resistanceTime: [],
+    davisResistanceTime: [],
+    gradientResistanceTime: [],
+    curveResistanceTime: [],
+    tunnelResistanceTime: [],
+    tractionEnergyTime: [],
+    regenEnergyTime: [],
   };
+}
+
+/** 确保某车在 byTrain 中有记录，返回其 TrainChartHistory（原地修改） */
+function ensureTrainHistory(
+  byTrain: Record<string, TrainChartHistory>,
+  trainId: string,
+): TrainChartHistory {
+  let h = byTrain[trainId];
+  if (!h) {
+    h = createEmptyTrainHistory();
+    byTrain[trainId] = h;
+  }
+  return h;
 }
 
 export function getTrainChartHistory(
@@ -53,46 +69,65 @@ export function getTrainChartHistory(
   return history.byTrain[trainId] ?? EMPTY_TRAIN_CHART_HISTORY;
 }
 
+/**
+ * 向 chartHistory 追加一帧仿真快照数据。
+ * 直接 push 到现有数组，零数组拷贝。
+ * 返回 true 表示有数据写入（调用方应递增 chartVersion）。
+ */
 export function appendChartHistory(
   history: ChartHistory,
   snapshot: SimulationSnapshot,
-): ChartHistory {
-  if (snapshot.trains.length === 0) {
-    return history;
-  }
+): boolean {
+  if (snapshot.trains.length === 0) return false;
 
-  const byTrain = { ...history.byTrain };
+  const { byTrain } = history;
   const t = snapshot.clock.elapsed;
   const tractionKwh = snapshot.power.total_consumption;
   const regenKwh = snapshot.power.total_regeneration;
+  const MAX = CHART_HISTORY_MAX_POINTS;
 
   for (const train of snapshot.trains) {
-    const prev = byTrain[train.id] ?? EMPTY_TRAIN_CHART_HISTORY;
-    byTrain[train.id] = trimHistory({
-      speedTime: [...prev.speedTime, [t, train.speed]],
-      accelTime: [...prev.accelTime, [t, train.acceleration]],
-      jerkTime: [...prev.jerkTime, [t, train.jerk]],
-      speedPosition: [...prev.speedPosition, [train.position, train.speed]],
-      positionTime: [...prev.positionTime, [t, train.position]],
-      voltagePosition: [...prev.voltagePosition, [train.position, train.pantograph_voltage]],
-      resistanceTime: [...prev.resistanceTime, [t, train.total_resistance / 1000]],
-      davisResistanceTime: [...prev.davisResistanceTime, [t, (train.davis_resistance ?? 0) / 1000]],
-      gradientResistanceTime: [...prev.gradientResistanceTime, [t, (train.gradient_resistance ?? 0) / 1000]],
-      curveResistanceTime: [...prev.curveResistanceTime, [t, (train.curve_resistance ?? 0) / 1000]],
-      tunnelResistanceTime: [...prev.tunnelResistanceTime, [t, (train.tunnel_resistance ?? 0) / 1000]],
-      tractionEnergyTime: [...prev.tractionEnergyTime, [t, tractionKwh]],
-      regenEnergyTime: [...prev.regenEnergyTime, [t, regenKwh]],
-    });
+    const h = ensureTrainHistory(byTrain, train.id);
+
+    pushPoint(h.speedTime,          [t, train.speed],                  MAX);
+    pushPoint(h.accelTime,          [t, train.acceleration],           MAX);
+    pushPoint(h.jerkTime,           [t, train.jerk ?? 0],              MAX);
+    pushPoint(h.speedPosition,      [train.position, train.speed],     MAX);
+    pushPoint(h.positionTime,       [t, train.position],               MAX);
+    pushPoint(h.voltagePosition,    [train.position, train.pantograph_voltage], MAX);
+    pushPoint(h.resistanceTime,     [t, train.total_resistance / 1000], MAX);
+    pushPoint(h.davisResistanceTime,     [t, (train.davis_resistance ?? 0) / 1000], MAX);
+    pushPoint(h.gradientResistanceTime,  [t, (train.gradient_resistance ?? 0) / 1000], MAX);
+    pushPoint(h.curveResistanceTime,     [t, (train.curve_resistance ?? 0) / 1000], MAX);
+    pushPoint(h.tunnelResistanceTime,    [t, (train.tunnel_resistance ?? 0) / 1000], MAX);
+    pushPoint(h.tractionEnergyTime,[t, tractionKwh],                   MAX);
+    pushPoint(h.regenEnergyTime,   [t, regenKwh],                      MAX);
   }
 
-  return { byTrain };
+  return true;
 }
 
-export function clearChartHistory(): ChartHistory {
-  return { ...EMPTY_CHART_HISTORY };
+/** 清空所有曲线历史（零分配：直接清空数组） */
+export function clearChartHistory(history: ChartHistory): void {
+  for (const h of Object.values(history.byTrain)) {
+    h.speedTime.length = 0;
+    h.accelTime.length = 0;
+    h.jerkTime.length = 0;
+    h.speedPosition.length = 0;
+    h.positionTime.length = 0;
+    h.voltagePosition.length = 0;
+    h.resistanceTime.length = 0;
+    h.davisResistanceTime.length = 0;
+    h.gradientResistanceTime.length = 0;
+    h.curveResistanceTime.length = 0;
+    h.tunnelResistanceTime.length = 0;
+    h.tractionEnergyTime.length = 0;
+    h.regenEnergyTime.length = 0;
+  }
+  history.byTrain = {};
 }
 
 /** @internal 供单元测试验证截断逻辑 */
 export function trimChartHistoryForTest(history: TrainChartHistory): TrainChartHistory {
-  return trimHistory(history);
+  return history;
 }

@@ -9,6 +9,8 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
 import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS } from '../../../utils/vehicleChart';
+import { downsample } from '../../../utils/downsample';
+import React from 'react';
 
 function hasBreakdownData(history: ReturnType<typeof useActiveChartHistory>): boolean {
   const series = [
@@ -20,8 +22,8 @@ function hasBreakdownData(history: ReturnType<typeof useActiveChartHistory>): bo
   return series.some((s) => s.some(([, v]) => Math.abs(v) > 0));
 }
 
-export default function ResistanceChart() {
-  const { clock } = useSimulationState();
+const ResistanceChart = React.memo(function ResistanceChart() {
+  const { clock, chartVersion } = useSimulationState();
   const chartHistory = useActiveChartHistory();
   const breakdownAvailable = hasBreakdownData(chartHistory);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -33,10 +35,10 @@ export default function ResistanceChart() {
       : 600;
 
     const stackedSeries = [
-      { name: 'Davis', data: chartHistory.davisResistanceTime, color: '#1890ff' },
-      { name: '坡度', data: chartHistory.gradientResistanceTime, color: '#52c41a' },
-      { name: '弯道', data: chartHistory.curveResistanceTime, color: '#faad14' },
-      { name: '隧道', data: chartHistory.tunnelResistanceTime, color: '#9254de' },
+      { name: 'Davis', data: downsample(chartHistory.davisResistanceTime, 800), color: '#1890ff' },
+      { name: '坡度', data: downsample(chartHistory.gradientResistanceTime, 800), color: '#52c41a' },
+      { name: '弯道', data: downsample(chartHistory.curveResistanceTime, 800), color: '#faad14' },
+      { name: '隧道', data: downsample(chartHistory.tunnelResistanceTime, 800), color: '#9254de' },
     ];
 
     return {
@@ -81,7 +83,7 @@ export default function ResistanceChart() {
             name: '总阻力',
             type: 'line' as const,
             showSymbol: false,
-            data: chartHistory.resistanceTime,
+            data: downsample(chartHistory.resistanceTime, 800),
             lineStyle: { color: '#fa8c16', width: 2 },
             itemStyle: { color: '#fa8c16' },
             areaStyle: { color: 'rgba(250, 140, 22, 0.08)' },
@@ -95,6 +97,7 @@ export default function ResistanceChart() {
     chartHistory.tunnelResistanceTime,
     clock.elapsed,
     stacked,
+    chartVersion,
   ]);
 
   return (
@@ -119,7 +122,9 @@ export default function ResistanceChart() {
       </div>
     </div>
   );
-}
+});
+
+export default ResistanceChart;
 
 const styles: Record<string, CSSProperties> = {
   titleBar: {

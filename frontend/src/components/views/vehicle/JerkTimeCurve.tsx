@@ -9,11 +9,13 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
 import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS } from '../../../utils/vehicleChart';
+import { downsample } from '../../../utils/downsample';
+import React from 'react';
 
 const COMFORT_JERK_LIMIT = 0.75;
 
-export default function JerkTimeCurve() {
-  const { clock } = useSimulationState();
+const JerkTimeCurve = React.memo(function JerkTimeCurve() {
+  const { clock, chartVersion } = useSimulationState();
   const chartHistory = useActiveChartHistory();
 
   const option = useMemo((): EChartsOption => {
@@ -46,7 +48,7 @@ export default function JerkTimeCurve() {
           name: '冲击率',
           type: 'line',
           showSymbol: false,
-          data: chartHistory.jerkTime,
+          data: downsample(chartHistory.jerkTime, 800),
           lineStyle: { color: '#9254de', width: 2 },
           itemStyle: { color: '#9254de' },
           areaStyle: { color: 'rgba(146, 84, 222, 0.08)' },
@@ -101,7 +103,7 @@ export default function JerkTimeCurve() {
         },
       ],
     };
-  }, [chartHistory.jerkTime, clock.elapsed]);
+  }, [chartHistory.jerkTime, clock.elapsed, chartVersion]);
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -111,4 +113,6 @@ export default function JerkTimeCurve() {
       </div>
     </div>
   );
-}
+});
+
+export default JerkTimeCurve;

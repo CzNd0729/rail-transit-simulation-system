@@ -74,6 +74,7 @@ export const initialState: AppState = {
   signalParamBaselines: extractSignalParamBaselines(DEFAULT_SIGNAL_PARAMS),
   powerParamBaselines: extractPowerParamBaselines(DEFAULT_POWER_PARAMS),
   tractionCurveBaselines: extractTractionCurveBaselines(DEFAULT_VEHICLE_PARAMS.traction_curve),
+  chartVersion: 0,
 };
 
 // ==================== Action 类型 ====================
@@ -119,6 +120,8 @@ export function simulationReducer(state: AppState, action: SimulationAction): Ap
           : snapshot.trains.some((t) => t.id === state.selectedTrainId)
             ? state.selectedTrainId
             : snapshot.trains[0]?.id ?? null;
+      // 可变 push：原地修改 chartHistory，避免数组拷贝
+      const dataWritten = appendChartHistory(state.chartHistory, snapshot);
       return {
         ...state,
         clock: snapshot.clock,
@@ -128,7 +131,7 @@ export function simulationReducer(state: AppState, action: SimulationAction): Ap
         signaling: snapshot.signaling,
         track: snapshot.track,
         events: [...state.events, ...snapshot.events].slice(-500),
-        chartHistory: appendChartHistory(state.chartHistory, snapshot),
+        chartVersion: dataWritten ? state.chartVersion + 1 : state.chartVersion,
       };
     }
 
@@ -159,15 +162,14 @@ export function simulationReducer(state: AppState, action: SimulationAction): Ap
       return { ...state, fps: action.payload };
 
     case 'CLEAR_CHART_HISTORY':
-      return {
-        ...state,
-        chartHistory: clearChartHistory(),
-      };
+      clearChartHistory(state.chartHistory);
+      return { ...state, chartVersion: state.chartVersion + 1 };
 
     case 'RESET_RUN_DATA':
+      clearChartHistory(state.chartHistory);
       return {
         ...state,
-        chartHistory: clearChartHistory(),
+        chartVersion: state.chartVersion + 1,
         stats: { ...initialState.stats },
       };
 

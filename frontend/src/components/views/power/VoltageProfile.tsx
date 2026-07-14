@@ -9,6 +9,8 @@ import { useSimulationState } from '../../../context/SimulationContext';
 import { getTrainChartHistory } from '../../../utils/chartHistory';
 import { trainColorByIndex } from '../../../utils/constants';
 import { axisTooltip } from '../../../utils/format';
+import { downsample } from '../../../utils/downsample';
+import React from 'react';
 
 /** 图例 / 标签用短车号 */
 function shortTrainLabel(trainId: string): string {
@@ -18,8 +20,8 @@ function shortTrainLabel(trainId: string): string {
 
 const CHART_HEIGHT = 260;
 
-export default function VoltageProfile() {
-  const { power, trains, chartHistory, lineLayout, selectedTrainId } =
+const VoltageProfile = React.memo(function VoltageProfile() {
+  const { power, trains, chartHistory, lineLayout, selectedTrainId, chartVersion } =
     useSimulationState();
   const totalLength = lineLayout?.total_length ?? 3200;
 
@@ -89,7 +91,7 @@ export default function VoltageProfile() {
         const lineSeries = {
           name: train.id,
           type: 'line' as const,
-          data: vp,
+          data: downsample(vp, 500),
           lineStyle: { color, width: 2 },
           itemStyle: { color },
           showSymbol: false,
@@ -164,7 +166,7 @@ export default function VoltageProfile() {
           idx,
         };
       }),
-    [sorted, trains, chartHistory, totalLength, yRange, substationSeries],
+    [sorted, trains, chartHistory, totalLength, yRange, substationSeries, chartVersion],
   );
 
   if (trains.length === 0) {
@@ -218,4 +220,6 @@ export default function VoltageProfile() {
       </div>
     </div>
   );
-}
+});
+
+export default VoltageProfile;
