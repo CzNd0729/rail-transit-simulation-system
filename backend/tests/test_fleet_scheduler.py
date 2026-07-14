@@ -70,6 +70,7 @@ def test_scheduler_dispatches_on_headway():
         direction: str,
         trip_legs: tuple[str, ...],
         start_pos: float,
+        **_kwargs: object,
     ) -> None:
         created.append((train_id, spawn_time, direction))
 
@@ -97,6 +98,7 @@ def test_scheduler_dual_origin_at_zero():
         direction: str,
         trip_legs: tuple[str, ...],
         start_pos: float,
+        **_kwargs: object,
     ) -> None:
         created.append(train_id)
 
@@ -116,6 +118,7 @@ def test_scheduler_holds_when_blocked_then_catches_up():
         direction: str,
         trip_legs: tuple[str, ...],
         start_pos: float,
+        **_kwargs: object,
     ) -> None:
         created.append((train_id, spawn_time))
 
@@ -131,3 +134,89 @@ def test_scheduler_holds_when_blocked_then_catches_up():
     assert r_resume.dispatched_ids == ["TRAIN_02"]
     assert created[1] == ("TRAIN_02", 150.0)
     assert sched.next_departure_time == 300.0
+
+
+# ── 存车线缓冲区测试 ──
+from sim_engine.orchestrator import TrainRun
+
+
+def test_receive_train_stores_in_buffer():
+    svc = _single_origin_service()
+    sched = FleetScheduler(svc)
+    created: list[str] = []
+
+    def create(
+        train_id: str,
+        spawn_time: float,
+        direction: str,
+        trip_legs: tuple[str, ...],
+        start_pos: float,
+        **_kwargs: object,
+    ) -> None:
+        created.append(train_id)
+
+    # 发一列车
+    sched.tick(0.0, [], create)
+    assert len(created) == 1
+
+    # 模拟该车到达终点，存入缓冲区
+    fake_run = TrainRun(
+        train_id="TRAIN_01",
+        vehicle_id="VEH_001",
+        total_trips=1,
+        total_mileage=18600.0,
+        state=None,
+        signaling=None,
+        ats=None,
+        manual_driver=None,
+        direction="up",
+        active=True,
+    )
+    ok = sched.receive_train(fake_run)
+    assert ok is True
+
+    # 验证缓冲区状态
+    bs = sched.buffer_state()
+    assert "ST01" in bs
+    assert len(bs["ST01"]) == 1
+    assert bs["ST01"][0]["vehicleId"] == "VEH_001"
+
+
+def test_buffer_train_used_before_new():
+    """缓冲区有车时优先发旧车，不发新车。"""
+    svc = _single_origin_service()
+    sched = FleetScheduler(svc)
+    created: list[tuple[str, str, int]] = []  # (train_id, vehicle_id, total_trips)
+
+    def create(
+        train_id: str,
+        spawn_time: float,
+        direction: str,
+        trip_legs: tuple[str, ...],
+        start_pos: float,
+        vehicle_id: str = "",
+        total_trips: int = 0,
+        passenger_load: float = 0.6,
+    ) -> None:
+        created.append((train_id, vehicle_id, total_trips))
+
+    # 先发新车（缓冲区空时发新车也会分配 vehicle_id）
+    sched.tick(0.0, [], create)
+    assert created[0][0] == "TRAIN_01"
+    assert created[0][1].startswith("VEH_")
+    assert created[0][2] == 0
+
+    # 存入缓冲区（模拟到达）
+    fake_run = TrainRun(
+        train_id="TRAIN_01",
+        vehicle_id="VEH_001",
+        total_trips=1, total_mileage=18600.0,
+        state=None, signaling=None, ats=None, manual_driver=None,
+        direction="up", active=True,
+    )
+    sched.receive_train(fake_run)
+
+    # 下一 tick 应该发旧车 VEH_001，而不是新车
+    sched.tick(150.0, [], create)
+    assert created[1][1] == "VEH_001"
+    assert created[1][2] == 2
