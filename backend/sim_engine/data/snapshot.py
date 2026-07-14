@@ -62,6 +62,7 @@ def build_simulation_snapshot(
     signaling_extra: dict | None = None,
     occupancy: list[dict] | None = None,
     switch_states: list[dict] | None = None,
+    buffer_state: dict | None = None,
 ) -> dict:
     """构建 simulation_snapshot（camelCase，与 API 文档对齐）。"""
     if not train_entries:
@@ -133,6 +134,7 @@ def build_simulation_snapshot(
             },
             "signaling": signaling,
             "track": {"occupancy": occupancy or [], "switchStates": switch_states or []},
+            "bufferState": buffer_state or {},
             "events": [],
         },
     }
