@@ -6,7 +6,7 @@ import { useMemo } from 'react';
 import type { EChartsOption } from 'echarts';
 import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
-import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
+import { useActiveChartHistory, useChartFollowClock } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
 import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS } from '../../../utils/vehicleChart';
 import { downsample } from '../../../utils/downsample';
@@ -19,10 +19,11 @@ const JERK_Y_MAX = 1.5; // 固定 Y 轴范围，避免 auto-scale 抖动
 const JerkTimeCurve = React.memo(function JerkTimeCurve() {
   const { clock, chartVersion } = useSimulationState();
   const chartHistory = useActiveChartHistory();
+  const followClock = useChartFollowClock();
 
   const option = useMemo((): EChartsOption => {
     const xMax = chartHistory.jerkTime.length > 0
-      ? stableVehicleTimeMax(clock.elapsed, chartHistory.jerkTime.at(-1)?.[0])
+      ? stableVehicleTimeMax(clock.elapsed, chartHistory.jerkTime.at(-1)?.[0], 600, followClock)
       : 600;
 
     return {
@@ -33,6 +34,7 @@ const JerkTimeCurve = React.memo(function JerkTimeCurve() {
       xAxis: {
         type: 'value' as const,
         name: '时间 (s)',
+        min: 0,
         max: xMax,
         nameTextStyle: { color: '#a0a0a0' },
         axisLabel: vehicleTimeAxisLabel(),
@@ -103,7 +105,7 @@ const JerkTimeCurve = React.memo(function JerkTimeCurve() {
         },
       ],
     };
-  }, [chartHistory.jerkTime, clock.elapsed, chartVersion]);
+  }, [chartHistory.jerkTime, clock.elapsed, chartVersion, followClock]);
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

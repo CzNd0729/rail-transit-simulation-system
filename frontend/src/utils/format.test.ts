@@ -1,5 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { getDisplayMode, getSignalPhaseLabel, resolveSignalPhase } from './format';
+import {
+  getDisplayMode,
+  getSignalPhaseLabel,
+  resolveSignalPhase,
+  stableVehicleTimeMax,
+} from './format';
+
+describe('stableVehicleTimeMax', () => {
+  it('follows clock when followClock is true', () => {
+    expect(stableVehicleTimeMax(1000, 500, 600, true)).toBe(1010);
+  });
+
+  it('ignores global clock when followClock is false', () => {
+    expect(stableVehicleTimeMax(1000, 500, 600, false)).toBe(600);
+    expect(stableVehicleTimeMax(1000, 800, 600, false)).toBe(810);
+  });
+});
 
 describe('getDisplayMode', () => {
   it('returns stopped when runningPhase is dwell', () => {

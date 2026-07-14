@@ -6,15 +6,16 @@ import { useMemo } from 'react';
 import type { EChartsOption } from 'echarts';
 import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
-import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
+import { useActiveChartHistory, useChartFollowClock } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
-import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS } from '../../../utils/vehicleChart';
+import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS, xAxisSplitLineForRunState } from '../../../utils/vehicleChart';
 import { downsample } from '../../../utils/downsample';
 import React from 'react';
 
 const EnergyChart = React.memo(function EnergyChart() {
-  const { clock, chartVersion } = useSimulationState();
+  const { clock, chartVersion, runState } = useSimulationState();
   const chartHistory = useActiveChartHistory();
+  const followClock = useChartFollowClock();
 
   const option = useMemo((): EChartsOption => ({
     backgroundColor: 'transparent',
@@ -29,12 +30,14 @@ const EnergyChart = React.memo(function EnergyChart() {
     xAxis: {
       type: 'value' as const,
       name: '时间 (s)',
+      min: 0,
       max: chartHistory.tractionEnergyTime.length > 0
-        ? stableVehicleTimeMax(clock.elapsed, chartHistory.tractionEnergyTime.at(-1)?.[0])
+        ? stableVehicleTimeMax(clock.elapsed, chartHistory.tractionEnergyTime.at(-1)?.[0], 600, followClock)
         : 600,
       nameTextStyle: { color: '#a0a0a0' },
       axisLabel: vehicleTimeAxisLabel(),
       axisLine: { lineStyle: { color: '#2a2a4a' } },
+      splitLine: xAxisSplitLineForRunState(runState),
     },
     yAxis: {
       type: 'value' as const,
@@ -61,7 +64,7 @@ const EnergyChart = React.memo(function EnergyChart() {
         itemStyle: { color: '#52c41a' },
       },
     ],
-  }), [chartHistory.tractionEnergyTime, chartHistory.regenEnergyTime, clock.elapsed, chartVersion]);
+  }), [chartHistory.tractionEnergyTime, chartHistory.regenEnergyTime, clock.elapsed, chartVersion, followClock, runState]);
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

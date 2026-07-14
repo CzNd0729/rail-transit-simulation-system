@@ -21,13 +21,20 @@ export function formatAxisLabel(
   return value.toFixed(decimals);
 }
 
-/** 时间轴 max 取整到十分位，避免浮点噪声轴标签 */
+/**
+ * 时间轴 max 取整到十分位。
+ * followClock=false：曲线车已离线时只跟末点，避免全局时钟拉长造成后半段假直线。
+ */
 export function stableVehicleTimeMax(
   elapsed: number,
   lastTime?: number,
   minMax = 600,
+  followClock = true,
 ): number {
-  const raw = Math.max(elapsed + 10, (lastTime ?? 0) + 10, minMax);
+  const tip = (lastTime ?? 0) + 10;
+  const raw = followClock
+    ? Math.max(elapsed + 10, tip, minMax)
+    : Math.max(tip, minMax);
   return Math.round(raw * 10) / 10;
 }
 

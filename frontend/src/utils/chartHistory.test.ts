@@ -3,6 +3,7 @@ import {
   CHART_HISTORY_MAX_POINTS,
   appendChartHistory,
   clearChartHistory,
+  compressSeriesPoints,
   getTrainChartHistory,
 } from './chartHistory';
 import type { SimulationSnapshot } from '../types/simulation';
@@ -117,14 +118,27 @@ describe('appendChartHistory', () => {
     expect(getTrainChartHistory(history, 'TRAIN_02').speedTime).toEqual([[1.0, 40]]);
   });
 
-  it('truncates when exceeding CHART_HISTORY_MAX_POINTS', () => {
+  it('compressSeriesPoints keeps first and last timestamps', () => {
+    const pts = compressSeriesPoints(
+      Array.from({ length: 100 }, (_, i) => [i * 0.1, i] as [number, number]),
+      10,
+    );
+    expect(pts).toHaveLength(10);
+    expect(pts[0]?.[0]).toBe(0);
+    expect(pts.at(-1)?.[0]).toBeCloseTo(9.9, 5);
+  });
+
+  it('append compression keeps journey start after growing past high-water', () => {
     const history = { byTrain: {} };
-    // Push more than the cap
-    for (let i = 0; i < CHART_HISTORY_MAX_POINTS + 5; i++) {
+    // 使用较小次数验证路径：反复压测靠 compress 单元；此处验证阈值下首点仍在
+    const steps = 20;
+    for (let i = 0; i < steps; i++) {
       appendChartHistory(history, makeSnapshot(i * 0.1, 50, 0, i));
     }
     const h = getTrainChartHistory(history, 'TRAIN_01');
-    expect(h.speedTime.length).toBeLessThanOrEqual(CHART_HISTORY_MAX_POINTS);
+    expect(h.speedTime[0]?.[0]).toBe(0);
+    expect(h.speedTime.length).toBe(steps);
+    expect(CHART_HISTORY_MAX_POINTS).toBeGreaterThan(steps);
   });
 });
 

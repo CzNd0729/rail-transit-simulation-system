@@ -7,15 +7,16 @@ import { useMemo } from 'react';
 import type { EChartsOption } from 'echarts';
 import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
-import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
+import { useActiveChartHistory, useChartFollowClock } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
-import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS } from '../../../utils/vehicleChart';
+import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS, xAxisSplitLineForRunState } from '../../../utils/vehicleChart';
 import { downsample } from '../../../utils/downsample';
 import React from 'react';
 
 const AccelTimeCurve = React.memo(function AccelTimeCurve() {
-  const { clock, chartVersion } = useSimulationState();
+  const { clock, chartVersion, runState } = useSimulationState();
   const chartHistory = useActiveChartHistory();
+  const followClock = useChartFollowClock();
 
   const option = useMemo((): EChartsOption => ({
     backgroundColor: 'transparent',
@@ -25,12 +26,14 @@ const AccelTimeCurve = React.memo(function AccelTimeCurve() {
     xAxis: {
       type: 'value' as const,
       name: '时间 (s)',
+      min: 0,
       max: chartHistory.accelTime.length > 0
-        ? stableVehicleTimeMax(clock.elapsed, chartHistory.accelTime.at(-1)?.[0])
+        ? stableVehicleTimeMax(clock.elapsed, chartHistory.accelTime.at(-1)?.[0], 600, followClock)
         : 600,
       nameTextStyle: { color: '#a0a0a0' },
       axisLabel: vehicleTimeAxisLabel(),
       axisLine: { lineStyle: { color: '#2a2a4a' } },
+      splitLine: xAxisSplitLineForRunState(runState),
     },
     yAxis: {
       type: 'value' as const,
@@ -50,7 +53,7 @@ const AccelTimeCurve = React.memo(function AccelTimeCurve() {
         areaStyle: { color: 'rgba(82, 196, 26, 0.08)' },
       },
     ],
-  }), [chartHistory.accelTime, clock.elapsed, chartVersion]);
+  }), [chartHistory.accelTime, clock.elapsed, chartVersion, followClock, runState]);
 
   return (
     <div className="panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

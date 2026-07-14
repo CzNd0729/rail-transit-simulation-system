@@ -6,9 +6,9 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import type { EChartsOption } from 'echarts';
 import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
-import { useActiveChartHistory } from '../../../hooks/useSelectedTrain';
+import { useActiveChartHistory, useChartFollowClock } from '../../../hooks/useSelectedTrain';
 import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
-import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS } from '../../../utils/vehicleChart';
+import { vehicleTimeAxisLabel, vehicleValueAxisLabel, VEHICLE_CHART_DECIMALS, xAxisSplitLineForRunState } from '../../../utils/vehicleChart';
 import { downsample } from '../../../utils/downsample';
 import React from 'react';
 
@@ -23,15 +23,16 @@ function hasBreakdownData(history: ReturnType<typeof useActiveChartHistory>): bo
 }
 
 const ResistanceChart = React.memo(function ResistanceChart() {
-  const { clock, chartVersion } = useSimulationState();
+  const { clock, chartVersion, runState } = useSimulationState();
   const chartHistory = useActiveChartHistory();
+  const followClock = useChartFollowClock();
   const breakdownAvailable = hasBreakdownData(chartHistory);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const stacked = showBreakdown && breakdownAvailable;
 
   const option = useMemo((): EChartsOption => {
     const xMax = chartHistory.resistanceTime.length > 0
-      ? stableVehicleTimeMax(clock.elapsed, chartHistory.resistanceTime.at(-1)?.[0])
+      ? stableVehicleTimeMax(clock.elapsed, chartHistory.resistanceTime.at(-1)?.[0], 600, followClock)
       : 600;
 
     const stackedSeries = [
@@ -56,10 +57,12 @@ const ResistanceChart = React.memo(function ResistanceChart() {
       xAxis: {
         type: 'value' as const,
         name: '时间 (s)',
+        min: 0,
         max: xMax,
         nameTextStyle: { color: '#a0a0a0' },
         axisLabel: vehicleTimeAxisLabel(),
         axisLine: { lineStyle: { color: '#2a2a4a' } },
+        splitLine: xAxisSplitLineForRunState(runState),
       },
       yAxis: {
         type: 'value' as const,
@@ -98,6 +101,8 @@ const ResistanceChart = React.memo(function ResistanceChart() {
     clock.elapsed,
     stacked,
     chartVersion,
+    followClock,
+    runState,
   ]);
 
   return (

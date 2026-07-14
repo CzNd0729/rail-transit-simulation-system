@@ -6,26 +6,23 @@ import { useMemo } from 'react';
 import type { EChartsOption } from 'echarts';
 import SimEChart from '../../common/SimEChart';
 import { useSimulationState } from '../../../context/SimulationContext';
-import { useActiveChartHistory, useSelectedTrain } from '../../../hooks/useSelectedTrain';
+import {
+  useActiveChartHistory,
+  useChartFollowClock,
+  useSelectedTrain,
+} from '../../../hooks/useSelectedTrain';
 import { mockLineData } from '../../../data/mockLineData';
-import { axisTooltip } from '../../../utils/format';
+import { axisTooltip, stableVehicleTimeMax } from '../../../utils/format';
+import { xAxisSplitLineForRunState } from '../../../utils/vehicleChart';
 import { resolveLatestDeviation } from '../../../utils/signalSelectors';
 import { downsample } from '../../../utils/downsample';
 import React from 'react';
-
-/** X 轴上限按 50s 阶梯取整，避免每帧 float 抖动 */
-function stableTimeMax(points: [number, number][]): number {
-  if (points.length === 0) return 60;
-  const lastT = points[points.length - 1][0];
-  return Math.ceil(Math.max(lastT + 20, 60) / 50) * 50;
-}
 
 const STATION_LABEL_MAX_CHARS = 4;
 const STATION_LABEL_WIDTH = 76;
 const STATION_LABEL_LINE_HEIGHT = 12;
 const BOTTOM_ZONE_RATIO = 0.04;
 const MIN_FONT_SIZE = 7;
-/** 用于估算相邻站名垂直间距（像素） */
 const CHART_HEIGHT_ESTIMATE = 400;
 
 interface StationLabelStyle {
@@ -82,7 +79,8 @@ function buildStationLabel(
 
 const TimetableChart = React.memo(function TimetableChart() {
   const chartHistory = useActiveChartHistory();
-  const { lineLayout, signaling, chartVersion } = useSimulationState();
+  const { clock, lineLayout, signaling, chartVersion, runState } = useSimulationState();
+  const followClock = useChartFollowClock();
   const train = useSelectedTrain();
   const stations = lineLayout?.stations ?? mockLineData.stations;
   const maxPos = lineLayout?.total_length ?? mockLineData.total_length;
@@ -91,12 +89,20 @@ const TimetableChart = React.memo(function TimetableChart() {
     train?.id ?? 'TRAIN_01',
   );
 
-  const xMax = useMemo(
-    () => stableTimeMax(chartHistory.positionTime),
-    [chartHistory.positionTime],
-  );
+  // 必须依赖 chartVersion：可变 push 时 positionTime 引用不变，否则 xMax 会卡死在旧值
+  const xMax = useMemo(() => {
+    const lastT = chartHistory.positionTime.at(-1)?.[0];
+    if (chartHistory.positionTime.length === 0) return 60;
+    // 与车辆视图对齐：跟随 clock，避免运行图轴落后仿真时间
+    const raw = stableVehicleTimeMax(clock.elapsed, lastT, 60, followClock);
+    return Math.ceil(raw / 50) * 50;
+  }, [chartHistory.positionTime, chartVersion, clock.elapsed, followClock]);
+
 
   const stationMarkLines = useMemo(() => {
+    // 仿真未启动：不显示站名（含安河桥北）
+    if (runState === 'idle') return [];
+
     const sorted = [...stations].sort((a, b) => a.chainage - b.chainage);
     const labelById = new Map<string, StationLabelStyle>();
     let prevChainage: number | null = null;
@@ -119,14 +125,13 @@ const TimetableChart = React.memo(function TimetableChart() {
           lineHeight: STATION_LABEL_LINE_HEIGHT,
           width: STATION_LABEL_WIDTH,
           overflow: 'breakAll' as const,
-          // ECharts 6 默认 middle 会把站名堆在图中央；end = 参考线右端
           position: 'end' as const,
           ...(style.offset ? { offset: style.offset } : {}),
         },
         lineStyle: { color: '#3a3a5a', type: 'dashed' as const },
       };
     });
-  }, [stations, maxPos]);
+  }, [stations, maxPos, runState]);
 
   const option = useMemo(
     (): EChartsOption => ({
@@ -142,7 +147,9 @@ const TimetableChart = React.memo(function TimetableChart() {
         nameTextStyle: { color: '#a0a0a0' },
         axisLabel: { color: '#a0a0a0' },
         axisLine: { lineStyle: { color: '#2a2a4a' } },
+        min: 0,
         max: xMax,
+        splitLine: xAxisSplitLineForRunState(runState),
       },
       yAxis: {
         type: 'value' as const,
@@ -169,7 +176,7 @@ const TimetableChart = React.memo(function TimetableChart() {
         },
       ],
     }),
-    [chartHistory.positionTime, xMax, maxPos, stationMarkLines, chartVersion],
+    [chartHistory.positionTime, xMax, maxPos, stationMarkLines, chartVersion, runState],
   );
 
   const deviationText = deviation

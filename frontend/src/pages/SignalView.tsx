@@ -1,41 +1,39 @@
 /**
  * SignalView — 信号视图（迭代二单车简化版）
- *
- * - UI-SIG-01: 移动授权示意图 — 列车位置 + 安全包络 + 目标站台
- * - UI-SIG-02: 速度包络线 — 区段限速 + ATP 限速 + 目标速度 + 实际速度
- * - UI-SIG-03: 运行图 — 单列车时间-距离轨迹
- * - UI-SIG-04~06: 留待迭代三/四
  */
 import MAChart from '../components/views/signal/MAChart';
 import SpeedEnvelope from '../components/views/signal/SpeedEnvelope';
 import TimetableChart from '../components/views/signal/TimetableChart';
 import SignalStatusBar from '../components/views/signal/SignalStatusBar';
+import { ChartLifecycleProvider } from '../components/common/ChartLifecycleContext';
 
-export default function SignalView() {
+export default function SignalView({ active = true }: { active?: boolean }) {
   return (
-    <div style={styles.container}>
-      <div style={styles.mainRow}>
-        <div style={styles.leftColumn}>
-          <div style={styles.maSection}>
-            <div style={styles.panelFill}>
-              <MAChart />
+    <ChartLifecycleProvider active={active}>
+      <div style={styles.container}>
+        <div style={styles.mainRow}>
+          <div style={styles.leftColumn}>
+            <div style={styles.maSection}>
+              <div style={styles.panelFill}>
+                <MAChart />
+              </div>
+            </div>
+            <div style={styles.envelopeSection}>
+              <div style={styles.panelFill}>
+                <SpeedEnvelope />
+              </div>
             </div>
           </div>
-          <div style={styles.envelopeSection}>
-            <div style={styles.panelFill}>
-              <SpeedEnvelope />
-            </div>
-          </div>
-        </div>
 
-        <div style={styles.rightColumn}>
-          <div style={styles.panelFill}>
-            <TimetableChart />
+          <div style={styles.rightColumn}>
+            <div style={styles.panelFill}>
+              <TimetableChart />
+            </div>
           </div>
         </div>
+        <SignalStatusBar />
       </div>
-      <SignalStatusBar />
-    </div>
+    </ChartLifecycleProvider>
   );
 }
 

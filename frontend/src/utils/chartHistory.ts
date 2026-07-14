@@ -23,13 +23,7 @@ export const EMPTY_CHART_HISTORY: ChartHistory = {
 /** 每列车每序列最大缓存点数（0.1s 步长约 5000s 全程） */
 export const CHART_HISTORY_MAX_POINTS = 50_000;
 
-/** 向系列数组追加一个点，超出上限时移除最早的点（零拷贝） */
-function pushPoint(series: [number, number][], point: [number, number], max: number): void {
-  series.push(point);
-  if (series.length > max) {
-    series.shift();
-  }
-}
+type Point = [number, number];
 
 function createEmptyTrainHistory(): TrainChartHistory {
   return {
@@ -47,6 +41,37 @@ function createEmptyTrainHistory(): TrainChartHistory {
     tractionEnergyTime: [],
     regenEnergyTime: [],
   };
+}
+
+/** 均匀压缩，保留首尾，避免滑动窗口丢弃 t≈0 导致前半段空白 */
+export function compressSeriesPoints(points: Point[], maxPoints: number): Point[] {
+  const n = points.length;
+  if (n <= maxPoints) return points.slice();
+  if (maxPoints < 2) return [points[n - 1]];
+
+  const result: Point[] = new Array(maxPoints);
+  const last = maxPoints - 1;
+  for (let i = 0; i < maxPoints; i += 1) {
+    const src = i === last ? n - 1 : Math.round((i * (n - 1)) / last);
+    result[i] = points[src];
+  }
+  return result;
+}
+
+/**
+ * O(1) 追加；超过高水位后整段压缩到 ~0.8*max（保留起点）。
+ * 禁止 shift 丢前缀。
+ */
+function pushPoint(series: Point[], point: Point, maxPoints: number): void {
+  series.push(point);
+  const highWater = Math.floor(maxPoints * 1.25);
+  if (series.length <= highWater) return;
+  const target = Math.max(2, Math.floor(maxPoints * 0.8));
+  const compressed = compressSeriesPoints(series, target);
+  series.length = 0;
+  for (let i = 0; i < compressed.length; i += 1) {
+    series.push(compressed[i]);
+  }
 }
 
 /** 确保某车在 byTrain 中有记录，返回其 TrainChartHistory（原地修改） */
@@ -89,19 +114,19 @@ export function appendChartHistory(
   for (const train of snapshot.trains) {
     const h = ensureTrainHistory(byTrain, train.id);
 
-    pushPoint(h.speedTime,          [t, train.speed],                  MAX);
-    pushPoint(h.accelTime,          [t, train.acceleration],           MAX);
-    pushPoint(h.jerkTime,           [t, train.jerk ?? 0],              MAX);
-    pushPoint(h.speedPosition,      [train.position, train.speed],     MAX);
-    pushPoint(h.positionTime,       [t, train.position],               MAX);
-    pushPoint(h.voltagePosition,    [train.position, train.pantograph_voltage], MAX);
-    pushPoint(h.resistanceTime,     [t, train.total_resistance / 1000], MAX);
-    pushPoint(h.davisResistanceTime,     [t, (train.davis_resistance ?? 0) / 1000], MAX);
-    pushPoint(h.gradientResistanceTime,  [t, (train.gradient_resistance ?? 0) / 1000], MAX);
-    pushPoint(h.curveResistanceTime,     [t, (train.curve_resistance ?? 0) / 1000], MAX);
-    pushPoint(h.tunnelResistanceTime,    [t, (train.tunnel_resistance ?? 0) / 1000], MAX);
-    pushPoint(h.tractionEnergyTime,[t, tractionKwh],                   MAX);
-    pushPoint(h.regenEnergyTime,   [t, regenKwh],                      MAX);
+    pushPoint(h.speedTime, [t, train.speed], MAX);
+    pushPoint(h.accelTime, [t, train.acceleration], MAX);
+    pushPoint(h.jerkTime, [t, train.jerk ?? 0], MAX);
+    pushPoint(h.speedPosition, [train.position, train.speed], MAX);
+    pushPoint(h.positionTime, [t, train.position], MAX);
+    pushPoint(h.voltagePosition, [train.position, train.pantograph_voltage], MAX);
+    pushPoint(h.resistanceTime, [t, train.total_resistance / 1000], MAX);
+    pushPoint(h.davisResistanceTime, [t, (train.davis_resistance ?? 0) / 1000], MAX);
+    pushPoint(h.gradientResistanceTime, [t, (train.gradient_resistance ?? 0) / 1000], MAX);
+    pushPoint(h.curveResistanceTime, [t, (train.curve_resistance ?? 0) / 1000], MAX);
+    pushPoint(h.tunnelResistanceTime, [t, (train.tunnel_resistance ?? 0) / 1000], MAX);
+    pushPoint(h.tractionEnergyTime, [t, tractionKwh], MAX);
+    pushPoint(h.regenEnergyTime, [t, regenKwh], MAX);
   }
 
   return true;
@@ -125,9 +150,4 @@ export function clearChartHistory(history: ChartHistory): void {
     h.regenEnergyTime.length = 0;
   }
   history.byTrain = {};
-}
-
-/** @internal 供单元测试验证截断逻辑 */
-export function trimChartHistoryForTest(history: TrainChartHistory): TrainChartHistory {
-  return history;
 }
