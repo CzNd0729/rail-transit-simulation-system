@@ -2,18 +2,21 @@
  * ScenarioListPanel — 方案列表+勾选面板
  * 展示所有已保存方案，支持勾选、加载、删除
  */
-import { useSimulationState } from '../../context/SimulationContext';
-import { deleteScenario, applyScenario, renameScenario } from '../../services/api';
+import { useSimulationState, useSimulationDispatch } from '../../context/SimulationContext';
+import { deleteScenario, applyScenario, renameScenario, getParams } from '../../services/api';
+import { parseApiParams } from '../../utils/apiAdapter';
+import { useChartSwitchGate } from '../common/ChartSwitchGate';
 import type { ScenarioSummary } from '../../types/simulation';
 import { formatSimTime } from '../../utils/format';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, startTransition } from 'react';
 
 interface ScenarioListPanelProps {
   scenarios: ScenarioSummary[];
   checkedIds: Set<string>;
   onToggle: (id: string) => void;
   onDeleted: () => void;
-  onApplied: () => void;
+  /** 应用成功并完成前端同步后回调（可选） */
+  onApplied?: () => void;
   loading: boolean;
 }
 
@@ -26,16 +29,18 @@ export default function ScenarioListPanel({
   loading,
 }: ScenarioListPanelProps) {
   const { runState } = useSimulationState();
+  const dispatch = useSimulationDispatch();
+  const { beginSwitch } = useChartSwitchGate();
   const isRunning = runState === 'running';
   const [renaming, setRenaming] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [applyingId, setApplyingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (renaming) {
       const s = scenarios.find((x) => x.id === renaming);
       setEditValue(s?.name ?? '');
-      // 延迟让 DOM 渲染后再 focus
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [renaming, scenarios]);
@@ -54,7 +59,7 @@ export default function ScenarioListPanel({
     }
     try {
       await renameScenario(id, name);
-      onDeleted(); // 复用刷新列表
+      onDeleted();
     } catch {
       alert('重命名失败');
     }
@@ -84,11 +89,24 @@ export default function ScenarioListPanel({
       alert('请先暂停或停止仿真');
       return;
     }
+    if (applyingId) return;
+    setApplyingId(id);
     try {
       await applyScenario(id);
-      onApplied();
+      dispatch({ type: 'RESET_RUN_DATA' });
+      dispatch({ type: 'SET_RUN_STATE', payload: 'stopped' });
+      const raw = await getParams();
+      const params = parseApiParams(raw as unknown as Record<string, unknown>);
+      dispatch({ type: 'INIT_PARAMS', payload: params });
+      beginSwitch();
+      startTransition(() => {
+        dispatch({ type: 'SET_VIEW', payload: 'overview' });
+      });
+      onApplied?.();
     } catch {
       alert('加载方案失败');
+    } finally {
+      setApplyingId(null);
     }
   };
 
@@ -162,9 +180,9 @@ export default function ScenarioListPanel({
               <button
                 className="btn"
                 onClick={() => handleApply(s.id)}
-                disabled={isRunning}
+                disabled={isRunning || applyingId === s.id}
                 style={styles.actionBtn}
-                title="加载方案参数到引擎"
+                title="加载方案参数并前往综合视图"
               >
                 📥
               </button>

@@ -108,9 +108,7 @@ export default function ScenarioComparePage() {
           checkedIds={checkedIds}
           onToggle={handleToggle}
           onDeleted={loadScenarios}
-          onApplied={() => {
-            window.dispatchEvent(new CustomEvent('scenario-applied'));
-          }}
+          onApplied={loadScenarios}
           loading={loading}
         />
       </div>
