@@ -46,6 +46,7 @@ export function useMockReplay() {
     tractionKwh: 0,
     regenKwh: 0,
   });
+  const evaluationTriggeredRef = useRef(false);
 
   useEffect(() => {
     dispatch({ type: 'WS_CONNECTED' });
@@ -60,6 +61,27 @@ export function useMockReplay() {
         runStatsRef.current.tractionKwh = snapshot.power.total_consumption;
         runStatsRef.current.regenKwh = snapshot.power.total_regeneration;
         dispatch({ type: 'RUNTIME_UPDATE', payload: snapshot });
+
+        // 评估窗口检测：到达 evaluation_time 时触发评估完成通知
+        const evaluationTime = paramsRef.current.signal.evaluation_time ?? 600;
+        if (
+          !evaluationTriggeredRef.current
+          && snapshot.clock.elapsed >= evaluationTime
+        ) {
+          evaluationTriggeredRef.current = true;
+          dispatch({
+            type: 'SET_EVALUATION_COMPLETE',
+            payload: {
+              evaluationTime,
+              elapsed: snapshot.clock.elapsed,
+            },
+          });
+          // 自动保存方案
+          const autoId = `scenario_mock_${Date.now()}`;
+          window.dispatchEvent(new CustomEvent('scenario-auto-saved', {
+            detail: { id: autoId, name: '自动保存' },
+          }));
+        }
       },
       onComplete: () => {
         const s = runStatsRef.current;
@@ -96,6 +118,7 @@ export function useMockReplay() {
           runStatsRef.current = {
             sumSpeed: 0, count: 0, maxSpeed: 0, tripTime: 0, tractionKwh: 0, regenKwh: 0,
           };
+          evaluationTriggeredRef.current = false;
           replayer.loadScenario(buildScenarioFromParams(paramsRef.current));
           dispatch({ type: 'SET_RUN_STATE', payload: 'running' });
           replayer.start();

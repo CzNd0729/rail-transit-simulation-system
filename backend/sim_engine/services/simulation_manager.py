@@ -600,6 +600,19 @@ class SimulationManager:
             orch.sim_params.total_time = float(signal_updates["totalTime"])
             updated.append("signal.totalTime")
 
+        # 持久化 evaluation_time / total_time 到 YAML，确保 reset 后不丢失
+        if "evaluationTime" in signal_updates or "totalTime" in signal_updates:
+            sim_path = CONFIG_DIR / "simulation.yaml"
+            with sim_path.open("r", encoding="utf-8") as fp:
+                sim_data = yaml.safe_load(fp) or {}
+            sim_section = sim_data.setdefault("simulation", sim_data)
+            if "evaluationTime" in signal_updates:
+                sim_section["evaluation_time"] = float(signal_updates["evaluationTime"])
+            if "totalTime" in signal_updates:
+                sim_section["total_time"] = float(signal_updates["totalTime"])
+            with sim_path.open("w", encoding="utf-8") as fp:
+                yaml.dump(sim_data, fp, allow_unicode=True, default_flow_style=False)
+
         return {"updated": updated, "params": self.get_params()}
 
     # ==================== CSV 导出 ====================
