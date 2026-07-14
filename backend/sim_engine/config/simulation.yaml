@@ -7,4 +7,5 @@ simulation:
   target_speed_ratio: 0.8
   time_step: 0.1
   total_time: 6000
+  evaluation_time: 600    # 评估窗口时长 (s)，方案保存时以此截取指标
   train_count: 3

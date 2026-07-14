@@ -119,6 +119,8 @@ class ExternalInterfaceConfig:
 class SimulationParams:
     time_step: float = 0.1
     total_time: float = 600.0
+    evaluation_time: float = 600.0
+    """评估窗口时长 (s)，方案保存时以此截取指标。"""
     speed_multiplier: float = 1.0
     target_speed_ratio: float = 0.8
     station_stop_tolerance: float = 1.0
@@ -292,6 +294,7 @@ def load_simulation_params(path: str | Path) -> SimulationParams:
         train_count=int(data.get("train_count", 1)),
         departure_interval=float(data.get("departure_interval", 120.0)),
         bidirectional=bool(data.get("bidirectional", False)),
+        evaluation_time=float(data.get("evaluation_time", 600.0)),
         pid=pid,
         power=power,
         signal=signal,
