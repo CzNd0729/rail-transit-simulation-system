@@ -1,11 +1,11 @@
 """FastAPI 应用入口。
 提供 REST API + WebSocket 实时通信 + 后台仿真循环。
 
-支持两种启动模式:
-  - 常规模式: 仅对接前端（默认）
-  - 外部系统模式: 额外连接 PLC/网络屏/信号屏硬件
+启动模式:
+  - 常规模式: 仅对接前端（默认，也是唯一推荐模式）
 
-由 __main__.py 通过环境变量 SIM_ENGINE_EXTERNAL 控制。
+**已弃用外部系统模式**：SIM_ENGINE_EXTERNAL 环境变量和 external_mode 参数
+保留仅作兼容，未来版本将移除。外部系统接入方案已废弃。
 """
 
 from __future__ import annotations
@@ -26,9 +26,9 @@ from sim_engine.ws.manager import WebSocketConnectionManager
 # 全局单例
 ws_manager = WebSocketConnectionManager()
 
-# 读取外部系统模式标志（由 __main__.py 设置）
-_external_mode = os.environ.get("SIM_ENGINE_EXTERNAL", "0") == "1"
-sim_manager = SimulationManager(ws_manager, external_mode=_external_mode)
+# 读取外部系统模式标志（由 __main__.py 设置，已弃用）
+_external_mode = os.environ.get("SIM_ENGINE_EXTERNAL", "0") == "1"  # DEPRECATED
+sim_manager = SimulationManager(ws_manager, external_mode=_external_mode)  # DEPRECATED
 
 _HEARTBEAT_INTERVAL = 15.0  # 秒
 

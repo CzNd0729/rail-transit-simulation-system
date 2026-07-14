@@ -34,7 +34,7 @@ from sim_engine.vehicle.config import load_vehicle_params
 from sim_engine.vehicle.dynamics import VehicleSystem, effective_speed_limit_kmh
 from sim_engine.vehicle.models import ControlCommands, StepResult, TrainState
 
-# TODO: 迭代二 — 启用外部系统桥接
+# 外部系统桥接 — 已弃用（外部系统接入方案已废弃）
 # from sim_engine.external.bridge import ExternalBridge
 
 CONFIG_DIR = Path(__file__).resolve().parent / "config"
@@ -113,7 +113,7 @@ class Orchestrator:
     last_snapshot: dict | None = None
     _on_snapshot: Callable[[dict], None] | None = None
 
-    # TODO: 迭代二 — 外部系统桥接
+    # 外部系统桥接 — 已弃用（外部系统接入方案已废弃）
     # external_bridge: ExternalBridge | None = None
 
     @property
@@ -180,7 +180,7 @@ class Orchestrator:
             rail_resistance=sim_params.power.rail_resistance,
         )
 
-        # TODO: 迭代二 — 启用外部系统桥接
+        # 外部系统桥接 — 已弃用（外部系统接入方案已废弃）
         # external_bridge = None
         # if sim_params.external.enabled:
         #     from sim_engine.external.bridge import ExternalBridge
@@ -674,7 +674,7 @@ class Orchestrator:
         if self._on_snapshot:
             self._on_snapshot(snapshot)
 
-        # TODO: 迭代二 — 外部系统输出
+        # 外部系统输出 — 已弃用（外部系统接入方案已废弃）
         # if self.external_bridge is not None:
         #     self.external_bridge.update_from_engine(snapshot, self.sim_params)
 

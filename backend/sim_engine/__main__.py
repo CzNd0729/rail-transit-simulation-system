@@ -1,9 +1,12 @@
 """CLI 入口 — 启动仿真引擎后端服务。
 
+**已弃用 --external 参数**：外部系统接入方案已废弃，后端默认直接对接前端。
+`--external` 参数保留仅作兼容，未来版本将移除。
+
 用法:
   python -m sim_engine                          # 常规后端（对接前端）
-  python -m sim_engine --external               # 连接外部系统（PLC/网络屏/信号屏）
-  python -m sim_engine --external --host 0.0.0.0 --port 8000
+  # python -m sim_engine --external             # 已弃用
+  python -m sim_engine --host 0.0.0.0 --port 8000
 """
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ def main():
     parser.add_argument(
         "--external",
         action="store_true",
-        help="启用外部系统连接模式（连接真实 PLC/网络屏/信号屏硬件）",
+        help="[已弃用] 启用外部系统连接模式 — 外部系统接入方案已废弃，前端对接无需此参数",
     )
     parser.add_argument(
         "--host",
@@ -53,12 +56,19 @@ def main():
     args = parser.parse_args()
 
     if args.external:
+        import warnings
+        warnings.warn(
+            "--external 参数已弃用：外部系统接入方案已废弃，后端默认直接对接前端。",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         print("=" * 60)
-        print("  外部系统模式已启用")
+        print("  [已弃用] 外部系统模式已启用")
         print(f"  PLC:      192.168.100.123:8001")
         print(f"  网络屏:    192.168.100.121:8888")
         print(f"  信号屏:    192.168.100.122:9999")
         print(f"  UDP 总控: 192.168.200.110:23001 → 192.168.200.102:23002")
+        print("  注意: 此模式已弃用，请使用默认模式（无 --external）对接前端")
         print("=" * 60)
     else:
         print("常规模式 — 仅提供 REST API + WebSocket 对接前端")

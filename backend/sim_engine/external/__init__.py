@@ -1,9 +1,14 @@
-"""外部系统通信层（PLC / 网络屏 / 信号屏 / 总控节点 UDP）。
+"""
+外部系统通信层（PLC / 网络屏 / 信号屏 / 总控节点 UDP）。
 
-提供与真实司机台 PLC、网络屏（HMI）、信号屏（MMI）以及总控数据库节点
-的 TCP/UDP 通信能力，将外部输入注入仿真引擎，并将引擎状态输出到外设。
+**已弃用** — 外部系统接入方案已废弃，后端默认直接对接前端。
+保留此包仅作参考，不再维护。
 
-用法:
+功能:
+  提供与真实司机台 PLC、网络屏（HMI）、信号屏（MMI）以及总控数据库节点
+  的 TCP/UDP 通信能力，将外部输入注入仿真引擎，并将引擎状态输出到外设。
+
+用法（仅作历史参考）:
     from sim_engine.external.bridge import ExternalBridge
     bridge = ExternalBridge(use_real_hardware=False)
     bridge.start_all()

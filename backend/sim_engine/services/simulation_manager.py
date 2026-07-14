@@ -21,8 +21,9 @@ from sim_engine.vehicle.models import TractionCurvePoint
 from sim_engine.ws.manager import WebSocketConnectionManager
 
 # 外部系统桥接 — 仅在 external_mode 时导入
+# DEPRECATED: 外部系统接入方案已废弃
 try:
-    from sim_engine.external.bridge import ExternalBridge  # type: ignore
+    from sim_engine.external.bridge import ExternalBridge  # type: ignore  # noqa: F401
     _HAS_EXTERNAL = True
 except ImportError:
     _HAS_EXTERNAL = False
@@ -33,7 +34,7 @@ class SimulationManager:
 
     Args:
         ws_manager: WebSocket 连接管理器。
-        external_mode: 是否启用外部系统桥接（PLC/网络屏/信号屏）。
+        external_mode: [已弃用] 是否启用外部系统桥接 — 外部系统接入方案已废弃。
     """
 
     def __init__(self, ws_manager: WebSocketConnectionManager, external_mode: bool = False) -> None:
@@ -48,14 +49,15 @@ class SimulationManager:
         self._peak_power: float = 0.0  # kW
 
         # 外部系统桥接器（仅在 external_mode 时创建）
+        # DEPRECATED: 外部系统接入方案已废弃
         self.external_bridge: ExternalBridge | None = None
         if self.external_mode and _HAS_EXTERNAL:
             self._init_external_bridge()
 
-    # ==================== 外部系统桥接 ====================
+    # ==================== 外部系统桥接（已弃用） ====================
 
     def _init_external_bridge(self) -> None:
-        """初始化外部系统桥接器（连接 PLC/网络屏/信号屏）。"""
+        """[已弃用] 初始化外部系统桥接器 — 外部系统接入方案已废弃。"""
         if not _HAS_EXTERNAL:
             print("警告: 外部系统模块不可用，请检查 sim_engine.external")
             return
@@ -88,9 +90,9 @@ class SimulationManager:
         self._peak_power = 0.0
 
     def _apply_external_input(self) -> None:
-        """从外部系统读取 PLC 输入，注入仿真引擎。
+        """[已弃用] 从外部系统读取 PLC 输入，注入仿真引擎。
 
-        在 external_mode 下每步调用一次。
+        外部系统接入方案已废弃，此方法保留仅作兼容。
         """
         if self.external_bridge is None:
             return
@@ -117,9 +119,9 @@ class SimulationManager:
         #     orch.trains[0].manual_driver.set_brake(...)
 
     def _apply_external_output(self, snapshot: dict) -> None:
-        """将仿真状态输出到外部系统。
+        """[已弃用] 将仿真状态输出到外部系统。
 
-        在 external_mode 下每步调用一次。
+        外部系统接入方案已废弃，此方法保留仅作兼容。
         """
         if self.external_bridge is None:
             return
@@ -553,7 +555,7 @@ class SimulationManager:
             if snapshot:
                 self._update_tracking(snapshot)
 
-                # 外部系统模式：输入 → 仿真 → 输出
+                # 外部系统模式：输入 → 仿真 → 输出（DEPRECATED）
                 if self.external_mode:
                     self._apply_external_input()
                     self._apply_external_output(snapshot)

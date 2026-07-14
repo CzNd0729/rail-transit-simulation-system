@@ -88,12 +88,12 @@ class SignalConfig:
 
 @dataclass
 class ExternalInterfaceConfig:
-    """外部系统接口配置。"""
+    """[已弃用] 外部系统接口配置 — 外部系统接入方案已废弃。"""
 
     enabled: bool = False
-    """是否启用外部接口（迭代一默认关闭）。"""
+    """是否启用外部接口（已弃用）。"""
     use_real_hardware: bool = False
-    """True=连接真实硬件, False=使用内置模拟数据。"""
+    """True=连接真实硬件, False=使用内置模拟数据（已弃用）。"""
 
     plc_device_ip: str = "192.168.100.123"
     plc_deploy_ip: str = "192.168.200.102"
@@ -134,7 +134,7 @@ class SimulationParams:
     pid: PidParams = field(default_factory=PidParams)
     power: PowerConfig = field(default_factory=PowerConfig)
     signal: SignalConfig = field(default_factory=SignalConfig)
-    external: ExternalInterfaceConfig = field(default_factory=ExternalInterfaceConfig)
+    external: ExternalInterfaceConfig = field(default_factory=ExternalInterfaceConfig)  # DEPRECATED
 
     def total_train_count(self) -> int:
         """编排器应创建的列车总数。"""
@@ -260,7 +260,7 @@ def load_simulation_params(path: str | Path) -> SimulationParams:
     power = load_power_params(config_dir)
     signal = load_signal_params(config_dir)
 
-    # 加载外部接口配置
+    # 加载外部接口配置（DEPRECATED）
     ext = data.get("external_interface", {}) or {}
     external = ExternalInterfaceConfig(
         enabled=bool(ext.get("enabled", False)),
@@ -295,5 +295,5 @@ def load_simulation_params(path: str | Path) -> SimulationParams:
         pid=pid,
         power=power,
         signal=signal,
-        external=external,
+        external=external,  # DEPRECATED
     )
