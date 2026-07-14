@@ -71,6 +71,7 @@ class DispatchOrigin:
     first_departure_s: float = 0.0
     headway_s: float = 150.0
     headway_pattern_s: tuple[float, ...] = ()
+    buffer_capacity: int = 1
 
 
 @dataclass(frozen=True)
@@ -104,3 +105,16 @@ class TimetableDeviation:
     delay_arrival: float
     nominal_dwell: float
     adjusted_dwell: float
+
+
+@dataclass
+class BufferSlot:
+    """存车线中的一列车。"""
+
+    vehicle_id: str
+    previous_train_id: str
+    total_trips: int = 0
+    total_mileage: float = 0.0
+    passenger_load: float = 0.6
+    state: object = None
+    arrival_time: float = 0.0

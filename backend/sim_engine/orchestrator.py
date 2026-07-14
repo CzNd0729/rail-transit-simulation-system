@@ -88,6 +88,9 @@ class TrainRun:
     legs: list[Timetable] = field(default_factory=list)
     leg_index: int = 0
     turnback_state: str | None = None
+    vehicle_id: str = ""
+    total_trips: int = 0
+    total_mileage: float = 0.0
 
 
 @dataclass

@@ -51,3 +51,47 @@ simulation:
     assert params.signal.atp.safety_distance == 300.0
     assert params.signal.ats.dwell_adjust_mode == "extend"
     assert params.signal.following_min_interval == 500.0
+
+
+# ── 存车线缓冲区数据模型测试 ──
+from sim_engine.signaling.models import BufferSlot, DispatchOrigin
+
+
+def test_buffer_slot_defaults():
+    slot = BufferSlot(
+        vehicle_id="VEH_001",
+        previous_train_id="D01",
+        total_trips=1,
+        total_mileage=5000.0,
+        passenger_load=0.6,
+        state=None,
+        arrival_time=2000.0,
+    )
+    assert slot.vehicle_id == "VEH_001"
+    assert slot.total_trips == 1
+    assert slot.total_mileage == 5000.0
+
+
+def test_dispatch_origin_buffer_capacity():
+    origin = DispatchOrigin(
+        origin_station="ST01",
+        origin_chainage=0.0,
+        initial_direction="down",
+        trip_leg_names=("down", "up"),
+    )
+    assert origin.buffer_capacity == 1
+
+
+def test_train_run_vehicle_id():
+    from sim_engine.orchestrator import TrainRun
+
+    run = TrainRun(
+        train_id="D01",
+        state=None,
+        signaling=None,
+        ats=None,
+        manual_driver=None,
+    )
+    assert run.vehicle_id == ""
+    assert run.total_trips == 0
+    assert run.total_mileage == 0.0
