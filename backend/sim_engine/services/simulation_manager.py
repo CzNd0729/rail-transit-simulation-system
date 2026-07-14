@@ -188,6 +188,10 @@ class SimulationManager:
         与 pause 不同——pause 冻结当前进度；stop 结束后时钟/位置回到起点，
         便于用户查看运行摘要后再次从 A 站启动。
         """
+        # 外部系统模式：打印最终汇总
+        if self.external_mode and self.external_bridge:
+            self.external_bridge.log_final_summary()
+
         self.stop_loop()
         orch = self.orchestrator
         summary = orch.recorder.summary()
@@ -557,6 +561,8 @@ class SimulationManager:
                 if self.external_mode:
                     self._apply_external_input()
                     self._apply_external_output(snapshot)
+                    if self.external_bridge:
+                        self.external_bridge.log_status_summary(snapshot)
 
                 # 广播快照
                 await self.ws_manager.broadcast(snapshot)
@@ -569,6 +575,14 @@ class SimulationManager:
                         "reason": "running",
                     },
                 })
+
+            # 外部模式：不自动退出，持续运行直到外部调用 stop()
+            if self.external_mode:
+                dt = orch.clock.time_step
+                mult = orch.sim_params.speed_multiplier
+                await asyncio.sleep(dt / mult)
+                continue
+
             # 终点停稳判断
             line_end = (
                 not self._is_continuous_dispatch(orch)
@@ -586,7 +600,9 @@ class SimulationManager:
             else:
                 should_complete = self._all_trains_finished(orch) or line_end
             if should_complete:
-                # 先记录结束时刻的摘要，保存最终 snapshot/summary
+                # 外部系统模式：打印最终汇总
+                if self.external_mode and self.external_bridge:
+                    self.external_bridge.log_final_summary()
                 self._last_summary = orch.recorder.summary()
                 if snapshot:
                     self._last_snapshot = snapshot

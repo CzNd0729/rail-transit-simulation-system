@@ -95,6 +95,58 @@ class ExternalBridge:
         # 运行状态
         self.running = False
 
+        # 简易日志：上次打日志的时间
+        self._last_log_time = 0.0
+        self.log_interval = 5.0  # 每 5s wall-clock 打印一行状态
+
+    # ── 简易日志 ────────────────────────────────────────
+
+    def log_status_summary(self, snapshot: dict) -> None:
+        """每 5s wall-clock 打印一条简易状态日志（连接状态 + 运行数据）。"""
+        now = time.time()
+        if now - self._last_log_time < self.log_interval:
+            return
+        self._last_log_time = now
+
+        hw = "硬件" if self.use_real_hardware else "模拟"
+        parts = [f"[外部 {hw}]"]
+
+        # 连接状态
+        if self.plc:
+            parts.append(f"PLC {'✓' if self.plc.connected else '✗'}({self.plc.send_count}/{self.plc.recv_count})")
+        if self.hmi:
+            parts.append(f"网络屏 {'✓' if self.hmi.connected else '✗'}({self.hmi.send_count})")
+        if self.mmi:
+            parts.append(f"信号屏 {'✓' if self.mmi.connected else '✗'}({self.mmi.send_count})")
+        if self.udp:
+            parts.append(f"UDP {'✓' if self.udp.is_connected() else '✗'}(↑{self.udp.send_count} ↓{self.udp.recv_count})")
+
+        # 运行数据（首列车）
+        train = self._extract_lead_train(snapshot)
+        if train:
+            state = train.get("state", {})
+            speed_kmh = state.get("speed", 0) * 3.6
+            pos = state.get("position", 0)
+            mode = state.get("mode", "?")
+            parts.append(f" 车速={speed_kmh:.0f}km/h  位置={pos:.0f}m  模式={mode}")
+
+        print("  ".join(parts))
+
+    def log_final_summary(self) -> None:
+        """仿真结束时打印最终汇总。"""
+        print("-" * 50)
+        print("  外部系统通信汇总")
+        print("-" * 50)
+        if self.plc:
+            print(f"  PLC:      连接={self.plc.connected}, 发送={self.plc.send_count}, 接收={self.plc.recv_count}")
+        if self.hmi:
+            print(f"  网络屏:   连接={self.hmi.connected}, 发送={self.hmi.send_count}")
+        if self.mmi:
+            print(f"  信号屏:   连接={self.mmi.connected}, 发送={self.mmi.send_count}")
+        if self.udp:
+            print(f"  UDP:      运行中={self.udp.is_connected()}, 发送={self.udp.send_count}, 接收={self.udp.recv_count}")
+        print("-" * 50)
+
     # ── 启动/停止 ──────────────────────────────────────
 
     def start_all(self) -> dict:
@@ -194,6 +246,8 @@ class ExternalBridge:
         trains_udp = self._build_udp_trains(snapshot)
         self.udp.update_trains(trains_udp)
         result["udp"] = True
+
+        # 5. 每 5s 打印一条简易状态日志
 
         return result
 

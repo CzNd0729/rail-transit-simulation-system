@@ -117,6 +117,11 @@ class Orchestrator:
     # external_bridge: ExternalBridge | None = None
 
     @property
+    def is_external_mode(self) -> bool:
+        """是否为外部系统模式（由外部系统控车，不自作主张发车）。"""
+        return self.sim_params.external.enabled
+
+    @property
     def train_state(self) -> TrainState | None:
         return self.trains[0].state if self.trains else None
 
@@ -207,16 +212,19 @@ class Orchestrator:
             _timetable_path=config_dir / "timetable.yaml",
             # external_bridge=external_bridge,
         )
-        station_chainages = {s.id: s.chainage for s in track.track.stations}
-        orch._service_timetable = load_service_timetable(
-            orch._timetable_path, station_chainages
-        )
-        if orch._is_continuous():
-            orch._fleet_scheduler = FleetScheduler(
-                orch._service_timetable, station_chainages
+
+        # 外部模式：不加载时刻表，不自作主张发车，等外部系统通过信号系统加车
+        if not orch.is_external_mode:
+            station_chainages = {s.id: s.chainage for s in track.track.stations}
+            orch._service_timetable = load_service_timetable(
+                orch._timetable_path, station_chainages
             )
-            orch._turnback = TurnbackController(orch._service_timetable)
-        orch._init_trains()
+            if orch._is_continuous():
+                orch._fleet_scheduler = FleetScheduler(
+                    orch._service_timetable, station_chainages
+                )
+                orch._turnback = TurnbackController(orch._service_timetable)
+            orch._init_trains()
         return orch
 
     def _is_continuous(self) -> bool:
@@ -359,11 +367,16 @@ class Orchestrator:
             sw.state = "normal"
             sw.transition_elapsed = 0.0
             sw._target_state = "normal"
-        self._init_trains(passenger_load=passenger_load)
+        if not self.is_external_mode:
+            self._init_trains(passenger_load=passenger_load)
         self.run_state = RunState.IDLE
         self.last_snapshot = None
 
     def start(self, passenger_load: float = 0.6) -> None:
+        if self.is_external_mode:
+            # 外部模式：不清空现有列车，直接启动
+            self.run_state = RunState.RUNNING
+            return
         if not self.trains and not self._is_continuous():
             self.reset(passenger_load)
         elif self._is_continuous() and self.run_state == RunState.IDLE:
@@ -481,27 +494,30 @@ class Orchestrator:
 
     def step_once(self) -> dict | None:
         """推进一个仿真步（ENG-06 单步调试）。暂停/空闲时也可强制调用。"""
-        if self._service_timetable is None:
-            station_chainages = {
-                s.id: s.chainage for s in self.track.track.stations
-            }
-            self._service_timetable = load_service_timetable(
-                self._timetable_path, station_chainages
-            )
-            if self._is_continuous():
-                self._fleet_scheduler = FleetScheduler(
-                    self._service_timetable, station_chainages
+        # 外部模式：不自动派车/发车，由外部系统通过信号系统加车
+        if not self.is_external_mode:
+            if self._service_timetable is None:
+                station_chainages = {
+                    s.id: s.chainage for s in self.track.track.stations
+                }
+                self._service_timetable = load_service_timetable(
+                    self._timetable_path, station_chainages
                 )
-                self._turnback = TurnbackController(self._service_timetable)
+                if self._is_continuous():
+                    self._fleet_scheduler = FleetScheduler(
+                        self._service_timetable, station_chainages
+                    )
+                    self._turnback = TurnbackController(self._service_timetable)
 
         dt = self.clock.time_step
         elapsed = self.clock.elapsed
-        if self._is_continuous():
-            self._tick_continuous_dispatch(elapsed)
-        else:
-            if not self.trains:
-                self._init_trains_fixed(self._passenger_load)
-            self._spawn_trains(elapsed)
+        if not self.is_external_mode:
+            if self._is_continuous():
+                self._tick_continuous_dispatch(elapsed)
+            else:
+                if not self.trains:
+                    self._init_trains_fixed(self._passenger_load)
+                self._spawn_trains(elapsed)
 
         active_runs = [r for r in self.trains if r.active]
         if not active_runs:
@@ -681,7 +697,18 @@ class Orchestrator:
         return snapshot
 
     def run_until(self, max_steps: int | None = None) -> dict:
-        """运行仿真直到结束、停止或达到步数上限。"""
+        """运行仿真直到结束、停止或达到步数上限。
+
+        外部模式：不自动退出，持续运行直到外部调用 stop()。
+        """
+        if self.is_external_mode:
+            # 外部模式：持续运行不停车，由外部系统（信号系统/司机）决定何时加车、折返
+            if self.run_state == RunState.IDLE:
+                self.start()
+            while self.run_state == RunState.RUNNING:
+                self.step_once()
+            return {"status": "external_stopped", "steps": 0}
+
         if self.run_state == RunState.IDLE:
             self.start()
         steps = 0
