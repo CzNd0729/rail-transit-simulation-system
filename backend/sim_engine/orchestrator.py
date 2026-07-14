@@ -535,15 +535,6 @@ class Orchestrator:
                 self._init_trains_fixed(self._passenger_load)
             self._spawn_trains(elapsed)
 
-        # ── 列车到达终点→存入存车线 ──
-        if self._fleet_scheduler is not None:
-            for run in self.trains:
-                if not run.active:
-                    continue
-                if self._at_terminal(run):
-                    run.active = False
-                    self._fleet_scheduler.receive_train(run)
-
         active_runs = [r for r in self.trains if r.active]
         if not active_runs:
             self.clock.tick()
@@ -577,6 +568,15 @@ class Orchestrator:
                 )
 
         self.clock.tick()
+
+        # ── 列车到达终点→存入存车线（步进后检测） ──
+        if self._fleet_scheduler is not None:
+            for run in self.trains:
+                if not run.active:
+                    continue
+                if self._at_terminal(run):
+                    run.active = False
+                    self._fleet_scheduler.receive_train(run)
 
         leading = max(
             (r for r in active_runs if r.last_step is not None),

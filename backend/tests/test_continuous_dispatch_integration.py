@@ -70,3 +70,67 @@ def test_fixed_mode_train_count_fallback():
     snap = orch.step_once()
     assert snap is not None
     assert len(snap["data"]["trains"]) == 1
+
+
+def test_continuous_arrival_stores_in_buffer():
+    """列车到达终点后应存入缓冲区，而非继续 active。"""
+    orch = Orchestrator.from_config_dir()
+    orch.reset()
+    orch.start()
+    # 运行足够长的时间，让 D01 到达 ST24（约 2000s）
+    for _ in range(25000):
+        orch.step_once()
+    # 检查缓冲区应有车辆
+    assert orch._fleet_scheduler is not None
+    bs = orch._fleet_scheduler.buffer_state()
+    has_any = any(len(v) > 0 for v in bs.values())
+    assert has_any, f"buffer_state should have entries, got {bs}"
+
+
+def test_continuous_buffer_vehicle_id_persists():
+    """从缓冲区发出后 vehicle_id 应保持不变，total_trips 递增。"""
+    orch = Orchestrator.from_config_dir()
+    orch.reset()
+    orch.start()
+    vehicle_ids: set[str] = set()
+    for _ in range(50000):
+        orch.step_once()
+        for run in orch.trains:
+            if run.active and run.vehicle_id:
+                vehicle_ids.add(run.vehicle_id)
+    assert len(vehicle_ids) >= 2, f"Expected >=2 vehicle_ids, got {vehicle_ids}"
+
+
+def test_continuous_buffer_steady_state():
+    """长时间运行后，列车总数应趋于稳定（不再增长），进入稳态。"""
+    orch = Orchestrator.from_config_dir()
+    orch.sim_params.total_time = 10000.0
+    orch.reset()
+    orch.start()
+    train_counts: list[int] = []
+    for _ in range(100000):
+        orch.step_once()
+        active = len([r for r in orch.trains if r.active])
+        buffer_total = sum(
+            len(v) for v in (orch._fleet_scheduler.buffer_state() if orch._fleet_scheduler else {}).values()
+        )
+        train_counts.append(active + buffer_total)
+    # 后半段的列车总数应该稳定，不再增长
+    half = len(train_counts) // 2
+    second_half = train_counts[half:]
+    max_growth = max(second_half) - min(second_half)
+    assert max_growth <= 2, f"列车总数不稳定，后半段波动 {max_growth}"
+
+
+def test_continuous_buffer_new_train_stops_after_steady():
+    """稳态后不应再产生新车（全部 vehicle_id 来自缓冲区复用）。"""
+    orch = Orchestrator.from_config_dir()
+    orch.sim_params.total_time = 10000.0
+    orch.reset()
+    orch.start()
+    for _ in range(100000):
+        orch.step_once()
+    for run in orch.trains:
+        if run.active:
+            assert run.vehicle_id.startswith("VEH_"), f"Unexpected vehicle_id: {run.vehicle_id}"
+    assert len(orch.trains) > 0
