@@ -131,22 +131,51 @@ async def save_scenario(body: dict) -> dict:
     # 收集运行统计
     stats = sim.get_run_stats()
 
+    # 确定评估时长
+    if sim._evaluation_snapshot is not None:
+        eval_duration = sim._evaluation_snapshot["elapsed"]
+        eval_summary = sim._evaluation_snapshot["summary"]
+        eval_tracking = sim._evaluation_snapshot["tracking"]
+    else:
+        eval_duration = summary.get("total_time", 0.0) if summary else 0.0
+        eval_summary = summary
+        eval_tracking = stats
+
     # 提取结果指标
     power_data = sn.get("data", {}).get("power", {}) if sn else {}
     traction_energy = power_data.get("totalConsumption", 0.0)  # kWh
     regen_energy = power_data.get("totalRegeneration", 0.0)  # kWh
     net_energy = round(traction_energy - regen_energy, 4)
 
+    # 计算再生利用率（除零保护）
+    regen_rate = 0.0
+    if traction_energy > 0:
+        regen_rate = round((regen_energy / traction_energy) * 100, 2)
+
+    # 提取舒适度/安全/准点指标
+    max_jerk = eval_tracking.get("maxJerk", 0.0)
+    avg_jerk = eval_tracking.get("avgJerk", 0.0)
+    max_accel = eval_tracking.get("maxAccel", 0.0)
+    eb_count = eval_tracking.get("ebCount", 0)
+    total_delay = eval_tracking.get("totalDelay", 0.0)
+
     result = {
-        "totalTime": round(summary.get("total_time", 0.0), 2),
-        "totalDistance": round(summary.get("max_position", 0.0), 2),
-        "avgSpeed": round(summary.get("avg_speed", 0.0), 2),
-        "maxSpeed": round(summary.get("max_speed", 0.0), 2),
+        "totalTime": round(eval_duration, 2),
+        "totalDistance": round(eval_summary.get("max_position", 0.0), 2) if eval_summary else 0.0,
+        "avgSpeed": round(eval_summary.get("avg_speed", 0.0), 2) if eval_summary else 0.0,
+        "maxSpeed": round(eval_summary.get("max_speed", 0.0), 2) if eval_summary else 0.0,
         "tractionEnergy": round(traction_energy, 4),
         "regenEnergy": round(regen_energy, 4),
         "netEnergy": net_energy,
-        "minVoltage": round(stats["minVoltage"], 2),
-        "peakPower": round(stats["peakPower"], 2),
+        "minVoltage": round(stats.get("minVoltage", 1500.0), 2),
+        "peakPower": round(stats.get("peakPower", 0.0), 2),
+        "maxJerk": round(max_jerk, 4),
+        "avgJerk": round(avg_jerk, 4),
+        "maxAccel": round(max_accel, 4),
+        "regenRate": regen_rate,
+        "ebCount": eb_count,
+        "totalDelay": round(total_delay, 2),
+        "evaluationDuration": round(eval_duration, 2),
     }
 
     # 组装方案
