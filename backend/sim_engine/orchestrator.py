@@ -34,6 +34,9 @@ from sim_engine.vehicle.config import load_vehicle_params
 from sim_engine.vehicle.dynamics import VehicleSystem, effective_speed_limit_kmh
 from sim_engine.vehicle.models import ControlCommands, StepResult, TrainState
 
+# TODO: 迭代二 — 启用外部系统桥接
+# from sim_engine.external.bridge import ExternalBridge
+
 CONFIG_DIR = Path(__file__).resolve().parent / "config"
 
 
@@ -110,6 +113,9 @@ class Orchestrator:
     last_snapshot: dict | None = None
     _on_snapshot: Callable[[dict], None] | None = None
 
+    # TODO: 迭代二 — 外部系统桥接
+    # external_bridge: ExternalBridge | None = None
+
     @property
     def train_state(self) -> TrainState | None:
         return self.trains[0].state if self.trains else None
@@ -174,6 +180,21 @@ class Orchestrator:
             rail_resistance=sim_params.power.rail_resistance,
         )
 
+        # TODO: 迭代二 — 启用外部系统桥接
+        # external_bridge = None
+        # if sim_params.external.enabled:
+        #     from sim_engine.external.bridge import ExternalBridge
+        #     external_bridge = ExternalBridge(
+        #         plc_host=sim_params.external.plc_device_ip,
+        #         plc_port=sim_params.external.plc_port,
+        #         hmi_host=sim_params.external.network_screen_device_ip,
+        #         hmi_port=sim_params.external.network_screen_port,
+        #         mmi_host=sim_params.external.signal_screen_device_ip,
+        #         mmi_port=sim_params.external.signal_screen_port,
+        #         use_real_hardware=sim_params.external.use_real_hardware,
+        #     )
+        #     external_bridge.start_all()
+
         orch = cls(
             vehicle=vehicle,
             track=track,
@@ -184,6 +205,7 @@ class Orchestrator:
             occupancy=occupancy,
             switch_manager=switch_manager,
             _timetable_path=config_dir / "timetable.yaml",
+            # external_bridge=external_bridge,
         )
         station_chainages = {s.id: s.chainage for s in track.track.stations}
         orch._service_timetable = load_service_timetable(
@@ -651,6 +673,11 @@ class Orchestrator:
         self.last_snapshot = snapshot
         if self._on_snapshot:
             self._on_snapshot(snapshot)
+
+        # TODO: 迭代二 — 外部系统输出
+        # if self.external_bridge is not None:
+        #     self.external_bridge.update_from_engine(snapshot, self.sim_params)
+
         return snapshot
 
     def run_until(self, max_steps: int | None = None) -> dict:
