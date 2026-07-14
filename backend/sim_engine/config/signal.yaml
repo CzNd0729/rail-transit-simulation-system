@@ -7,5 +7,6 @@ signal:
     dwell_adjust_mode: recover      # 赶点：晚点缩短 / 早点等到发车点
     min_dwell_time: 15              # 最小停站时间 (s)
     max_dwell_time: 300             # 最大停站时间 (s)
+    early_hold_margin: 30           # 早点 hold 上限相对 nominal 的裕度 (s)
   following:
     min_interval: 500               # 最小追踪间隔 (m)

@@ -413,6 +413,26 @@ def test_dwell_transition_to_traction_after_expiry():
     assert ctrl.signal_state.dwell_remaining == 0.0
 
 
+def test_upbound_does_not_reenter_dwell_same_station_after_exit():
+    """上行停在站心略大侧且本站已站停完成后，不得再次进入同站 DWELL。"""
+    ctrl = ThreeStageController(
+        _make_track_three_stations(), _make_vehicle_params(), _make_sim_params()
+    )
+    # 站停刚结束：仍在 ST02 站心略大侧（上行未越过中心）
+    ctrl._state = TrainSignalState(
+        phase=Phase.TRACTION,
+        dwell_remaining=0.0,
+        _dwell_station_id="ST02",
+    )
+    train = _make_train(position=1000.1, speed=0.0)
+    train.direction = "up"
+    cmd = ctrl.compute_commands(train, dt=0.1)
+    assert ctrl.signal_state.phase != Phase.DWELL
+    assert ctrl.signal_state._dwell_station_id == "ST02"
+    assert ctrl.signal_state.target_station_id == "ST01"
+    assert cmd.phase != "dwell"
+
+
 @pytest.fixture
 def make_ctrl_with_ats():
     def _factory(planned_arrival: float = 100.0):

@@ -208,6 +208,17 @@ class ThreeStageController:
 
         target = self.track.next_station_ahead(train.position, train.direction)
 
+        # 本站站停已结束后，若仍未越过站中心，next_station_ahead 会再次返回本站
+        # （典型：上行停在站心略大侧）。推进目标到下一站，避免同站反复进 DWELL。
+        if target is not None and target.id == st._dwell_station_id:
+            eps = 1e-3
+            beyond = (
+                target.chainage - eps
+                if train.direction == "up"
+                else target.chainage + eps
+            )
+            target = self.track.next_station_ahead(beyond, train.direction)
+
         # 制动阶段锁定目标站：进入 BRAKING 时保存的目标站 ID，
         # 防止越过站台后 next_station_ahead 切换为下一站导致前馈制动归零
         if st.phase == Phase.BRAKING and st._brake_target_id:
