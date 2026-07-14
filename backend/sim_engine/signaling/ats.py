@@ -1,4 +1,4 @@
-"""ATS 运行图调度（SIG-06 策略 B：延长站停）。"""
+"""ATS 运行图调度（SIG-06：recover 赶点 / extend 兼容）。"""
 
 from __future__ import annotations
 
@@ -23,7 +23,17 @@ class ATSController:
             return nominal_dwell, None
 
         delay = actual_arrival - planned
-        if self._config.dwell_adjust_mode == "extend":
+        mode = self._config.dwell_adjust_mode
+        if mode == "recover":
+            if delay > 0:
+                adjusted = nominal_dwell - delay
+            else:
+                planned_dep = self._timetable.planned_departure(station_id)
+                if planned_dep is not None:
+                    adjusted = max(nominal_dwell, planned_dep - actual_arrival)
+                else:
+                    adjusted = nominal_dwell - delay
+        elif mode == "extend":
             adjusted = nominal_dwell + max(0.0, delay)
         else:
             adjusted = nominal_dwell

@@ -36,6 +36,12 @@ class Timetable:
                 return e.planned_arrival
         return None
 
+    def planned_departure(self, station_id: str) -> float | None:
+        for e in self.entries:
+            if e.station_id == station_id:
+                return e.planned_departure
+        return None
+
     def with_absolute_times(self, base_elapsed: float) -> Timetable:
         """将 leg 内相对时刻平移为仿真绝对时刻。"""
         return Timetable(
