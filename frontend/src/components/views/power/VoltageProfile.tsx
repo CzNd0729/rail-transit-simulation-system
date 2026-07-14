@@ -2,14 +2,16 @@
  * VoltageProfile — 接触网电压分布图（每车独立图表，纵向堆叠）
  * 基于《需求文档》UI-PWR-01
  * 各列车独立网压曲线 + 变电所标记，选中列车置顶
+ *
+ * 核心设计：电压-位置数据是历史记录，列车经过某位置后不再变化，
+ * 因此每帧只追加新数据，不重绘旧数据，彻底消除抖动。
  */
 import ReactECharts from 'echarts-for-react';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useSimulationState } from '../../../context/SimulationContext';
 import { getTrainChartHistory } from '../../../utils/chartHistory';
 import { trainColorById } from '../../../utils/constants';
 import { axisTooltip } from '../../../utils/format';
-import { downsample } from '../../../utils/downsample';
 import React from 'react';
 
 /** 图例 / 标签用短车号 */
@@ -18,22 +20,22 @@ function shortTrainLabel(trainId: string): string {
   return num ? `#${num}` : trainId;
 }
 
+/** 固定 Y 轴范围，避免每帧数据波动导致轴位移抖动 */
+const Y_RANGE = { yMin: 0, yMax: 2000 };
+
 const VoltageProfile = React.memo(function VoltageProfile() {
   const { power, trains, chartHistory, lineLayout, selectedTrainId, chartVersion } =
     useSimulationState();
   const totalLength = lineLayout?.total_length ?? 3200;
 
-  // 记住当前展示的列车，不随新车发车自动切换
+  // 锚定列车逻辑（不随新车发车自动切换）
   const pinnedTrainRef = useRef<string | null>(null);
-  // 用户手动选车时更新锚定
   if (selectedTrainId && selectedTrainId !== pinnedTrainRef.current) {
     pinnedTrainRef.current = selectedTrainId;
   }
-  // 初始化：无锚定时取首车
   if (!pinnedTrainRef.current && trains.length > 0) {
     pinnedTrainRef.current = trains[0].id;
   }
-  // 锚定车已消失才回退
   const pinnedId = pinnedTrainRef.current;
   const trainExists = pinnedId && trains.some((t) => t.id === pinnedId);
   if (!trainExists && trains.length > 0) {
@@ -44,27 +46,14 @@ const VoltageProfile = React.memo(function VoltageProfile() {
   const selectedTrain = targetId ? trains.find((t) => t.id === targetId) : trains[0];
   const filteredTrains = selectedTrain ? [selectedTrain] : [];
 
-  // Y 轴范围（仅选中列车）
-  const yRange = useMemo(() => {
-    let min = Infinity;
-    let max = -Infinity;
-    for (const train of filteredTrains) {
-      min = Math.min(min, train.pantograph_voltage);
-      max = Math.max(max, train.pantograph_voltage);
-      const vp = getTrainChartHistory(chartHistory, train.id).voltagePosition;
-      for (const p of vp) {
-        if (p[1] < min) min = p[1];
-        if (p[1] > max) max = p[1];
-      }
-    }
-    if (!isFinite(min)) { min = 1500; max = 1500; }
-    return {
-      yMin: Math.floor(Math.min(1000, min - 100) / 100) * 100,
-      yMax: Math.ceil(Math.max(1600, max + 100) / 100) * 100,
-    };
-  }, [filteredTrains, chartHistory]);
+  // ECharts 实例引用
+  const chartRef = useRef<ReactECharts>(null);
+  // 已渲染的历史数据长度（按列车 ID 记录）
+  const renderedLenRef = useRef<Record<string, number>>({});
+  // 上一次的 chartVersion，用于检测是否被重置
+  const prevVersionRef = useRef<number>(chartVersion);
 
-  // 变电所标记（所有子图共享）
+  // 变电所标记（稳定，只在 substations 变化时重建）
   const substationSeries = useMemo(
     () => ({
       name: '变电所',
@@ -87,94 +76,141 @@ const VoltageProfile = React.memo(function VoltageProfile() {
     [power.substations],
   );
 
-  // 生成选中列车的 ECharts option
-  const trainOptions = useMemo(
-    () =>
-      filteredTrains.map((train, idx) => {
-        const color = trainColorById(train.id, train.direction);
-        const vp =
-          getTrainChartHistory(chartHistory, train.id).voltagePosition;
+  // 检测 chartVersion 回退（历史数据被清空重置），重置渲染计数
+  if (chartVersion < prevVersionRef.current) {
+    renderedLenRef.current = {};
+  }
+  prevVersionRef.current = chartVersion;
 
-        const lineSeries = {
-          name: train.id,
-          type: 'line' as const,
-          data: downsample(vp, 500),
-          lineStyle: { color, width: 2 },
-          itemStyle: { color },
-          showSymbol: false,
-          emphasis: { focus: 'series' as const },
-        };
+  // 核心：每帧只追加新数据点，不重绘旧数据
+  useEffect(() => {
+    if (!chartRef.current || !targetId) return;
+    const echartsInstance = chartRef.current.getEchartsInstance();
+    if (!echartsInstance) return;
 
-        const markerSeries = {
-          name: `${train.id}·当前`,
-          type: 'scatter' as const,
-          data: [[train.position, train.pantograph_voltage]],
-          symbol: 'circle',
-          symbolSize: 10,
-          itemStyle: {
-            color,
-            borderColor: '#fff',
-            borderWidth: 1.5,
-            shadowBlur: 6,
-            shadowColor: color,
-          },
-          label: {
-            show: true,
-            formatter: shortTrainLabel(train.id),
-            position: 'top' as const,
-            distance: 8,
-            color,
-            fontSize: 11,
-            fontWeight: 600,
-            backgroundColor: 'rgba(0,0,0,0.55)',
-            padding: [2, 5],
-            borderRadius: 3,
-          },
+    const train = trains.find((t) => t.id === targetId);
+    const color = trainColorById(targetId, train?.direction ?? 'up');
+    const vp = getTrainChartHistory(chartHistory, targetId).voltagePosition;
+    const rendered = renderedLenRef.current[targetId] ?? 0;
+
+    // 历史数据被清空（重置场景），重置图表
+    if (vp.length < rendered) {
+      renderedLenRef.current[targetId] = 0;
+      echartsInstance.clear();
+      // 继续走下方首次渲染逻辑
+    }
+
+    const effectiveRendered = renderedLenRef.current[targetId] ?? 0;
+
+    // 首次渲染：创建完整图表
+    if (effectiveRendered === 0 && vp.length > 0) {
+      renderedLenRef.current[targetId] = vp.length;
+      const currentPos = train ? [[train.position, train.pantograph_voltage]] : [];
+
+      echartsInstance.setOption(
+        {
+          backgroundColor: 'transparent',
+          animation: false,
           tooltip: {
-            formatter: () =>
-              `${train.id}<br/>位置 ${train.position.toFixed(0)} m<br/>网压 ${train.pantograph_voltage.toFixed(0)} V`,
+            trigger: 'axis' as const,
+            formatter: (params: any) => {
+              const formatted = axisTooltip(2)(params);
+              return formatted.replace(/:\s*([\d.]+)$/, ': $1 V');
+            },
           },
-          z: 10,
-        };
-
-        return {
-          option: {
-            backgroundColor: 'transparent',
-            animation: false,
-            tooltip: {
-              trigger: 'axis' as const,
-              formatter: (params: any) => {
-                const formatted = axisTooltip(2)(params);
-                return formatted.replace(/:\s*([\d.]+)$/, ': $1 V');
+          grid: { left: 50, right: 20, top: 28, bottom: 30 },
+          xAxis: {
+            type: 'value' as const,
+            name: '公里标 (m)',
+            min: 0,
+            max: totalLength,
+            nameTextStyle: { color: '#a0a0a0' },
+            axisLabel: { color: '#a0a0a0' },
+            axisLine: { lineStyle: { color: '#2a2a4a' } },
+          },
+          yAxis: {
+            type: 'value' as const,
+            name: '电压 (V)',
+            min: Y_RANGE.yMin,
+            max: Y_RANGE.yMax,
+            nameTextStyle: { color: '#a0a0a0' },
+            axisLabel: { color: '#a0a0a0' },
+            axisLine: { lineStyle: { color: '#2a2a4a' } },
+          },
+          series: [
+            {
+              name: targetId,
+              type: 'line' as const,
+              data: vp.slice(),
+              lineStyle: { color, width: 2 },
+              itemStyle: { color },
+              showSymbol: false,
+              sampling: 'lttb',
+              emphasis: { focus: 'series' as const },
+            },
+            {
+              name: `${targetId}·当前`,
+              type: 'scatter' as const,
+              data: currentPos,
+              symbol: 'circle',
+              symbolSize: 10,
+              itemStyle: {
+                color,
+                borderColor: '#fff',
+                borderWidth: 1.5,
+                shadowBlur: 6,
+                shadowColor: color,
               },
+              label: {
+                show: true,
+                formatter: shortTrainLabel(targetId),
+                position: 'top' as const,
+                distance: 8,
+                color,
+                fontSize: 11,
+                fontWeight: 600,
+                backgroundColor: 'rgba(0,0,0,0.55)',
+                padding: [2, 5],
+                borderRadius: 3,
+              },
+              z: 10,
             },
-            grid: { left: 50, right: 20, top: 28, bottom: 30 },
-            xAxis: {
-              type: 'value' as const,
-              name: '公里标 (m)',
-              min: 0,
-              max: totalLength,
-              nameTextStyle: { color: '#a0a0a0' },
-              axisLabel: { color: '#a0a0a0' },
-              axisLine: { lineStyle: { color: '#2a2a4a' } },
-            },
-            yAxis: {
-              type: 'value' as const,
-              name: '电压 (V)',
-              min: yRange.yMin,
-              max: yRange.yMax,
-              nameTextStyle: { color: '#a0a0a0' },
-              axisLabel: { color: '#a0a0a0' },
-              axisLine: { lineStyle: { color: '#2a2a4a' } },
-            },
-            series: [lineSeries, markerSeries, substationSeries],
-          },
-          train,
-          idx,
-        };
-      }),
-    [filteredTrains, trains, chartHistory, totalLength, yRange, substationSeries, chartVersion],
-  );
+            substationSeries,
+          ],
+        },
+        { notMerge: false },
+      );
+      return;
+    }
+
+    // 追加新数据（增量更新）
+    if (vp.length > effectiveRendered) {
+      renderedLenRef.current[targetId] = vp.length;
+      echartsInstance.setOption(
+        {
+          series: [
+            { data: vp.slice() },
+            { data: train ? [[train.position, train.pantograph_voltage]] : [] },
+          ],
+        },
+        { notMerge: false },
+      );
+      return;
+    }
+
+    // 无新历史数据，仅更新当前标记位置
+    if (train) {
+      echartsInstance.setOption(
+        {
+          series: [
+            {},
+            { data: [[train.position, train.pantograph_voltage]] },
+          ],
+        },
+        { notMerge: false },
+      );
+    }
+  }, [chartVersion, targetId, trains, chartHistory, totalLength, substationSeries]);
 
   if (filteredTrains.length === 0) {
     return (
@@ -198,15 +234,15 @@ const VoltageProfile = React.memo(function VoltageProfile() {
         )}
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
-        {trainOptions.map(({ option, train }) => (
-          <div key={train.id} style={{ height: '100%' }}>
-            <ReactECharts
-              option={option}
-              style={{ height: '100%', width: '100%' }}
-              notMerge={true}
-            />
-          </div>
-        ))}
+        <div key={filteredTrains[0].id} style={{ height: '100%' }}>
+          <ReactECharts
+            ref={chartRef}
+            option={{}}
+            style={{ height: '100%', width: '100%' }}
+            notMerge={false}
+            key={filteredTrains[0].id}
+          />
+        </div>
       </div>
     </div>
   );
