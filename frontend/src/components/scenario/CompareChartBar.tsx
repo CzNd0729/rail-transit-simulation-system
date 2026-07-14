@@ -48,8 +48,8 @@ export default function CompareChartBar({ scenarios }: CompareChartBarProps) {
       top: 0,
     },
     grid: {
-      left: 50,
-      right: 20,
+      left: 55,
+      right: 55,
       top: 30,
       bottom: 50,
     },
@@ -63,23 +63,28 @@ export default function CompareChartBar({ scenarios }: CompareChartBarProps) {
       },
       axisLine: { lineStyle: { color: '#2a2a4a' } },
     },
-    yAxis: (
-      BAR_METRICS.map((m, i) => ({
+    yAxis: [
+      {
         type: 'value' as const,
-        name: `${m.label} (${m.unit})`,
+        name: '净能耗 (kWh) / 平均速度 (km/h)',
         nameTextStyle: { color: '#a0a0a0', fontSize: 10 },
         axisLabel: { color: '#a0a0a0', fontSize: 10 },
         axisLine: { lineStyle: { color: '#2a2a4a' } },
         splitLine: { lineStyle: { color: 'rgba(42, 42, 74, 0.4)' } },
-        // 多 Y 轴分左右
-        position: i % 2 === 0 ? ('left' as const) : ('right' as const),
-        offset: i > 0 ? (Math.floor((i - 1) / 2)) * 55 : 0,
-      }))
-    ),
+      },
+      {
+        type: 'value' as const,
+        name: '总耗时 (s)',
+        nameTextStyle: { color: '#a0a0a0', fontSize: 10 },
+        axisLabel: { color: '#a0a0a0', fontSize: 10 },
+        axisLine: { lineStyle: { color: '#2a2a4a' } },
+        splitLine: { show: false },
+      },
+    ],
     series: BAR_METRICS.map((m, i) => ({
       name: m.label,
       type: 'bar' as const,
-      yAxisIndex: i,
+      yAxisIndex: m.key === 'totalTime' ? 1 : 0,
       data: scenarios.map((s) => {
         const v = (s.result as unknown as Record<string, number>)[m.key];
         return typeof v === 'number' ? Number(v.toFixed(1)) : 0;
