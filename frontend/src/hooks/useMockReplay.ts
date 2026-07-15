@@ -76,12 +76,12 @@ export function useMockReplay() {
               elapsed: snapshot.clock.elapsed,
             },
           });
-          // 自动保存方案：自动方案_YYYY-MM-DD HH:mm
+          // 自动保存方案：自动保存方案_YYYY-MM-DD HH:mm
           const autoId = `scenario_mock_${Date.now()}`;
           const d = new Date();
           const pad = (n: number) => String(n).padStart(2, '0');
           const autoName =
-            `自动方案_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            `自动保存方案_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
           window.dispatchEvent(new CustomEvent('scenario-auto-saved', {
             detail: { id: autoId, name: autoName },
           }));

@@ -640,7 +640,7 @@ class SimulationManager:
                         from sim_engine.api.scenarios import _generate_id, _write_scenario
                         now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                         auto_name = (
-                            f"自动方案_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                            f"自动保存方案_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
                         )
                         auto_id = _generate_id()
                         power_data = snapshot.get("data", {}).get("power", {}) if snapshot else {}
